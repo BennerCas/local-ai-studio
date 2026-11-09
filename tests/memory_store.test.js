@@ -253,4 +253,104 @@ describe("memory-store.js", () => {
     assert.equal(reset.contextAnalyzerPrompt, memoryStore.DEFAULT_CONTEXT_ANALYZER_PROMPT);
     assert.equal(reset.projectOverride, "");
   });
+
+  it("persiste dualConfig con deep-merge aislado por proyecto y sesiones assistant_dual", () => {
+    const defA = memoryStore.getProjectState("AlphaDual").dualConfig;
+    assert.equal(defA.enabled, false);
+    assert.equal(defA.pair, "freeai+directml");
+    assert.equal(defA.agentA.source, "freeai");
+    assert.equal(defA.agentB.source, "directml");
+
+    // Guardar configuración Dual en AlphaDual con campos personalizados
+    const upAlpha = memoryStore.updateProjectState("AlphaDual", {
+      dualConfig: {
+        enabled: true,
+        pair: "freeai+ollama",
+        workflow: "debate",
+        unloadBetweenTurns: false,
+        agentA: {
+          source: "freeai",
+          model: "qwen-2.5-coder",
+          roleLabel: "Planificador",
+          profileId: "SteveJobs",
+          skillId: "backend-architect",
+          customSystemPrompt: "Diseña módulos desacoplados",
+          temperature: 0.4,
+          maxTokens: 3072,
+          numCtx: 8192
+        },
+        agentB: {
+          source: "ollama",
+          model: "qwen2.5-coder:latest",
+          roleLabel: "Auditor",
+          profileId: "ElonMusk",
+          skillId: "code-reviewer",
+          temperature: 0.1,
+          maxTokens: 2048,
+          numCtx: 4096
+        }
+      }
+    });
+
+    assert.equal(upAlpha.dualConfig.enabled, true);
+    assert.equal(upAlpha.dualConfig.pair, "freeai+ollama");
+    assert.equal(upAlpha.dualConfig.workflow, "debate");
+    assert.equal(upAlpha.dualConfig.agentA.profileId, "SteveJobs");
+    assert.equal(upAlpha.dualConfig.agentB.skillId, "code-reviewer");
+
+    // Deep-merge parcial NO debe sobrescribir los campos existentes de agentA ni agentB
+    const mergedAlpha = memoryStore.updateProjectState("AlphaDual", {
+      dualConfig: {
+        agentB: { roleLabel: "Auditor Refinado" }
+      }
+    });
+    assert.equal(mergedAlpha.dualConfig.enabled, true);
+    assert.equal(mergedAlpha.dualConfig.workflow, "debate");
+    assert.equal(mergedAlpha.dualConfig.agentA.profileId, "SteveJobs");
+    assert.equal(mergedAlpha.dualConfig.agentB.skillId, "code-reviewer");
+    assert.equal(mergedAlpha.dualConfig.agentB.roleLabel, "Auditor Refinado");
+
+    // Aislamiento estricto: BetaDual sigue con dual OFF
+    const betaState = memoryStore.getProjectState("BetaDual");
+    assert.equal(betaState.dualConfig.enabled, false);
+    assert.equal(betaState.dualConfig.pair, "freeai+directml");
+
+    // Persistencia completa de chats Dual (mode='dual', dualConfigSummary, role='assistant_dual')
+    const savedDual = memoryStore.saveChat({
+      id: "dual_chat_1",
+      title: "Diseño módulo auth dual",
+      project: "AlphaDual",
+      mode: "dual",
+      dualConfigSummary: {
+        pair: "freeai+ollama",
+        workflow: "debate",
+        agentA: { source: "freeai", model: "qwen-2.5-coder", roleLabel: "Planificador" },
+        agentB: { source: "ollama", model: "qwen2.5-coder:latest", roleLabel: "Auditor Refinado" }
+      },
+      messages: [
+        { role: "user", content: "Implementa src/auth.js" },
+        {
+          role: "assistant_dual",
+          content: "[Agente A ...]\n[Agente B ...]",
+          dual: {
+            pair: "freeai+ollama",
+            workflow: "debate",
+            notices: ["Aviso de prueba"],
+            agentA: { source: "freeai", model: "qwen-2.5-coder", roleLabel: "Planificador", stage: 3, stageLabel: "Consolida", text: "Código final" },
+            agentB: { source: "ollama", model: "qwen2.5-coder:latest", roleLabel: "Auditor", stage: 2, stageLabel: "Crítica", text: "Observaciones" }
+          }
+        }
+      ]
+    });
+
+    assert.equal(savedDual.mode, "dual");
+    assert.equal(savedDual.dualConfigSummary.pair, "freeai+ollama");
+    const listed = memoryStore.listChats({ project: "AlphaDual" });
+    assert.equal(listed[0].mode, "dual");
+    assert.equal(listed[0].dualConfigSummary.workflow, "debate");
+    const loaded = memoryStore.getChat("dual_chat_1");
+    assert.equal(loaded.messages[1].role, "assistant_dual");
+    assert.equal(loaded.messages[1].dual.agentA.stage, 3);
+    assert.equal(loaded.messages[1].dual.notices[0], "Aviso de prueba");
+  });
 });

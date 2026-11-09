@@ -2,7 +2,7 @@ const http = require("node:http");
 const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, execFile } = require("node:child_process");
 
 const envLoader = require("../../env-loader.js");
 envLoader.loadAllEnv();
@@ -13,6 +13,7 @@ const contextAnalyzer = require("../../context-analyzer.js");
 const skillsBridge = require("../../skills-bridge.js");
 const freeai = require("../../freeai-bridge.js");
 const integrations = require("../../integrations-bridge.js");
+const hardwareAdvisor = require("../../hardware-advisor.js");
 
 const DEFAULT_PORT = 63719;
 const DEFAULT_OLLAMA_HOST = "127.0.0.1";
@@ -23,6 +24,7 @@ const DIRECTML_SCRIPT = "C:\\antigravityAS\\Modelos -ai-brains\\api_openai.py";
 const PRELOAD_PATH = "C:\\Users\\Benner\\.gemini\\antigravity\\lib\\node_modules\\sidecar_sdk\\preload.js";
 const HTML_FILE_PATH = path.join(__dirname, "ui.html");
 const ASSETS_DIR = path.join(__dirname, "assets");
+const TRAY_ICO_PATH = path.resolve(__dirname, "..", "..", "tray_icon.ico");
 const ASSET_MIME_TYPES = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
@@ -367,14 +369,63 @@ function buildFallbackEnterContextReport(enterPayload, offlineReason = null) {
   return lines.join("\n");
 }
 
+function pickDefaultModelForSource(catalog, source) {
+  const norm = hardwareAdvisor.normalizeEngineSource(source);
+  if (norm === "directml") {
+    const first = (catalog.directmlModels && catalog.directmlModels[0]) || null;
+    return (first && (first.name || first.id)) || "Phi-3.5-mini-instruct-ONNX";
+  }
+  if (norm === "freeai") {
+    const first = (catalog.freeAiModels && catalog.freeAiModels[0]) || null;
+    return (first && (first.name || first.id)) || "freeai:qwen7b";
+  }
+  const firstLocal = (catalog.localModels && catalog.localModels[0]) || null;
+  return (firstLocal && (firstLocal.name || firstLocal.model)) || "";
+}
+
+function flattenHistoryMessagesForDual(rawMessages) {
+  const list = Array.isArray(rawMessages) ? rawMessages : [];
+  const out = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const role = String(raw.role || "user").trim();
+    if (role === "system") continue;
+    if (role === "assistant_dual") {
+      const parts = [];
+      const aData = raw.dual && raw.dual.agentA;
+      const bData = raw.dual && raw.dual.agentB;
+      if (aData && String(aData.text || "").trim()) {
+        const labelA = aData.roleLabel || aData.model || aData.source || "Agente A";
+        parts.push(`[Agente A (${labelA}):\n${String(aData.text).trim()}]`);
+      }
+      if (bData && String(bData.text || "").trim()) {
+        const labelB = bData.roleLabel || bData.model || bData.source || "Agente B";
+        parts.push(`[Agente B (${labelB}):\n${String(bData.text).trim()}]`);
+      }
+      const combined = parts.join("\n\n") || String(raw.content || "");
+      if (combined.trim()) {
+        out.push({ role: "assistant", content: combined });
+      }
+      continue;
+    }
+    const cleanRole = role === "assistant" || role === "user" ? role : "assistant";
+    out.push({ role: cleanRole, content: String(raw.content ?? "") });
+  }
+  return out;
+}
+
 function createStudioServer(options = {}) {
   const config = {
     ollamaHost: options.ollamaHost || process.env.LOCAL_AI_OLLAMA_HOST || DEFAULT_OLLAMA_HOST,
     ollamaPort: Number(options.ollamaPort || process.env.LOCAL_AI_OLLAMA_PORT || DEFAULT_OLLAMA_PORT),
     directmlHost: options.directmlHost || process.env.LOCAL_AI_DIRECTML_HOST || DEFAULT_DIRECTML_HOST,
     directmlPort: Number(options.directmlPort || process.env.LOCAL_AI_DIRECTML_PORT || DEFAULT_DIRECTML_PORT),
-    autoStartDirectML: options.autoStartDirectML !== false
+    autoStartDirectML: options.autoStartDirectML !== false,
+    telemetryOverride: options.telemetryOverride || null,
+    skipWindowsApply: options.skipWindowsApply === true,
+    allowHostProcessControl: options.allowHostProcessControl !== false
   };
+  let activeDirectmlEnv = {};
 
   function checkDirectMLAlive() {
     return new Promise((resolve) => {
@@ -395,7 +446,43 @@ function createStudioServer(options = {}) {
     });
   }
 
-  async function startDirectMLServer() {
+  async function getDirectmlHealth() {
+    const isAlive = await checkDirectMLAlive();
+    if (!isAlive) {
+      return { status: "offline", isAlive: false };
+    }
+    return new Promise((resolve) => {
+      const hReq = http.get({
+        hostname: config.directmlHost,
+        port: config.directmlPort,
+        path: "/health",
+        timeout: 2000
+      }, (hRes) => {
+        let data = "";
+        hRes.on("data", (c) => { data += c; });
+        hRes.on("end", () => {
+          if (hRes.statusCode === 200) {
+            try {
+              const h = JSON.parse(data);
+              resolve({ status: "online", isAlive: true, ...h });
+              return;
+            } catch (_e) {}
+          }
+          resolve({ status: "online", isAlive: true });
+        });
+      });
+      hReq.on("error", () => resolve({ status: "offline", isAlive: false }));
+      hReq.on("timeout", () => {
+        hReq.destroy();
+        resolve({ status: "offline", isAlive: false });
+      });
+    });
+  }
+
+  async function startDirectMLServer(envOverrides = null) {
+    if (envOverrides && typeof envOverrides === "object") {
+      activeDirectmlEnv = { ...activeDirectmlEnv, ...envOverrides };
+    }
     const isAlive = await checkDirectMLAlive();
     if (isAlive) {
       return { ok: true, message: `DirectML ya está activo en http://${config.directmlHost}:${config.directmlPort}` };
@@ -413,7 +500,8 @@ function createStudioServer(options = {}) {
           ...process.env,
           OLIVE_GPU_MEMORY_LIMIT: process.env.OLIVE_GPU_MEMORY_LIMIT || "25",
           OLIVE_CPU_THREADS: process.env.OLIVE_CPU_THREADS || "12",
-          ORT_DML_DEVICE_ID: process.env.ORT_DML_DEVICE_ID || "0"
+          ORT_DML_DEVICE_ID: process.env.ORT_DML_DEVICE_ID || "0",
+          ...activeDirectmlEnv
         }
       });
       child.unref();
@@ -428,6 +516,313 @@ function createStudioServer(options = {}) {
       return { ok: true, message: "DirectML iniciando en segundo plano..." };
     } catch (err) {
       return { ok: false, error: safeErrMsg(err) };
+    }
+  }
+
+  async function stopDirectMLServer() {
+    if (!config.allowHostProcessControl) {
+      const alive = await checkDirectMLAlive();
+      return {
+        ok: true,
+        skippedHostControl: true,
+        stopped: false,
+        isAlive: alive,
+        message: "Control de procesos del host deshabilitado en modo aislado."
+      };
+    }
+
+    if (directMlProcess) {
+      try {
+        directMlProcess.kill("SIGTERM");
+      } catch (_e) {}
+      directMlProcess = null;
+    }
+
+    if (process.platform === "win32") {
+      await new Promise((resolve) => {
+        execFile(
+          "powershell",
+          [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name LIKE 'python%'\" | Where-Object { $_.CommandLine -match 'api_openai\\.py' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+          ],
+          { windowsHide: true, timeout: 5000 },
+          () => resolve()
+        );
+      });
+    }
+
+    let alive = await checkDirectMLAlive();
+    for (let i = 0; i < 6 && alive; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      alive = await checkDirectMLAlive();
+    }
+
+    return {
+      ok: true,
+      stopped: !alive,
+      isAlive: alive,
+      message: alive
+        ? "DirectML sigue respondiendo tras el intento de detención."
+        : "Servidor DirectML detenido y memoria GPU/RAM liberada."
+    };
+  }
+
+  async function restartDirectMLServer(envOverrides = null) {
+    if (envOverrides && typeof envOverrides === "object") {
+      activeDirectmlEnv = { ...activeDirectmlEnv, ...envOverrides };
+    }
+    if (!config.allowHostProcessControl) {
+      return { ok: true, skippedHostControl: true };
+    }
+    const wasAlive = await checkDirectMLAlive();
+    await stopDirectMLServer();
+    if (wasAlive || config.autoStartDirectML) {
+      return startDirectMLServer(activeDirectmlEnv);
+    }
+    return { ok: true, stopped: true, isAlive: false };
+  }
+
+  function getOllamaPs() {
+    return new Promise((resolve) => {
+      const req = http.get({
+        hostname: config.ollamaHost,
+        port: config.ollamaPort,
+        path: "/api/ps",
+        timeout: 2000
+      }, (oRes) => {
+        let data = "";
+        oRes.on("data", (c) => { data += c; });
+        oRes.on("end", () => {
+          if (oRes.statusCode !== 200) {
+            resolve([]);
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            resolve(Array.isArray(parsed.models) ? parsed.models : []);
+          } catch (_e) {
+            resolve([]);
+          }
+        });
+      });
+      req.on("error", () => resolve([]));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve([]);
+      });
+    });
+  }
+
+  function unloadOllamaModel(modelName) {
+    const cleanModel = String(modelName || "").replace(/^ollama:/i, "").trim();
+    if (!cleanModel) {
+      return Promise.resolve({ ok: false, model: "", skipped: true });
+    }
+    return new Promise((resolve) => {
+      const bodyBuf = Buffer.from(JSON.stringify({
+        model: cleanModel,
+        keep_alive: 0,
+        stream: false
+      }), "utf8");
+      const req = http.request({
+        hostname: config.ollamaHost,
+        port: config.ollamaPort,
+        path: "/api/generate",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": bodyBuf.length
+        },
+        timeout: 4000
+      }, (uRes) => {
+        uRes.resume();
+        uRes.on("end", () => {
+          resolve({ ok: uRes.statusCode === 200, model: cleanModel, statusCode: uRes.statusCode });
+        });
+      });
+      req.on("error", () => resolve({ ok: false, model: cleanModel, statusCode: 0 }));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve({ ok: false, model: cleanModel, statusCode: 0, timeout: true });
+      });
+      req.write(bodyBuf);
+      req.end();
+    });
+  }
+
+  async function unloadAllLoadedOllamaModels() {
+    const loaded = await getOllamaPs();
+    const names = Array.from(new Set(
+      loaded.map((m) => String(m && (m.name || m.model) || "").trim()).filter(Boolean)
+    ));
+    const results = [];
+    for (const name of names) {
+      results.push(await unloadOllamaModel(name));
+    }
+    return results;
+  }
+
+  async function restartOllamaDaemon() {
+    if (!config.allowHostProcessControl) {
+      return { ok: true, skippedHostControl: true };
+    }
+    if (process.platform === "win32") {
+      await new Promise((resolve) => {
+        execFile(
+          "powershell",
+          [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Get-Process ollama, 'ollama app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"
+          ],
+          { windowsHide: true, timeout: 5000 },
+          () => resolve()
+        );
+      });
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    try {
+      const child = spawn("ollama", ["serve"], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+        env: { ...process.env }
+      });
+      child.unref();
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        const psOk = await new Promise((resolve) => {
+          const r = http.get({
+            hostname: config.ollamaHost,
+            port: config.ollamaPort,
+            path: "/api/tags",
+            timeout: 1200
+          }, (res) => {
+            res.resume();
+            resolve(res.statusCode === 200);
+          });
+          r.on("error", () => resolve(false));
+          r.on("timeout", () => { r.destroy(); resolve(false); });
+        });
+        if (psOk) return { ok: true, alive: true };
+      }
+      return { ok: true, alive: false, message: "Ollama iniciando en segundo plano..." };
+    } catch (err) {
+      return { ok: false, error: safeErrMsg(err) };
+    }
+  }
+
+  async function fetchCombinedModelsCatalog() {
+    const fetchOllama = new Promise((resolve) => {
+      const oReq = http.get({
+        hostname: config.ollamaHost,
+        port: config.ollamaPort,
+        path: "/api/tags",
+        timeout: 4000
+      }, (oRes) => {
+        let data = "";
+        oRes.on("data", (c) => { data += c; });
+        oRes.on("end", () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.models || []);
+          } catch (_e) {
+            resolve([]);
+          }
+        });
+      });
+      oReq.on("error", () => resolve([]));
+      oReq.on("timeout", () => { oReq.destroy(); resolve([]); });
+    });
+
+    const fetchDirectML = new Promise((resolve) => {
+      const dReq = http.get({
+        hostname: config.directmlHost,
+        port: config.directmlPort,
+        path: "/v1/models",
+        timeout: 4000
+      }, (dRes) => {
+        let data = "";
+        dRes.on("data", (c) => { data += c; });
+        dRes.on("end", () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.data || []);
+          } catch (_e) {
+            resolve([]);
+          }
+        });
+      });
+      dReq.on("error", () => resolve([]));
+      dReq.on("timeout", () => { dReq.destroy(); resolve([]); });
+    });
+
+    const fetchFreeAi = freeai.fetchModels().catch((e) => {
+      console.warn("[Local AI Chat] Free.ai fetch error:", safeErrMsg(e));
+      return [];
+    });
+
+    try {
+      const [ollamaModels, directmlModels, freeAiModels] = await Promise.all([fetchOllama, fetchDirectML, fetchFreeAi]);
+      const fallbackDirectML = [
+        {
+          id: "Phi-3.5-mini-instruct-ONNX",
+          displayName: "Phi-3.5-mini-instruct (INT4 AWQ DirectML)",
+          size: "2.3 GB",
+          active: true,
+          status: "ready"
+        },
+        {
+          id: "Hermes-3-8B-UNLOCKED-ONNX-DirectML",
+          displayName: "Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)",
+          size: "8.5 GB",
+          active: false,
+          status: "ready"
+        }
+      ];
+      const actualDML = (directmlModels && directmlModels.length > 0) ? directmlModels : fallbackDirectML;
+
+      const formattedLocal = (ollamaModels || []).map((m) => ({
+        ...m,
+        displayName: `${m.name} (Local)`,
+        isLocal: true,
+        provider: "Ollama Local"
+      }));
+
+      const formattedDirectML = actualDML.map((m) => ({
+        name: m.id || m.name,
+        id: m.id || m.name,
+        displayName: m.displayName || `${m.id || m.name} (DirectML GPU)`,
+        size: m.size || "DirectML",
+        isDirectML: true,
+        active: m.active || false,
+        provider: "DirectML Nativo",
+        status: m.status || "ready"
+      }));
+
+      const formattedFreeAi = (freeAiModels || []).map((m) => ({
+        name: m.id,
+        rawId: m.rawId,
+        displayName: m.name,
+        size: m.license,
+        type: m.type,
+        isFreeAi: true,
+        provider: "Free.ai Cloud",
+        details: { family: m.type, parameter_size: m.provider }
+      }));
+
+      return {
+        models: [...formattedDirectML, ...formattedFreeAi, ...formattedLocal],
+        directmlModels: formattedDirectML,
+        freeAiModels: formattedFreeAi,
+        localModels: formattedLocal
+      };
+    } catch (_err) {
+      return { models: [], directmlModels: [], freeAiModels: [], localModels: [] };
     }
   }
 
@@ -539,12 +934,24 @@ function createStudioServer(options = {}) {
     proxyReq.end();
   }
 
-  function streamAnalysisFromEngine({ engine, model, systemPrompt, userPrompt, payload }, onToken) {
+  async function streamEngineCompletion({ engine, model, messages: providedMessages, systemPrompt, userPrompt, payload = {} }, onToken) {
+    if (engine === "directml") {
+      const alive = await checkDirectMLAlive();
+      if (!alive && config.autoStartDirectML) {
+        await startDirectMLServer();
+      }
+    }
+
     return new Promise((resolve, reject) => {
-      const messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ];
+      const messages = Array.isArray(providedMessages) && providedMessages.length > 0
+        ? providedMessages.map((m) => ({
+            role: String((m && m.role) || "user"),
+            content: String((m && m.content) ?? "")
+          }))
+        : [
+            { role: "system", content: String(systemPrompt || "") },
+            { role: "user", content: String(userPrompt || "") }
+          ];
 
       let settled = false;
       let accumulated = "";
@@ -564,7 +971,28 @@ function createStudioServer(options = {}) {
         reject(err);
       }
 
+      function processSseLine(line) {
+        const trimmed = String(line || "").trim();
+        if (!trimmed || trimmed.startsWith(":") || trimmed === "data: [DONE]") return;
+        const rawJson = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+        try {
+          const parsed = JSON.parse(rawJson);
+          if (parsed && parsed.error) {
+            doneReject(parsed.error.message || parsed.error);
+            return;
+          }
+          const content = (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content || parsed.choices[0].message?.content))
+            || (parsed.message && parsed.message.content)
+            || "";
+          if (content) {
+            accumulated += content;
+            onToken(content);
+          }
+        } catch (_e) {}
+      }
+
       if (engine === "freeai") {
+        const cleanFreeModel = String(model || "qwen7b").replace(/^freeai:/i, "").trim() || "qwen7b";
         const baseUrl = freeai.getBaseUrl();
         const key = freeai.getKey();
         const isDefaultCloud = baseUrl === "https://api.free.ai/v1";
@@ -582,11 +1010,11 @@ function createStudioServer(options = {}) {
 
         const client = parsedTarget.protocol === "http:" ? http : https;
         const bodyData = JSON.stringify({
-          model: model || "qwen7b",
+          model: cleanFreeModel,
           messages,
           stream: true,
-          temperature: payload.temperature !== undefined ? payload.temperature : 0.3,
-          max_tokens: payload.max_tokens || 2048
+          temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3,
+          max_tokens: Number(payload.max_tokens) || 2048
         });
 
         const req = client.request(targetUrl, {
@@ -597,7 +1025,7 @@ function createStudioServer(options = {}) {
             "Content-Length": Buffer.byteLength(bodyData, "utf8"),
             "User-Agent": "Antigravity/1.0"
           },
-          timeout: 30000
+          timeout: 90000
         }, (upstreamRes) => {
           if (upstreamRes.statusCode !== 200) {
             let errBody = "";
@@ -615,22 +1043,16 @@ function createStudioServer(options = {}) {
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || "";
             for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith(":") || trimmed === "data: [DONE]") continue;
-              const rawJson = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
-              try {
-                const parsed = JSON.parse(rawJson);
-                const content = (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content || parsed.choices[0].message?.content))
-                  || (parsed.message && parsed.message.content)
-                  || "";
-                if (content) {
-                  accumulated += content;
-                  onToken(content);
-                }
-              } catch (_e) {}
+              processSseLine(line);
             }
           });
-          upstreamRes.on("end", () => doneResolve());
+          upstreamRes.on("end", () => {
+            if (buffer.trim()) {
+              processSseLine(buffer);
+              buffer = "";
+            }
+            doneResolve();
+          });
           upstreamRes.on("error", (err) => doneReject(err.message));
         });
 
@@ -648,12 +1070,13 @@ function createStudioServer(options = {}) {
       }
 
       if (engine === "directml") {
+        const cleanDmlModel = String(model || "Phi-3.5-mini-instruct-ONNX").replace(/^directml:/i, "").trim() || "Phi-3.5-mini-instruct-ONNX";
         const bodyData = JSON.stringify({
-          model: model || "Phi-3.5-mini-instruct-ONNX",
+          model: cleanDmlModel,
           messages,
           stream: true,
-          max_tokens: payload.max_tokens || 2048,
-          temperature: payload.temperature !== undefined ? payload.temperature : 0.3
+          max_tokens: Number(payload.max_tokens) || 2048,
+          temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3
         });
 
         const req = http.request({
@@ -666,7 +1089,7 @@ function createStudioServer(options = {}) {
             "Accept": "text/event-stream",
             "Content-Length": Buffer.byteLength(bodyData, "utf8")
           },
-          timeout: 30000
+          timeout: 90000
         }, (upstreamRes) => {
           if (upstreamRes.statusCode !== 200) {
             let errBody = "";
@@ -683,22 +1106,16 @@ function createStudioServer(options = {}) {
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || "";
             for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith(":") || trimmed === "data: [DONE]") continue;
-              const rawJson = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
-              try {
-                const parsed = JSON.parse(rawJson);
-                const content = (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content || parsed.choices[0].message?.content))
-                  || (parsed.message && parsed.message.content)
-                  || "";
-                if (content) {
-                  accumulated += content;
-                  onToken(content);
-                }
-              } catch (_e) {}
+              processSseLine(line);
             }
           });
-          upstreamRes.on("end", () => doneResolve());
+          upstreamRes.on("end", () => {
+            if (buffer.trim()) {
+              processSseLine(buffer);
+              buffer = "";
+            }
+            doneResolve();
+          });
           upstreamRes.on("error", (err) => doneReject(err.message));
         });
 
@@ -713,13 +1130,34 @@ function createStudioServer(options = {}) {
       }
 
       // Default: Ollama (/api/chat con stream: true)
+      const cleanOllamaModel = String(model || "").replace(/^ollama:/i, "").trim();
+      const mergedOptions = {};
+      if (payload.modelfileOptions && typeof payload.modelfileOptions === "object") {
+        Object.assign(mergedOptions, payload.modelfileOptions);
+      }
+      if (payload.temperature !== undefined && Number.isFinite(Number(payload.temperature))) {
+        mergedOptions.temperature = Number(payload.temperature);
+      }
+      if (payload.max_tokens !== undefined && Number.isFinite(Number(payload.max_tokens))) {
+        mergedOptions.num_predict = Number(payload.max_tokens);
+      }
+      if (payload.num_ctx !== undefined && Number.isFinite(Number(payload.num_ctx))) {
+        mergedOptions.num_ctx = Number(payload.num_ctx);
+      }
+      if (payload.num_thread !== undefined && Number.isFinite(Number(payload.num_thread))) {
+        mergedOptions.num_thread = Number(payload.num_thread);
+      }
+
       const ollamaBody = {
-        model,
+        model: cleanOllamaModel,
         messages,
         stream: true
       };
-      if (payload.modelfileOptions && typeof payload.modelfileOptions === "object") {
-        ollamaBody.options = payload.modelfileOptions;
+      if (Object.keys(mergedOptions).length > 0) {
+        ollamaBody.options = mergedOptions;
+      }
+      if (payload.keep_alive !== undefined) {
+        ollamaBody.keep_alive = payload.keep_alive;
       }
       const bodyData = JSON.stringify(ollamaBody);
 
@@ -732,7 +1170,7 @@ function createStudioServer(options = {}) {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(bodyData, "utf8")
         },
-        timeout: 30000
+        timeout: 90000
       }, (upstreamRes) => {
         if (upstreamRes.statusCode !== 200) {
           let errBody = "";
@@ -743,38 +1181,36 @@ function createStudioServer(options = {}) {
           return;
         }
 
+        const processOllamaLine = (line) => {
+          const trimmed = String(line || "").trim();
+          if (!trimmed) return;
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.error) {
+              doneReject(parsed.error);
+              return;
+            }
+            const content = (parsed.message && parsed.message.content) || parsed.response || "";
+            if (content) {
+              accumulated += content;
+              onToken(content);
+            }
+          } catch (_e) {}
+        };
+
         upstreamRes.setEncoding("utf8");
         upstreamRes.on("data", (chunk) => {
           buffer += chunk;
           const lines = buffer.split(/\r?\n/);
           buffer = lines.pop() || "";
           for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (parsed.error) {
-                doneReject(parsed.error);
-                return;
-              }
-              const content = (parsed.message && parsed.message.content) || parsed.response || "";
-              if (content) {
-                accumulated += content;
-                onToken(content);
-              }
-            } catch (_e) {}
+            processOllamaLine(line);
           }
         });
         upstreamRes.on("end", () => {
           if (buffer.trim()) {
-            try {
-              const parsed = JSON.parse(buffer.trim());
-              const content = (parsed.message && parsed.message.content) || parsed.response || "";
-              if (content) {
-                accumulated += content;
-                onToken(content);
-              }
-            } catch (_e) {}
+            processOllamaLine(buffer);
+            buffer = "";
           }
           doneResolve();
         });
@@ -873,6 +1309,28 @@ function createStudioServer(options = {}) {
         res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
         res.end("// preload stub");
       }
+      return;
+    }
+
+    if (pathname === "/favicon.ico" && (req.method === "GET" || req.method === "HEAD")) {
+      try {
+        if (fs.existsSync(TRAY_ICO_PATH) && fs.statSync(TRAY_ICO_PATH).isFile()) {
+          const stat = fs.statSync(TRAY_ICO_PATH);
+          res.writeHead(200, {
+            "Content-Type": "image/x-icon",
+            "Content-Length": stat.size,
+            "Cache-Control": "no-cache, must-revalidate"
+          });
+          if (req.method === "HEAD") {
+            res.end();
+          } else {
+            fs.createReadStream(TRAY_ICO_PATH).pipe(res);
+          }
+          return;
+        }
+      } catch (_e) {}
+      res.writeHead(204);
+      res.end();
       return;
     }
 
@@ -1517,7 +1975,7 @@ function createStudioServer(options = {}) {
 
       let streamedText = "";
       try {
-        await streamAnalysisFromEngine(
+        await streamEngineCompletion(
           {
             engine: target.engine,
             model: target.model,
@@ -1680,50 +2138,145 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/directml/status" && req.method === "GET") {
-      const isAlive = await checkDirectMLAlive();
-      if (!isAlive) {
-        sendJson(res, 200, { status: "offline", isAlive: false });
-        return;
-      }
-
-      await new Promise((resolve) => {
-        const hReq = http.get({
-          hostname: config.directmlHost,
-          port: config.directmlPort,
-          path: "/health",
-          timeout: 2000
-        }, (hRes) => {
-          let data = "";
-          hRes.on("data", (c) => { data += c; });
-          hRes.on("end", () => {
-            if (hRes.statusCode === 200) {
-              try {
-                const h = JSON.parse(data);
-                sendJson(res, 200, { status: "online", isAlive: true, ...h });
-                resolve();
-                return;
-              } catch (_e) {}
-            }
-            sendJson(res, 200, { status: "online", isAlive: true });
-            resolve();
-          });
-        });
-        hReq.on("error", () => {
-          sendJson(res, 200, { status: "offline", isAlive: false });
-          resolve();
-        });
-        hReq.on("timeout", () => {
-          hReq.destroy();
-          sendJson(res, 200, { status: "offline", isAlive: false });
-          resolve();
-        });
-      });
+      const health = await getDirectmlHealth();
+      sendJson(res, 200, health);
       return;
     }
 
     if (pathname === "/api/directml/start" && req.method === "POST") {
       const result = await startDirectMLServer();
       sendJson(res, result.ok ? 200 : 500, result);
+      return;
+    }
+
+    if (pathname === "/api/directml/stop" && req.method === "POST") {
+      const result = await stopDirectMLServer();
+      sendJson(res, result.ok ? 200 : 500, result);
+      return;
+    }
+
+    if (pathname === "/api/ollama/unload" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      if (typeof payload.model === "string" && payload.model.trim()) {
+        const resUnload = await unloadOllamaModel(payload.model);
+        sendJson(res, 200, { ok: true, unloaded: [resUnload] });
+      } else {
+        const unloaded = await unloadAllLoadedOllamaModels();
+        sendJson(res, 200, { ok: true, unloaded });
+      }
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Hardware Advisor & Safe Tuning (/api/system/*)
+    // ---------------------------------------------------------
+    if (pathname === "/api/system/hardware-profile" && req.method === "GET") {
+      const forceRefresh = query.refresh === "1" || query.refresh === "true";
+      const [telemetry, ollamaPs, directmlStatus] = await Promise.all([
+        hardwareAdvisor.getHostHardwareTelemetry({
+          forceRefresh,
+          telemetryOverride: config.telemetryOverride
+        }),
+        getOllamaPs(),
+        getDirectmlHealth()
+      ]);
+      sendJson(res, 200, {
+        ok: true,
+        telemetry,
+        profiles: hardwareAdvisor.getRecommendedProfiles(telemetry),
+        ollamaPs,
+        directmlStatus
+      });
+      return;
+    }
+
+    if (pathname === "/api/system/hardware-evaluate" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const forceRefresh = payload.forceRefresh === true;
+      const [telemetry, catalog, ollamaPs, directmlStatus] = await Promise.all([
+        hardwareAdvisor.getHostHardwareTelemetry({
+          forceRefresh,
+          telemetryOverride: config.telemetryOverride
+        }),
+        fetchCombinedModelsCatalog(),
+        getOllamaPs(),
+        getDirectmlHealth()
+      ]);
+
+      const rawAgentA = (payload.agentA && typeof payload.agentA === "object") ? payload.agentA : {};
+      const rawAgentB = (payload.agentB && typeof payload.agentB === "object") ? payload.agentB : {};
+      const pair = hardwareAdvisor.normalizeDualPair(payload.pair || "", rawAgentA, rawAgentB);
+      const evaluation = hardwareAdvisor.evaluateDualConfiguration({
+        pair,
+        agentA: rawAgentA,
+        agentB: rawAgentB,
+        workflow: payload.workflow || "pipeline",
+        unloadBetweenTurns: payload.unloadBetweenTurns !== false,
+        modelsCatalog: catalog.models,
+        telemetry,
+        ollamaPs,
+        directmlStatus
+      });
+
+      sendJson(res, 200, {
+        ok: true,
+        telemetry,
+        evaluation,
+        profiles: hardwareAdvisor.getRecommendedProfiles(telemetry)
+      });
+      return;
+    }
+
+    if (pathname === "/api/system/apply-tuning" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const scope = payload.scope === "windows_user" ? "windows_user" : "session";
+      const telemetry = await hardwareAdvisor.getHostHardwareTelemetry({
+        forceRefresh: false,
+        telemetryOverride: config.telemetryOverride
+      });
+
+      const result = await hardwareAdvisor.applySystemTuning({
+        scope,
+        pair: payload.pair || null,
+        envOverrides: payload.envOverrides || null,
+        telemetry,
+        skipWindowsApply: config.skipWindowsApply
+      });
+
+      const restarts = {
+        unloadedOllama: [],
+        directml: null,
+        ollama: null
+      };
+
+      if (payload.unloadOllama) {
+        restarts.unloadedOllama = await unloadAllLoadedOllamaModels();
+      }
+      if (payload.restartDirectML) {
+        restarts.directml = await restartDirectMLServer(result.applied);
+      } else if (result.applied && Object.keys(result.applied).length > 0) {
+        const dmlSubset = {};
+        for (const k of ["OLIVE_GPU_MEMORY_LIMIT", "OLIVE_CPU_THREADS", "OLIVE_USE_DIRECTML", "ORT_DML_DEVICE_ID"]) {
+          if (result.applied[k] !== undefined) dmlSubset[k] = result.applied[k];
+        }
+        if (Object.keys(dmlSubset).length > 0) {
+          activeDirectmlEnv = { ...activeDirectmlEnv, ...dmlSubset };
+        }
+      }
+      if (payload.restartOllama) {
+        restarts.ollama = await restartOllamaDaemon();
+      }
+
+      const updatedTelemetry = await hardwareAdvisor.getHostHardwareTelemetry({
+        forceRefresh: true,
+        telemetryOverride: config.telemetryOverride
+      });
+
+      sendJson(res, 200, {
+        ...result,
+        telemetry: updatedTelemetry,
+        restarts
+      });
       return;
     }
 
@@ -1775,111 +2328,9 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/tags" && req.method === "GET") {
-      const fetchOllama = new Promise((resolve) => {
-        const oReq = http.get({
-          hostname: config.ollamaHost,
-          port: config.ollamaPort,
-          path: "/api/tags",
-          timeout: 4000
-        }, (oRes) => {
-          let data = "";
-          oRes.on("data", (c) => { data += c; });
-          oRes.on("end", () => {
-            try {
-              const parsed = JSON.parse(data);
-              resolve(parsed.models || []);
-            } catch (_e) {
-              resolve([]);
-            }
-          });
-        });
-        oReq.on("error", () => resolve([]));
-        oReq.on("timeout", () => { oReq.destroy(); resolve([]); });
-      });
-
-      const fetchDirectML = new Promise((resolve) => {
-        const dReq = http.get({
-          hostname: config.directmlHost,
-          port: config.directmlPort,
-          path: "/v1/models",
-          timeout: 4000
-        }, (dRes) => {
-          let data = "";
-          dRes.on("data", (c) => { data += c; });
-          dRes.on("end", () => {
-            try {
-              const parsed = JSON.parse(data);
-              resolve(parsed.data || []);
-            } catch (_e) {
-              resolve([]);
-            }
-          });
-        });
-        dReq.on("error", () => resolve([]));
-        dReq.on("timeout", () => { dReq.destroy(); resolve([]); });
-      });
-
-      const fetchFreeAi = freeai.fetchModels().catch((e) => {
-        console.warn("[Local AI Chat] Free.ai fetch error:", safeErrMsg(e));
-        return [];
-      });
-
       try {
-        const [ollamaModels, directmlModels, freeAiModels] = await Promise.all([fetchOllama, fetchDirectML, fetchFreeAi]);
-        const fallbackDirectML = [
-          {
-            id: "Phi-3.5-mini-instruct-ONNX",
-            displayName: "Phi-3.5-mini-instruct (INT4 AWQ DirectML)",
-            size: "2.3 GB",
-            active: true,
-            status: "ready"
-          },
-          {
-            id: "Hermes-3-8B-UNLOCKED-ONNX-DirectML",
-            displayName: "Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)",
-            size: "8.5 GB",
-            active: false,
-            status: "ready"
-          }
-        ];
-        const actualDML = (directmlModels && directmlModels.length > 0) ? directmlModels : fallbackDirectML;
-
-        const formattedLocal = (ollamaModels || []).map((m) => ({
-          ...m,
-          displayName: `${m.name} (Local)`,
-          isLocal: true,
-          provider: "Ollama Local"
-        }));
-
-        const formattedDirectML = actualDML.map((m) => ({
-          name: m.id || m.name,
-          id: m.id || m.name,
-          displayName: m.displayName || `${m.id || m.name} (DirectML GPU)`,
-          size: m.size || "DirectML",
-          isDirectML: true,
-          active: m.active || false,
-          provider: "DirectML Nativo",
-          status: m.status || "ready"
-        }));
-
-        const formattedFreeAi = (freeAiModels || []).map((m) => ({
-          name: m.id,
-          rawId: m.rawId,
-          displayName: m.name,
-          size: m.license,
-          type: m.type,
-          isFreeAi: true,
-          provider: "Free.ai Cloud",
-          details: { family: m.type, parameter_size: m.provider }
-        }));
-
-        const combined = [...formattedDirectML, ...formattedFreeAi, ...formattedLocal];
-        sendJson(res, 200, {
-          models: combined,
-          directmlModels: formattedDirectML,
-          freeAiModels: formattedFreeAi,
-          localModels: formattedLocal
-        });
+        const catalog = await fetchCombinedModelsCatalog();
+        sendJson(res, 200, catalog);
       } catch (_err) {
         sendJson(res, 200, { models: [], directmlModels: [], freeAiModels: [], localModels: [] });
       }
@@ -1970,6 +2421,469 @@ function createStudioServer(options = {}) {
       }
 
       proxyToOllama("/api/chat", "POST", JSON.stringify(ollamaPayload), res);
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Modo Dual Orquestado (2 Agentes Independientes)
+    // ---------------------------------------------------------
+    if (pathname === "/api/chat/dual" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
+        sendJsonError(res, 400, "El campo 'messages' es obligatorio y debe contener al menos un mensaje.");
+        return;
+      }
+
+      const RECOGNIZED_PAIRS = new Set([
+        "freeai+directml",
+        "directml+freeai",
+        "freeai+ollama",
+        "ollama+freeai",
+        "ollama+directml",
+        "directml+ollama"
+      ]);
+      const RECOGNIZED_ENGINES = new Set([
+        "ollama",
+        "local",
+        "directml",
+        "dml",
+        "onnx",
+        "freeai",
+        "free.ai",
+        "free-ai",
+        "cloud"
+      ]);
+
+      const rawPairInput = typeof payload.pair === "string" ? payload.pair.trim() : "";
+      if (rawPairInput) {
+        const cleanedPairToken = rawPairInput
+          .toLowerCase()
+          .replace(/free\.ai/g, "freeai")
+          .replace(/local/g, "ollama")
+          .replace(/\s+/g, "");
+        if (!RECOGNIZED_PAIRS.has(cleanedPairToken)) {
+          sendJsonError(res, 400, `Par dual no reconocido: '${rawPairInput}'. Usa freeai+directml, freeai+ollama o ollama+directml.`);
+          return;
+        }
+      }
+
+      const rawA = ensurePlainObject(payload.agentA || {}, "agentA");
+      const rawB = ensurePlainObject(payload.agentB || {}, "agentB");
+
+      if (rawA.source !== undefined && String(rawA.source).trim() !== "") {
+        const tokA = String(rawA.source).trim().toLowerCase();
+        if (!RECOGNIZED_ENGINES.has(tokA)) {
+          sendJsonError(res, 400, `Motor no reconocido para Agente A: '${rawA.source}'.`);
+          return;
+        }
+      }
+      if (rawB.source !== undefined && String(rawB.source).trim() !== "") {
+        const tokB = String(rawB.source).trim().toLowerCase();
+        if (!RECOGNIZED_ENGINES.has(tokB)) {
+          sendJsonError(res, 400, `Motor no reconocido para Agente B: '${rawB.source}'.`);
+          return;
+        }
+      }
+
+      let pair;
+      let defaults;
+      let srcA;
+      let srcB;
+
+      if (rawPairInput) {
+        pair = hardwareAdvisor.normalizeDualPair(rawPairInput);
+        defaults = hardwareAdvisor.getDefaultAgentsForPair(pair);
+        srcA = (rawA.source && String(rawA.source).trim())
+          ? hardwareAdvisor.normalizeEngineSource(rawA.source)
+          : defaults.sourceA;
+        srcB = (rawB.source && String(rawB.source).trim())
+          ? hardwareAdvisor.normalizeEngineSource(rawB.source)
+          : defaults.sourceB;
+      } else {
+        defaults = hardwareAdvisor.getDefaultAgentsForPair("freeai+directml");
+        srcA = (rawA.source && String(rawA.source).trim())
+          ? hardwareAdvisor.normalizeEngineSource(rawA.source)
+          : defaults.sourceA;
+        srcB = (rawB.source && String(rawB.source).trim())
+          ? hardwareAdvisor.normalizeEngineSource(rawB.source)
+          : defaults.sourceB;
+        if (srcA === srcB) {
+          sendJsonError(res, 400, `Modo Dual requiere dos motores distintos (A y B no pueden ser ambos '${srcA}').`);
+          return;
+        }
+        pair = hardwareAdvisor.normalizeDualPair("", { source: srcA }, { source: srcB });
+        defaults = hardwareAdvisor.getDefaultAgentsForPair(pair);
+      }
+
+      if (!hardwareAdvisor.isPairCompatibleWithAgents(pair, { source: srcA }, { source: srcB })) {
+        sendJsonError(res, 400, `Los agentes configurados (${srcA} + ${srcB}) no son compatibles con el par '${pair}'.`);
+        return;
+      }
+
+      const baseHistory = flattenHistoryMessagesForDual(payload.messages);
+      if (baseHistory.length === 0) {
+        sendJsonError(res, 400, "No hay mensajes válidos de usuario/asistente para procesar en Modo Dual.");
+        return;
+      }
+
+      const [telemetry, catalog, ollamaPs, directmlStatus] = await Promise.all([
+        hardwareAdvisor.getHostHardwareTelemetry({
+          forceRefresh: false,
+          telemetryOverride: config.telemetryOverride
+        }),
+        fetchCombinedModelsCatalog(),
+        getOllamaPs(),
+        getDirectmlHealth()
+      ]);
+
+      const modelA = (typeof rawA.model === "string" && rawA.model.trim())
+        ? rawA.model.trim()
+        : pickDefaultModelForSource(catalog, srcA);
+      const modelB = (typeof rawB.model === "string" && rawB.model.trim())
+        ? rawB.model.trim()
+        : pickDefaultModelForSource(catalog, srcB);
+
+      if (!modelA || !modelB) {
+        sendJsonError(
+          res,
+          400,
+          `No se pudo resolver un modelo válido para ${!modelA ? `Agente A (${srcA})` : `Agente B (${srcB})`}. Verifica que haya modelos disponibles.`
+        );
+        return;
+      }
+
+      const requestedWorkflow = hardwareAdvisor.normalizeWorkflow(payload.workflow || "", defaults.defaultWorkflow);
+      const requestedUnload = payload.unloadBetweenTurns !== undefined
+        ? Boolean(payload.unloadBetweenTurns)
+        : defaults.unloadBetweenTurns;
+
+      const evalNumCtxA = Number(rawA.numCtx || rawA.num_ctx);
+      const evalNumCtxB = Number(rawB.numCtx || rawB.num_ctx);
+
+      const evaluation = hardwareAdvisor.evaluateDualConfiguration({
+        pair,
+        agentA: {
+          source: srcA,
+          model: modelA,
+          numCtx: Number.isFinite(evalNumCtxA) && evalNumCtxA > 0 ? evalNumCtxA : undefined
+        },
+        agentB: {
+          source: srcB,
+          model: modelB,
+          numCtx: Number.isFinite(evalNumCtxB) && evalNumCtxB > 0 ? evalNumCtxB : undefined
+        },
+        workflow: requestedWorkflow,
+        unloadBetweenTurns: requestedUnload,
+        modelsCatalog: catalog.models,
+        telemetry,
+        ollamaPs,
+        directmlStatus
+      });
+
+      let effectiveWorkflow = requestedWorkflow;
+      let downgradedFromParallel = false;
+      if (requestedWorkflow === "parallel" && evaluation.bothLocalModels && !evaluation.allowParallelLocal && !payload.forceParallel) {
+        effectiveWorkflow = "pipeline";
+        downgradedFromParallel = true;
+      }
+      const effectiveUnloadBetweenTurns = evaluation.bothLocalModels ? Boolean(requestedUnload) : false;
+
+      const roleLabelA = String(rawA.roleLabel || rawA.role || "Arquitecto / Generador").trim();
+      const roleLabelB = String(rawB.roleLabel || rawB.role || "Auditor / Crítico").trim();
+      const rawProjIdentifier = payload.project || payload.projectPath || null;
+      const convId = payload.conversationId || null;
+      const globalDirective = typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "";
+
+      function composeAgentDirective(slot, roleLabel, ownPrompt) {
+        let stageRule = "";
+        if (effectiveWorkflow === "pipeline") {
+          stageRule = slot === "A"
+            ? "ETAPA 1 (Pipeline): Propón la arquitectura, análisis y código inicial completo y verificado."
+            : "ETAPA 2 (Pipeline): Audita rigurosamente la salida del Agente A, corrige fallos/omisiones y entrega la versión final refinada.";
+        } else if (effectiveWorkflow === "debate") {
+          stageRule = slot === "A"
+            ? "MODO DEBATE: Presenta primero tu solución sólida y, tras recibir la auditoría de B en la ronda final, consolida la versión definitiva superior."
+            : "MODO DEBATE (Crítica): Evalúa la propuesta de A con rigor técnico, señala vulnerabilidades, bugs o contradicciones y aporta correcciones concretas.";
+        } else {
+          stageRule = "MODO PARALELO: Responde de forma autónoma y completa a la solicitud del usuario aplicando tu rol y especialidad.";
+        }
+
+        const sections = [
+          `Eres el Agente ${slot} (${roleLabel}) en Local AI Studio (Modo Dual: ${pair} | Flujo: ${effectiveWorkflow}).`,
+          stageRule
+        ];
+        if (globalDirective) sections.push(`Directiva compartida de sesión:\n${globalDirective}`);
+        if (ownPrompt && String(ownPrompt).trim()) {
+          sections.push(`Directiva específica del Agente ${slot}:\n${String(ownPrompt).trim()}`);
+        }
+        return sections.join("\n\n");
+      }
+
+      const ctxA = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
+        writeToDisk: false,
+        skillId: rawA.skillId || null,
+        profileId: rawA.profileId || null,
+        customSystemPrompt: composeAgentDirective("A", roleLabelA, rawA.customSystemPrompt),
+        modelOverridesPrompt: rawA.modelSystemPrompt || null
+      });
+
+      const ctxB = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
+        writeToDisk: false,
+        skillId: rawB.skillId || null,
+        profileId: rawB.profileId || null,
+        customSystemPrompt: composeAgentDirective("B", roleLabelB, rawB.customSystemPrompt),
+        modelOverridesPrompt: rawB.modelSystemPrompt || null
+      });
+
+      const historyForA = injectSystemMessage(baseHistory, (ctxA && ctxA.systemPrompt) || "");
+      const historyForB = injectSystemMessage(baseHistory, (ctxB && ctxB.systemPrompt) || "");
+
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*"
+      });
+      if (typeof res.flushHeaders === "function") {
+        res.flushHeaders();
+      }
+
+      let clientClosed = false;
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          clientClosed = true;
+        }
+      });
+
+      const writeEvent = (ev) => {
+        if (clientClosed || res.writableEnded) return false;
+        try {
+          res.write(`${JSON.stringify(ev)}\n`);
+          return true;
+        } catch (_e) {
+          clientClosed = true;
+          return false;
+        }
+      };
+
+      const dualStartMs = Date.now();
+      let partialFailure = false;
+
+      const buildEngineOptions = (rawAgent, engine) => {
+        const opts = {};
+        if (rawAgent.temperature !== undefined && Number.isFinite(Number(rawAgent.temperature))) {
+          opts.temperature = Number(rawAgent.temperature);
+        }
+        const maxTok = Number(rawAgent.maxTokens || rawAgent.max_tokens);
+        if (Number.isFinite(maxTok) && maxTok > 0) {
+          opts.max_tokens = maxTok;
+        }
+        const numCtx = Number(rawAgent.numCtx || rawAgent.num_ctx);
+        if (Number.isFinite(numCtx) && numCtx > 0) {
+          opts.num_ctx = numCtx;
+        }
+        if (rawAgent.numThread !== undefined && Number.isFinite(Number(rawAgent.numThread))) {
+          opts.num_thread = Number(rawAgent.numThread);
+        }
+        if (engine === "ollama") {
+          if (rawAgent.keepAlive !== undefined) {
+            opts.keep_alive = rawAgent.keepAlive;
+          } else if (effectiveUnloadBetweenTurns && evaluation.bothLocalModels) {
+            opts.keep_alive = 0;
+          }
+        }
+        return opts;
+      };
+
+      async function executeAgentStage(slot, stageNum, stageLabel, engine, model, roleLabel, rawAgent, messagesForStage) {
+        if (clientClosed) {
+          return { ok: false, error: "Conexión cerrada por el cliente", partialText: "", elapsedMs: 0 };
+        }
+        const stageStart = Date.now();
+        writeEvent({
+          type: "agent_start",
+          agent: slot,
+          stage: stageNum,
+          stageLabel,
+          source: engine,
+          model,
+          roleLabel
+        });
+
+        try {
+          const result = await streamEngineCompletion(
+            {
+              engine,
+              model,
+              messages: messagesForStage,
+              payload: buildEngineOptions(rawAgent, engine)
+            },
+            (delta) => {
+              if (!clientClosed && delta) {
+                writeEvent({
+                  type: "agent_chunk",
+                  agent: slot,
+                  stage: stageNum,
+                  delta
+                });
+              }
+            }
+          );
+          const elapsedMs = Date.now() - stageStart;
+          const finalText = (result && result.text) || "";
+          writeEvent({
+            type: "agent_done",
+            agent: slot,
+            stage: stageNum,
+            source: engine,
+            model,
+            roleLabel,
+            elapsedMs,
+            text: finalText
+          });
+          return { ok: true, text: finalText, elapsedMs };
+        } catch (stageErr) {
+          partialFailure = true;
+          const elapsedMs = Date.now() - stageStart;
+          const partialText = stageErr && typeof stageErr.partialText === "string" ? stageErr.partialText : "";
+          const errMessage = safeErrMsg(stageErr);
+          writeEvent({
+            type: "agent_error",
+            agent: slot,
+            stage: stageNum,
+            source: engine,
+            model,
+            roleLabel,
+            elapsedMs,
+            error: errMessage,
+            partialText
+          });
+          return { ok: false, error: errMessage, partialText, elapsedMs };
+        }
+      }
+
+      try {
+        writeEvent({
+          type: "dual_preflight",
+          pair,
+          workflow: effectiveWorkflow,
+          requestedWorkflow,
+          downgradedFromParallel,
+          unloadBetweenTurns: effectiveUnloadBetweenTurns,
+          agentA: {
+            source: srcA,
+            model: modelA,
+            roleLabel: roleLabelA,
+            skillId: rawA.skillId || null,
+            profileId: rawA.profileId || null
+          },
+          agentB: {
+            source: srcB,
+            model: modelB,
+            roleLabel: roleLabelB,
+            skillId: rawB.skillId || null,
+            profileId: rawB.profileId || null
+          },
+          evaluation
+        });
+
+        if (downgradedFromParallel) {
+          writeEvent({
+            type: "system_notice",
+            level: "warn",
+            code: "AUTO_SEQUENTIAL_VRAM_GUARD",
+            message: "Modo Paralelo degradado automáticamente a Pipeline Secuencial (A → B) para evitar contención VRAM/DXGI con ambos motores locales activos."
+          });
+        }
+
+        if (effectiveWorkflow === "parallel") {
+          await Promise.all([
+            executeAgentStage("A", 1, "Paralelo A", srcA, modelA, roleLabelA, rawA, historyForA),
+            executeAgentStage("B", 1, "Paralelo B", srcB, modelB, roleLabelB, rawB, historyForB)
+          ]);
+        } else if (effectiveWorkflow === "debate") {
+          const resA1 = await executeAgentStage("A", 1, "Propuesta", srcA, modelA, roleLabelA, rawA, historyForA);
+
+          if (!clientClosed && effectiveUnloadBetweenTurns && evaluation.bothLocalModels && srcA === "ollama") {
+            await unloadOllamaModel(modelA).catch(() => {});
+          }
+
+          const stage2UserPrompt = (resA1.ok && resA1.text.trim())
+            ? [
+                "Audita y critica técnicamente la propuesta inicial del Agente A para la solicitud del usuario.",
+                "Señala errores, riesgos, inconsistencias o mejoras clave, y aporta correcciones o bloques de código mejorados:",
+                "",
+                "<salida_agente_a>",
+                resA1.text.trim(),
+                "</salida_agente_a>"
+              ].join("\n")
+            : [
+                `El Agente A (${modelA}) falló al generar su propuesta (${safeErrMsg(resA1.error || "error de ejecución")}).`,
+                "Genera de forma independiente la propuesta técnica y el análisis crítico para la solicitud original del usuario."
+              ].join("\n");
+
+          const messagesForB2 = [...historyForB, { role: "user", content: stage2UserPrompt }];
+          const resB2 = await executeAgentStage("B", 2, "Crítica y Auditoría", srcB, modelB, roleLabelB, rawB, messagesForB2);
+
+          if (!clientClosed && effectiveUnloadBetweenTurns && evaluation.bothLocalModels && srcB === "ollama") {
+            await unloadOllamaModel(modelB).catch(() => {});
+          }
+
+          // Etapa 3 (Consolidación final por A) SOLO si tanto Etapa 1 como Etapa 2 concluyeron con éxito
+          if (!clientClosed && resA1.ok && resB2.ok) {
+            const consolidationPrompt = [
+              "Revisa la auditoría del Agente B sobre tu propuesta inicial y produce una versión definitiva consolidada, limpia y lista para aplicar.",
+              "",
+              "<critica_agente_b>",
+              resB2.text.trim() || "[Sin observaciones adicionales]",
+              "</critica_agente_b>"
+            ].join("\n");
+
+            const messagesForA3 = [
+              ...historyForA,
+              { role: "assistant", content: resA1.text },
+              { role: "user", content: consolidationPrompt }
+            ];
+            await executeAgentStage("A", 3, "Consolida", srcA, modelA, roleLabelA, rawA, messagesForA3);
+          }
+        } else {
+          // Default canonical workflow: pipeline (A -> B)
+          const resA1 = await executeAgentStage("A", 1, "Propuesta Inicial", srcA, modelA, roleLabelA, rawA, historyForA);
+
+          if (!clientClosed && effectiveUnloadBetweenTurns && evaluation.bothLocalModels && srcA === "ollama") {
+            await unloadOllamaModel(modelA).catch(() => {});
+          }
+
+          const stage2UserPrompt = (resA1.ok && resA1.text.trim())
+            ? [
+                "Revisa, audita y refina la propuesta del Agente A para la solicitud anterior del usuario.",
+                "Corrige cualquier bug, hueco de seguridad o código incompleto, y entrega la respuesta/código final optimizado:",
+                "",
+                "<salida_agente_a>",
+                resA1.text.trim(),
+                "</salida_agente_a>"
+              ].join("\n")
+            : [
+                `El Agente A (${modelA}) no pudo completar la Etapa 1 (${safeErrMsg(resA1.error || "motor no disponible")}).`,
+                "Asume la ejecución completa de contingencia y resuelve directamente la solicitud del usuario."
+              ].join("\n");
+
+          const messagesForB2 = [...historyForB, { role: "user", content: stage2UserPrompt }];
+          await executeAgentStage("B", 2, "Auditoría y Refinamiento", srcB, modelB, roleLabelB, rawB, messagesForB2);
+        }
+      } finally {
+        if (!clientClosed && !res.writableEnded) {
+          writeEvent({
+            type: "dual_done",
+            pair,
+            workflow: effectiveWorkflow,
+            requestedWorkflow,
+            elapsedMs: Date.now() - dualStartMs,
+            partialFailure
+          });
+          res.end();
+        }
+      }
       return;
     }
 

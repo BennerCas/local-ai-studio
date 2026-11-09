@@ -8,6 +8,7 @@ const { execFileSync } = require("node:child_process");
 
 const envLoader = require("../env-loader.js");
 const memoryStore = require("../memory-store.js");
+const hardwareAdvisor = require("../hardware-advisor.js");
 const { createStudioServer } = require("../sidecars/local_ai_chat/server.js");
 
 let tempRoot = "";
@@ -31,7 +32,8 @@ const ENV_BACKUP_KEYS = [
   "LOCAL_AI_BRAIN_DIR",
   "FREEAI_BASE_URL",
   "FREEAI_API_KEY_1",
-  "FREE_AI_API_KEY"
+  "FREE_AI_API_KEY",
+  ...hardwareAdvisor.SAFE_AI_ENV_KEYS
 ];
 let savedEnvValues = {};
 
@@ -115,6 +117,51 @@ function createMockAiEngineServer() {
       return;
     }
 
+    if (req.url === "/api/tags" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        models: [
+          { name: "qwen2.5-coder:latest", size: 4200000000, details: { family: "qwen2", parameter_size: "7B" } },
+          { name: "claude:latest", size: 8600000000, details: { family: "llama", parameter_size: "8B" } },
+          { name: "deepseek-r1:cloud", size: 0, details: { family: "deepseek", parameter_size: "cloud" } }
+        ]
+      }));
+      return;
+    }
+
+    if (req.url === "/api/ps" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ models: [{ name: "qwen2.5-coder:latest", model: "qwen2.5-coder:latest" }] }));
+      return;
+    }
+
+    if (req.url === "/v1/models" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        data: [
+          { id: "Phi-3.5-mini-instruct-ONNX", displayName: "Phi-3.5-mini-instruct (INT4)", size: "2.3 GB", active: true, status: "ready" },
+          { id: "Hermes-3-8B-UNLOCKED-ONNX-DirectML", displayName: "Hermes-3-8B-UNLOCKED (Q8)", size: "8.5 GB", active: false, status: "ready" }
+        ]
+      }));
+      return;
+    }
+
+    if (req.url === "/freeai/v1/models" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        data: [
+          { id: "qwen-2.5-coder", name: "Qwen 2.5 Coder (Free.ai)", license: "Apache-2.0", type: "chat" }
+        ]
+      }));
+      return;
+    }
+
+    if (req.url === "/health" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, active_model: "Phi-3.5-mini-instruct-ONNX" }));
+      return;
+    }
+
     const chunks = [];
     req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
@@ -132,10 +179,29 @@ function createMockAiEngineServer() {
         raw
       });
 
+      if (parsed && String(parsed.model || "").includes("force-fail")) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: { message: `Forced mock failure for ${parsed.model}` } }));
+        return;
+      }
+
+      if (req.url === "/api/generate" && req.method === "POST") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ model: parsed?.model || "", done: true }));
+        return;
+      }
+
       if (req.url === "/freeai/v1/chat/completions") {
         res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8" });
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Respuesta Free.ai " } }] })}\n\n`);
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "verificada." } }] })}\n\n`);
+        const reply = parsed?.messages?.some((m) => String(m.content || "").includes("<critica_agente_b>"))
+          ? "Consolidación final Free.ai verificada."
+          : "Respuesta Free.ai verificada.";
+        if (reply === "Respuesta Free.ai verificada.") {
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Respuesta Free.ai " } }] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "verificada." } }] })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: reply } }] })}\n\n`);
+        }
         res.write("data: [DONE]\n\n");
         res.end();
         return;
@@ -170,6 +236,9 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     for (const k of ENV_BACKUP_KEYS) {
       savedEnvValues[k] = process.env[k];
     }
+    for (const k of hardwareAdvisor.SAFE_AI_ENV_KEYS) {
+      delete process.env[k];
+    }
 
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "local-ai-srv-test-"));
     tempProjectsDir = path.join(tempRoot, "projects");
@@ -203,7 +272,25 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     studioServer = createStudioServer({
       ollamaPort: mockEnginePort,
       directmlPort: mockEnginePort,
-      autoStartDirectML: false
+      autoStartDirectML: false,
+      skipWindowsApply: true,
+      allowHostProcessControl: false,
+      telemetryOverride: {
+        cpu: { name: "AMD Ryzen AI 7 350 w/ Radeon 860M", cores: 8, logicalThreads: 16, maxClockMHz: 2000 },
+        gpu: { name: "AMD Radeon(TM) 860M Graphics", driverVersion: "32.0.32015.12012", dedicatedVramGb: 2.0, isRadeon860M: true },
+        npu: { present: true, name: "NPU Compute Accelerator Device", status: "OK" },
+        ram: { totalGb: 29.66, freeGb: 7.2 },
+        env: {
+          user: {
+            OLLAMA_IGPU_ENABLE: "",
+            HSA_OVERRIDE_GFX_VERSION: "",
+            OLLAMA_FLASH_ATTENTION: "",
+            OLLAMA_KV_CACHE_TYPE: "",
+            OLIVE_GPU_MEMORY_LIMIT: "20",
+            OLIVE_CPU_THREADS: "12"
+          }
+        }
+      }
     });
     const studioPort = await listenServer(studioServer);
     studioBaseUrl = `http://127.0.0.1:${studioPort}`;
@@ -897,5 +984,231 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.ok(freeEvents.some((ev) => ev.message && ev.message.content.includes("Respuesta Free.ai")));
     assert.equal(freeEvents[freeEvents.length - 1].done, true);
     assert.equal(freeEvents[freeEvents.length - 1].fallback, false);
+  });
+
+  it("sirve /favicon.ico y /assets/local-ai-studio-icon.png y expone /api/system/* + /api/ollama/unload + /api/directml/stop", async () => {
+    const icoRes = await fetch(`${studioBaseUrl}/favicon.ico`);
+    assert.equal(icoRes.status, 200);
+    assert.equal(icoRes.headers.get("content-type"), "image/x-icon");
+    const icoBuf = Buffer.from(await icoRes.arrayBuffer());
+    assert.ok(icoBuf.length > 1000);
+    assert.deepEqual([...icoBuf.subarray(0, 4)], [0x00, 0x00, 0x01, 0x00], "Debe ser cabecera ICO válida");
+
+    const headIco = await fetch(`${studioBaseUrl}/favicon.ico`, { method: "HEAD" });
+    assert.equal(headIco.status, 200);
+
+    const pngRes = await fetch(`${studioBaseUrl}/assets/local-ai-studio-icon.png`);
+    assert.equal(pngRes.status, 200);
+    assert.equal(pngRes.headers.get("content-type"), "image/png");
+    const pngBuf = Buffer.from(await pngRes.arrayBuffer());
+    assert.deepEqual([...pngBuf.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+
+    const hwProf = await httpReq("/api/system/hardware-profile");
+    assert.equal(hwProf.status, 200);
+    assert.equal(hwProf.json.ok, true);
+    assert.ok(hwProf.json.telemetry.cpu.name.includes("860M"));
+    assert.ok(hwProf.json.profiles["freeai+directml"]);
+    assert.ok(hwProf.json.profiles["freeai+ollama"]);
+    assert.ok(hwProf.json.profiles["ollama+directml"]);
+
+    const evalHeavy = await httpReq("/api/system/hardware-evaluate", {
+      method: "POST",
+      body: {
+        pair: "ollama+directml",
+        workflow: "parallel",
+        unloadBetweenTurns: true,
+        agentA: { source: "ollama", model: "claude:latest", numCtx: 8192 },
+        agentB: { source: "directml", model: "Hermes-3-8B-UNLOCKED-ONNX-DirectML" }
+      }
+    });
+    assert.equal(evalHeavy.status, 200);
+    assert.equal(evalHeavy.json.evaluation.riskLevel, "critical");
+    assert.equal(evalHeavy.json.evaluation.allowParallelLocal, false);
+
+    // Zero-Trust: debe rechazar mutación de secretos o variables fuera de lista blanca con HTTP 400
+    const badTune = await httpReq("/api/system/apply-tuning", {
+      method: "POST",
+      body: { scope: "session", envOverrides: { GITHUB_TOKEN: "ghp_evil" } }
+    });
+    assert.equal(badTune.status, 400);
+
+    const goodTune = await httpReq("/api/system/apply-tuning", {
+      method: "POST",
+      body: { scope: "session", pair: "ollama+directml", unloadOllama: true }
+    });
+    assert.equal(goodTune.status, 200);
+    assert.equal(goodTune.json.ok, true);
+    assert.equal(goodTune.json.applied.OLIVE_GPU_MEMORY_LIMIT, "12");
+    assert.equal(goodTune.json.applied.OLLAMA_IGPU_ENABLE, "1");
+    assert.equal(goodTune.json.telemetry.env.effective.OLLAMA_IGPU_ENABLE, "1");
+    assert.ok(capturedMockRequests.some((r) => r.url === "/api/generate" && r.body && r.body.keep_alive === 0));
+
+    capturedMockRequests = [];
+    const unloadRes = await httpReq("/api/ollama/unload", { method: "POST", body: {} });
+    assert.equal(unloadRes.status, 200);
+    assert.equal(unloadRes.json.ok, true);
+    assert.ok(capturedMockRequests.some((r) => r.url === "/api/generate" && r.body && r.body.keep_alive === 0));
+
+    const stopDmlRes = await httpReq("/api/directml/stop", { method: "POST", body: {} });
+    assert.equal(stopDmlRes.status, 200);
+    assert.equal(typeof stopDmlRes.json.ok, "boolean");
+  });
+
+  it("POST /api/chat/dual valida HTTP 400 estricto y ejecuta Pipeline, Paralelo, Debate, Guard VRAM y Contingencia sin fallos", async () => {
+    process.env.FREEAI_BASE_URL = `http://127.0.0.1:${mockEnginePort}/freeai/v1`;
+    process.env.FREEAI_API_KEY_1 = "freeai_dual_mock_key";
+
+    // 1. Validaciones HTTP 400
+    const badMsgs = await httpReq("/api/chat/dual", { method: "POST", body: { pair: "freeai+directml", messages: [] } });
+    assert.equal(badMsgs.status, 400);
+
+    const badPair = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: { pair: "foo+bar", messages: [{ role: "user", content: "hi" }] }
+    });
+    assert.equal(badPair.status, 400);
+
+    const badEngine = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: { agentA: { source: "openai" }, agentB: { source: "ollama" }, messages: [{ role: "user", content: "hi" }] }
+    });
+    assert.equal(badEngine.status, 400);
+
+    const sameEngine = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: { agentA: { source: "freeai" }, agentB: { source: "freeai" }, messages: [{ role: "user", content: "hi" }] }
+    });
+    assert.equal(sameEngine.status, 400);
+
+    const mismatch = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        pair: "freeai+ollama",
+        agentA: { source: "freeai", model: "qwen-2.5-coder" },
+        agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+        messages: [{ role: "user", content: "hi" }]
+      }
+    });
+    assert.equal(mismatch.status, 400);
+
+    // 2. Pipeline con prompts independientes por agente + aplanamiento assistant_dual
+    capturedMockRequests = [];
+    const pipeRes = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        project: "AlphaApp",
+        pair: "freeai+ollama",
+        workflow: "pipeline",
+        agentA: {
+          source: "freeai",
+          model: "qwen-2.5-coder",
+          roleLabel: "Planificador",
+          profileId: "SteveJobs",
+          skillId: "backend-architect",
+          customSystemPrompt: "SOLO_AGENTE_A_XYZ"
+        },
+        agentB: {
+          source: "ollama",
+          model: "qwen2.5-coder:latest",
+          roleLabel: "Auditor",
+          profileId: "Pirata",
+          skillId: "code-reviewer",
+          customSystemPrompt: "SOLO_AGENTE_B_XYZ"
+        },
+        messages: [
+          { role: "user", content: "Turno 1" },
+          {
+            role: "assistant_dual",
+            dual: {
+              agentA: { model: "qwen-2.5-coder", text: "A previo" },
+              agentB: { model: "qwen2.5-coder:latest", text: "B previo" }
+            }
+          },
+          { role: "user", content: "Audita el modulo" }
+        ]
+      }
+    });
+    assert.equal(pipeRes.status, 200);
+    const pipeEvents = pipeRes.text.trim().split("\n").map((l) => JSON.parse(l));
+    assert.equal(pipeEvents[0].type, "dual_preflight");
+    assert.ok(pipeEvents.some((e) => e.type === "agent_done" && e.agent === "A" && e.text.includes("Respuesta Free.ai")));
+    assert.ok(pipeEvents.some((e) => e.type === "agent_done" && e.agent === "B" && e.text.includes("Respuesta Ollama")));
+    assert.equal(pipeEvents[pipeEvents.length - 1].type, "dual_done");
+    assert.equal(pipeEvents[pipeEvents.length - 1].partialFailure, false);
+
+    const freePipeReq = capturedMockRequests.find((r) => r.url === "/freeai/v1/chat/completions");
+    const ollamaPipeReq = capturedMockRequests.find((r) => r.url === "/api/chat");
+    assert.ok(freePipeReq.body.messages[0].content.includes("SOLO_AGENTE_A_XYZ"));
+    assert.equal(freePipeReq.body.messages[0].content.includes("SOLO_AGENTE_B_XYZ"), false);
+    assert.ok(freePipeReq.body.messages[0].content.includes("BACKEND-ARCHITECT"));
+    assert.ok(
+      freePipeReq.body.messages.some(
+        (m) => m.role === "assistant" && m.content.includes("[Agente A (") && m.content.includes("A previo") && m.content.includes("B previo")
+      )
+    );
+    assert.ok(ollamaPipeReq.body.messages[0].content.includes("SOLO_AGENTE_B_XYZ"));
+    assert.equal(ollamaPipeReq.body.messages[0].content.includes("SOLO_AGENTE_A_XYZ"), false);
+    assert.ok(ollamaPipeReq.body.messages[0].content.includes("CODE-REVIEWER"));
+    assert.ok(ollamaPipeReq.body.messages.some((m) => String(m.content || "").includes("<salida_agente_a>")));
+
+    // 3. Debate (3 etapas: A1 -> B2 -> A3)
+    capturedMockRequests = [];
+    const debateRes = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        project: "AlphaApp",
+        pair: "freeai+directml",
+        workflow: "debate",
+        agentA: { source: "freeai", model: "qwen-2.5-coder" },
+        agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+        messages: [{ role: "user", content: "Debate arquitectura" }]
+      }
+    });
+    assert.equal(debateRes.status, 200);
+    const debateEvents = debateRes.text.trim().split("\n").map((l) => JSON.parse(l));
+    assert.ok(debateEvents.some((e) => e.type === "agent_done" && e.agent === "A" && e.stage === 1));
+    assert.ok(debateEvents.some((e) => e.type === "agent_done" && e.agent === "B" && e.stage === 2));
+    assert.ok(debateEvents.some((e) => e.type === "agent_done" && e.agent === "A" && e.stage === 3 && e.text.includes("Consolidación final")));
+
+    // 4. Ollama + DirectML con parallel -> Auto-degradación a pipeline + descarga keep_alive=0
+    capturedMockRequests = [];
+    const guardRes = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        project: "AlphaApp",
+        pair: "ollama+directml",
+        workflow: "parallel",
+        unloadBetweenTurns: true,
+        agentA: { source: "ollama", model: "qwen2.5-coder:latest" },
+        agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+        messages: [{ role: "user", content: "Refactoriza seguro" }]
+      }
+    });
+    assert.equal(guardRes.status, 200);
+    const guardEvents = guardRes.text.trim().split("\n").map((l) => JSON.parse(l));
+    assert.equal(guardEvents[0].downgradedFromParallel, true);
+    assert.equal(guardEvents[0].workflow, "pipeline");
+    assert.ok(guardEvents.some((e) => e.type === "system_notice" && e.code === "AUTO_SEQUENTIAL_VRAM_GUARD"));
+    assert.ok(capturedMockRequests.some((r) => r.url === "/api/chat" && r.body && r.body.keep_alive === 0));
+    assert.ok(capturedMockRequests.some((r) => r.url === "/api/generate" && r.body && r.body.keep_alive === 0));
+
+    // 5. Contingencia ante fallo de un motor (Agent A force-fail): emite agent_error, B sigue en Pipeline, Debate omite Stage 3
+    capturedMockRequests = [];
+    const failPipeRes = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        project: "AlphaApp",
+        pair: "freeai+ollama",
+        workflow: "pipeline",
+        agentA: { source: "freeai", model: "force-fail-model" },
+        agentB: { source: "ollama", model: "qwen2.5-coder:latest" },
+        messages: [{ role: "user", content: "Continua sin A" }]
+      }
+    });
+    assert.equal(failPipeRes.status, 200);
+    const failEvents = failPipeRes.text.trim().split("\n").map((l) => JSON.parse(l));
+    assert.ok(failEvents.some((e) => e.type === "agent_error" && e.agent === "A"));
+    assert.ok(failEvents.some((e) => e.type === "agent_done" && e.agent === "B" && e.text.includes("Respuesta Ollama")));
+    assert.equal(failEvents[failEvents.length - 1].partialFailure, true);
   });
 });

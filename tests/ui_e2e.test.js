@@ -7,6 +7,7 @@ const path = require("node:path");
 
 const { chromium } = require("C:/Users/Benner/node_modules/playwright");
 const memoryStore = require("../memory-store.js");
+const hardwareAdvisor = require("../hardware-advisor.js");
 const { createStudioServer } = require("../sidecars/local_ai_chat/server.js");
 
 let tempRoot = "";
@@ -29,7 +30,8 @@ const ENV_BACKUP_KEYS = [
   "LOCAL_AI_BRAIN_DIR",
   "FREEAI_BASE_URL",
   "FREEAI_API_KEY_1",
-  "FREE_AI_API_KEY"
+  "FREE_AI_API_KEY",
+  ...hardwareAdvisor.SAFE_AI_ENV_KEYS
 ];
 let savedEnvValues = {};
 
@@ -63,9 +65,20 @@ function createMockAiEngineServer() {
             name: "qwen2.5-coder:latest",
             size: 4200000000,
             details: { family: "qwen2", parameter_size: "7B" }
+          },
+          {
+            name: "claude:latest",
+            size: 8600000000,
+            details: { family: "llama", parameter_size: "8B" }
           }
         ]
       }));
+      return;
+    }
+
+    if (req.url === "/api/ps" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ models: [] }));
       return;
     }
 
@@ -115,12 +128,55 @@ function createMockAiEngineServer() {
         parsed = JSON.parse(raw);
       } catch (_e) {}
 
+      if (req.url === "/api/generate" && req.method === "POST") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ model: parsed?.model || "", done: true }));
+        return;
+      }
+
       if (req.url === "/api/chat" && req.method === "POST") {
         const messages = Array.isArray(parsed?.messages) ? parsed.messages : [];
         const sysContent = messages.find((m) => m.role === "system")?.content || "";
         const lastUser = messages.filter((m) => m.role === "user").pop()?.content || "";
+        const fullPromptText = messages.map((m) => String(m.content || "")).join("\n");
 
         res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8" });
+
+        if (fullPromptText.includes("DUAL_WRITE_TEST")) {
+          const isStage2 = lastUser.includes("<salida_agente_a>");
+          const dualOllamaMd = isStage2
+            ? [
+                "Auditoría y refinamiento completados por Agente B (Ollama):",
+                "",
+                "```write:src/dual_shared.js",
+                "export const owner = 'agent-b-winner';",
+                "```",
+                "",
+                "```write:src/dual_only_b.js",
+                "export const fromB = true;",
+                "```"
+              ].join("\n")
+            : [
+                "Propuesta inicial de Ollama (Agente):",
+                "",
+                "```write:src/dual_shared.js",
+                "export const owner = 'ollama-draft';",
+                "```"
+              ].join("\n");
+
+          res.write(JSON.stringify({
+            model: parsed?.model || "qwen2.5-coder:latest",
+            message: { role: "assistant", content: dualOllamaMd },
+            done: false
+          }) + "\n");
+          res.write(JSON.stringify({
+            model: parsed?.model || "qwen2.5-coder:latest",
+            message: { role: "assistant", content: "" },
+            done: true
+          }) + "\n");
+          res.end();
+          return;
+        }
 
         if (
           sysContent.includes("Forensic Continuity Auditor") ||
@@ -178,7 +234,35 @@ function createMockAiEngineServer() {
       }
 
       if (req.url === "/v1/chat/completions" || req.url === "/freeai/v1/chat/completions") {
+        const messages = Array.isArray(parsed?.messages) ? parsed.messages : [];
+        const fullText = messages.map((m) => String(m.content || "")).join("\n");
         res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8" });
+        if (fullText.includes("DUAL_WRITE_TEST")) {
+          const isFree = req.url === "/freeai/v1/chat/completions";
+          const outMd = isFree
+            ? [
+                "Propuesta inicial de Free.ai (Agente A):",
+                "",
+                "```write:src/dual_shared.js",
+                "export const owner = 'agent-a-draft';",
+                "```",
+                "",
+                "```write:src/dual_only_a.js",
+                "export const fromA = true;",
+                "```"
+              ].join("\n")
+            : [
+                "Revisión DirectML:",
+                "",
+                "```write:src/dual_dml.js",
+                "export const dml = true;",
+                "```"
+              ].join("\n");
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: outMd } }] })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+          return;
+        }
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "OK stream." } }] })}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
@@ -195,6 +279,7 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
   beforeEach(async () => {
     savedEnvValues = {};
     for (const k of ENV_BACKUP_KEYS) savedEnvValues[k] = process.env[k];
+    for (const k of hardwareAdvisor.SAFE_AI_ENV_KEYS) delete process.env[k];
 
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "local-ai-e2e-"));
     tempProjectsDir = path.join(tempRoot, "projects");
@@ -245,7 +330,25 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     studioServer = createStudioServer({
       ollamaPort: mockEnginePort,
       directmlPort: mockEnginePort,
-      autoStartDirectML: false
+      autoStartDirectML: false,
+      skipWindowsApply: true,
+      allowHostProcessControl: false,
+      telemetryOverride: {
+        cpu: { name: "AMD Ryzen AI 7 350 w/ Radeon 860M", cores: 8, logicalThreads: 16, maxClockMHz: 2000 },
+        gpu: { name: "AMD Radeon(TM) 860M Graphics", driverVersion: "32.0.32015.12012", dedicatedVramGb: 2.0, isRadeon860M: true },
+        npu: { present: true, name: "NPU Compute Accelerator Device", status: "OK" },
+        ram: { totalGb: 29.66, freeGb: 7.2 },
+        env: {
+          user: {
+            OLLAMA_IGPU_ENABLE: "",
+            HSA_OVERRIDE_GFX_VERSION: "",
+            OLLAMA_FLASH_ATTENTION: "",
+            OLLAMA_KV_CACHE_TYPE: "",
+            OLIVE_GPU_MEMORY_LIMIT: "20",
+            OLIVE_CPU_THREADS: "12"
+          }
+        }
+      }
     });
     const studioPort = await listenServer(studioServer);
     studioBaseUrl = `http://127.0.0.1:${studioPort}`;
@@ -400,6 +503,11 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
       return {
         h1Count: h1s.length,
         h1Text: h1s[0]?.textContent?.trim(),
+        hasVibeLockup: Boolean(document.querySelector("h1.vibe-logo-lockup")),
+        hasVibePill: Boolean(document.querySelector(".vibe-pill-nav")),
+        hasVibeDot: Boolean(document.querySelector(".vibe-status-dot")),
+        hasVibeCursor: Boolean(document.querySelector(".vibe-cursor-blink")),
+        faviconHref: document.querySelector('link[rel="icon"]')?.getAttribute("href") || "",
         hasMain: Boolean(document.querySelector("main#chat-container")),
         hasMetaDesc: Boolean(document.querySelector('meta[name="description"]')?.getAttribute("content")),
         footerSig,
@@ -417,6 +525,11 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
 
     assert.equal(seoMetrics.h1Count, 1);
     assert.equal(seoMetrics.h1Text, "Local AI Studio");
+    assert.equal(seoMetrics.hasVibeLockup, true, "Logo header debe usar Vibe Pill lockup");
+    assert.equal(seoMetrics.hasVibePill, true);
+    assert.equal(seoMetrics.hasVibeDot, true);
+    assert.equal(seoMetrics.hasVibeCursor, true);
+    assert.match(seoMetrics.faviconHref, /local-ai-studio-icon\.png/);
     assert.equal(seoMetrics.hasMain, true);
     assert.equal(seoMetrics.hasMetaDesc, true);
     assert.equal(seoMetrics.footerSig, "HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®");
@@ -650,6 +763,198 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     await targetBtn.click();
     await page.waitForFunction(() => !document.getElementById("history-drawer").classList.contains("active"));
     await page.waitForFunction(() => document.querySelectorAll("#chat-container .btn-apply-action.applied").length >= 2);
+
+    assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
+    assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);
+
+    await context.close();
+  });
+
+  it("valida Modo Dual (3 pares, panel independiente A/B, Invertir A<->B, Hardware Advisor, Streaming Dual, Autoguardado deduplicado, recarga, aislamiento y 0 overflow)", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+
+    const consoleErrors = [];
+    const pageErrors = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") consoleErrors.push(msg.text());
+    });
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+
+    await page.route("**/api/integrations/github/repos**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: true, user: { login: "benner-e2e" }, repos: [], detectedRemote: { isGitRepo: false } })
+      });
+    });
+    await page.route("**/api/integrations/netlify/sites**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: true, user: { full_name: "Benner E2E" }, sites: [] })
+      });
+    });
+
+    await page.goto(studioBaseUrl, { waitUntil: "networkidle" });
+    await page.waitForFunction(() => {
+      const pSel = document.getElementById("profile-select");
+      const sSel = document.getElementById("skill-select");
+      const mSel = document.getElementById("model-select");
+      return pSel && pSel.options.length > 5 && sSel && sSel.options.length > 100 && mSel && mSel.value !== "";
+    });
+
+    // Seleccionar AlphaApp
+    await page.selectOption("#project-select", "AlphaApp");
+    await page.waitForTimeout(150);
+
+    // Activar Modo Dual -> debe abrir panel de configuración y evaluar hardware
+    await page.click("#btn-dual-mode");
+    await page.waitForSelector("#dual-config-panel.active");
+    await page.waitForSelector("#dual-bar-strip");
+    await page.waitForFunction(() => {
+      const sum = document.getElementById("dual-hw-summary")?.textContent || "";
+      return sum.includes("860M") && sum.includes("Pico Dual");
+    });
+
+    // Verificar los 3 modos de emparejamiento (1, 2, 3) y que A/B se actualizan sin colisión
+    await page.click("#dual-pair-freeai-directml");
+    assert.equal(await page.inputValue("#dual-a-source"), "freeai");
+    assert.equal(await page.inputValue("#dual-b-source"), "directml");
+
+    await page.click("#dual-pair-ollama-directml");
+    await page.waitForFunction(() => {
+      const txt = document.getElementById("dual-hw-warnings")?.textContent || "";
+      return txt.includes("OLIVE_GPU_MEMORY_LIMIT") || txt.includes("OLLAMA_IGPU_ENABLE");
+    });
+    assert.equal(await page.inputValue("#dual-a-source"), "ollama");
+    assert.equal(await page.inputValue("#dual-b-source"), "directml");
+
+    // Aplicar tuning de sesión sugerido desde Hardware Advisor
+    await page.click("#btn-dual-apply-recommended");
+    await page.waitForFunction(() => {
+      const sum = document.getElementById("dual-hw-summary")?.textContent || "";
+      return sum.includes("iGPU=ON") && sum.includes("DML=12");
+    });
+
+    // Cambiar a Modo 2: freeai + ollama y configurar A/B independientes
+    await page.click("#dual-pair-freeai-ollama");
+    await page.waitForTimeout(100);
+    assert.equal(await page.inputValue("#dual-a-source"), "freeai");
+    assert.equal(await page.inputValue("#dual-b-source"), "ollama");
+
+    // Invertir A <-> B y luego volver a Free.ai -> Ollama
+    await page.click("#btn-dual-swap");
+    await page.waitForTimeout(100);
+    assert.equal(await page.inputValue("#dual-a-source"), "ollama");
+    assert.equal(await page.inputValue("#dual-b-source"), "freeai");
+    await page.click("#btn-dual-swap");
+    await page.waitForTimeout(100);
+    assert.equal(await page.inputValue("#dual-a-source"), "freeai");
+    assert.equal(await page.inputValue("#dual-b-source"), "ollama");
+
+    // Configurar parámetros independientes en A y B + flujo Pipeline
+    await page.selectOption("#dual-workflow-select", "pipeline");
+    await page.fill("#dual-a-role", "Arquitecto Free.ai");
+    await page.fill("#dual-b-role", "Auditor Ollama");
+    await page.selectOption("#dual-a-profile", "engineering/engineering-backend-architect");
+    await page.selectOption("#dual-a-skill", "backend-architect");
+    await page.selectOption("#dual-b-profile", "Pirata");
+    await page.selectOption("#dual-b-skill", "code-reviewer");
+    await page.fill("#dual-a-directive", "DIRECTIVA_UNICA_A");
+    await page.fill("#dual-b-directive", "DIRECTIVA_UNICA_B");
+    await page.dispatchEvent("#dual-a-directive", "input");
+    await page.dispatchEvent("#dual-b-directive", "input");
+    await page.waitForTimeout(450);
+
+    // Capturar captura desktop con #dual-config-panel abierto si env solicita screenshots (con scrollTop = 0 visible)
+    const shotDir = process.env.LOCAL_AI_E2E_SCREENSHOT_DIR || tempRoot;
+    await page.evaluate(() => {
+      const panel = document.getElementById("dual-config-panel");
+      if (panel) panel.scrollTop = 0;
+    });
+    await page.screenshot({ path: path.join(shotDir, "desktop_dual_panel.png") });
+
+    // Cero overflow con #dual-config-panel abierto en desktop (1280x800) y sidecar (420x800)
+    const openDesktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(openDesktopOverflow <= 1, `Overflow desktop con panel dual: ${openDesktopOverflow}`);
+
+    await page.setViewportSize({ width: 420, height: 800 });
+    await page.evaluate(() => {
+      const panel = document.getElementById("dual-config-panel");
+      if (panel) panel.scrollTop = 0;
+    });
+    const openSidecarOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(openSidecarOverflow <= 1, `Overflow sidecar 420px con panel dual: ${openSidecarOverflow}`);
+    await page.screenshot({ path: path.join(shotDir, "sidecar_dual_panel.png") });
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Cerrar panel antes de enviar mensaje para capturar vista chat Dual amplia
+    await page.click("#btn-dual-close-panel");
+    await page.waitForFunction(() => !document.getElementById("dual-config-panel").classList.contains("active"));
+
+    // Enviar prompt DUAL_WRITE_TEST en flujo Pipeline -> B sobrescribe/gana en src/dual_shared.js, A aporta src/dual_only_a.js
+    await page.fill("#prompt-input", "DUAL_WRITE_TEST ejecuta cambios coordinados");
+    await page.click("#send-btn");
+
+    await page.waitForFunction(() => {
+      const turn = document.querySelector(".dual-turn-wrap");
+      if (!turn) return false;
+      const aDone = turn.querySelector('.dual-agent-pane[data-agent-slot="A"] .dual-pane-stage')?.textContent?.includes("✓");
+      const bDone = turn.querySelector('.dual-agent-pane[data-agent-slot="B"] .dual-pane-stage')?.textContent?.includes("✓");
+      const appliedBtns = turn.querySelectorAll(".btn-apply-action.applied");
+      const sendBtn = document.getElementById("send-btn");
+      return aDone && bDone && appliedBtns.length >= 4 && sendBtn && !sendBtn.disabled;
+    });
+
+    await page.screenshot({ path: path.join(shotDir, "desktop_dual.png") });
+
+    // Verificar en sidecar 420x800 también con tarjetas duales renderizadas
+    await page.setViewportSize({ width: 420, height: 800 });
+    const chatSidecarOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(chatSidecarOverflow <= 1, `Overflow sidecar 420px con .dual-turn-grid: ${chatSidecarOverflow}`);
+    await page.screenshot({ path: path.join(shotDir, "sidecar_dual.png") });
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Verificar deduplicación en disco: ganó Stage B en src/dual_shared.js + archivos únicos de A y B escritos
+    const sharedFile = path.join(projAlphaDir, "src", "dual_shared.js");
+    const onlyAFile = path.join(projAlphaDir, "src", "dual_only_a.js");
+    const onlyBFile = path.join(projAlphaDir, "src", "dual_only_b.js");
+    assert.equal(fs.existsSync(sharedFile), true);
+    assert.equal(fs.existsSync(onlyAFile), true);
+    assert.equal(fs.existsSync(onlyBFile), true);
+    assert.match(fs.readFileSync(sharedFile, "utf8"), /agent-b-winner/, "Stage B debe prevalecer sobre Stage A en Pipeline");
+    assert.match(fs.readFileSync(onlyAFile, "utf8"), /fromA = true/);
+    assert.match(fs.readFileSync(onlyBFile, "utf8"), /fromB = true/);
+
+    const dualButtonTexts = await page.evaluate(() => ({
+      aBtns: Array.from(document.querySelectorAll('.dual-agent-pane[data-agent-slot="A"] .btn-apply-action')).map((b) => b.textContent.trim()),
+      bBtns: Array.from(document.querySelectorAll('.dual-agent-pane[data-agent-slot="B"] .btn-apply-action')).map((b) => b.textContent.trim())
+    }));
+    assert.ok(dualButtonTexts.aBtns.some((t) => t.includes("Superado")), `Botón duplicado de A debe marcarse Superado: ${dualButtonTexts.aBtns}`);
+    assert.ok(dualButtonTexts.aBtns.some((t) => t.includes("Aplicado en Disco")));
+    assert.ok(dualButtonTexts.bBtns.every((t) => t.includes("Aplicado en Disco")));
+
+    // Verificar recarga limpia: restaura asistente dual (.dual-turn-grid), estado dual OFF/ON del proyecto y badge DUAL en Historial
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForSelector(".dual-turn-wrap .dual-turn-grid");
+    await page.waitForFunction(() => document.querySelector("#btn-dual-mode")?.classList.contains("active"));
+    assert.equal(await page.inputValue("#dual-a-role"), "Arquitecto Free.ai");
+    assert.equal(await page.inputValue("#dual-b-role"), "Auditor Ollama");
+    assert.equal(await page.inputValue("#dual-a-profile"), "engineering/engineering-backend-architect");
+    assert.equal(await page.inputValue("#dual-b-skill"), "code-reviewer");
+
+    // Verificar aislamiento por proyecto: cambiar a General -> dualConfig vuelve a OFF; regresar a AlphaApp -> dualConfig vuelve a ON
+    await page.selectOption("#project-select", "General");
+    await page.waitForFunction(() => !document.getElementById("btn-dual-mode")?.classList.contains("active"));
+    await page.selectOption("#project-select", "AlphaApp");
+    await page.waitForFunction(() => document.getElementById("btn-dual-mode")?.classList.contains("active"));
+
+    // Verificar badge DUAL en drawer Historial
+    await page.click("#btn-history");
+    await page.waitForSelector("#history-drawer.active .history-mode-badge");
+    const histBadge = await page.textContent("#history-drawer .history-mode-badge");
+    assert.match(histBadge, /DUAL \(freeai\+ollama\)/);
 
     assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
     assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);

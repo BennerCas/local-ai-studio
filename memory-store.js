@@ -206,11 +206,13 @@ function normalizeChatSession(sessionObj, existing = null) {
     project: String(sessionObj?.project || existing?.project || "General"),
     projectPath: String(sessionObj?.projectPath ?? existing?.projectPath ?? ""),
     convId: String(sessionObj?.convId ?? existing?.convId ?? ""),
+    mode: sessionObj?.mode === "dual" || (!sessionObj?.mode && existing?.mode === "dual") ? "dual" : "single",
     source: String(sessionObj?.source ?? existing?.source ?? "ollama"),
     model: String(sessionObj?.model ?? existing?.model ?? ""),
     skillId: String(sessionObj?.skillId ?? existing?.skillId ?? ""),
     profileId: String(sessionObj?.profileId ?? existing?.profileId ?? ""),
     customSystemPrompt: String(sessionObj?.customSystemPrompt ?? existing?.customSystemPrompt ?? ""),
+    dualConfigSummary: sessionObj?.dualConfigSummary ?? existing?.dualConfigSummary ?? null,
     appliedFiles,
     messages,
     createdAt,
@@ -225,10 +227,12 @@ function toChatSummary(chat) {
     project: chat.project,
     projectPath: chat.projectPath,
     convId: chat.convId,
+    mode: chat.mode || "single",
     source: chat.source,
     model: chat.model,
     skillId: chat.skillId,
     profileId: chat.profileId || "",
+    dualConfigSummary: chat.dualConfigSummary || null,
     messageCount: Array.isArray(chat.messages) ? chat.messages.length : (chat.messageCount || 0),
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt
@@ -279,11 +283,13 @@ function getChat(id) {
       project: data.project || "General",
       projectPath: data.projectPath || "",
       convId: data.convId || "",
+      mode: data.mode === "dual" ? "dual" : "single",
       source: data.source || "ollama",
       model: data.model || "",
       skillId: data.skillId || "",
       profileId: data.profileId || "",
       customSystemPrompt: data.customSystemPrompt || "",
+      dualConfigSummary: data.dualConfigSummary || null,
       appliedFiles: Array.isArray(data.appliedFiles) ? data.appliedFiles : [],
       messages: Array.isArray(data.messages) ? data.messages : [],
       createdAt: data.createdAt || data.updatedAt || null,
@@ -581,6 +587,102 @@ function normalizeProjectKeyAndMeta(projectKeyOrPath) {
   return { project: raw, projectPath: "" };
 }
 
+function normalizeDualAgentConfig(raw = {}, fallback = {}) {
+  const srcRaw = String(raw?.source || fallback.source || "ollama").trim().toLowerCase();
+  const source = srcRaw === "directml"
+    ? "directml"
+    : (srcRaw === "freeai" || srcRaw === "free.ai" ? "freeai" : "ollama");
+
+  const tempRaw = Number(raw?.temperature ?? fallback.temperature ?? 0.3);
+  const temperature = Number.isFinite(tempRaw)
+    ? Math.min(2, Math.max(0, Math.round(tempRaw * 100) / 100))
+    : 0.3;
+
+  const maxTokRaw = parseInt(raw?.maxTokens ?? fallback.maxTokens ?? 2048, 10);
+  const maxTokens = Number.isFinite(maxTokRaw)
+    ? Math.min(16384, Math.max(128, maxTokRaw))
+    : 2048;
+
+  const numCtxRaw = parseInt(raw?.numCtx ?? fallback.numCtx ?? 4096, 10);
+  const numCtx = Number.isFinite(numCtxRaw)
+    ? Math.min(65536, Math.max(1024, numCtxRaw))
+    : 4096;
+
+  return {
+    source,
+    model: String(raw?.model ?? fallback.model ?? ""),
+    roleLabel: String(raw?.roleLabel ?? fallback.roleLabel ?? "Agente Especialista").slice(0, 80),
+    profileId: String(raw?.profileId ?? fallback.profileId ?? ""),
+    skillId: String(raw?.skillId ?? fallback.skillId ?? ""),
+    customSystemPrompt: String(raw?.customSystemPrompt ?? fallback.customSystemPrompt ?? ""),
+    temperature,
+    maxTokens,
+    numCtx
+  };
+}
+
+function buildDefaultDualConfig() {
+  return {
+    enabled: false,
+    pair: "freeai+directml",
+    workflow: "parallel",
+    unloadBetweenTurns: true,
+    agentA: {
+      source: "freeai",
+      model: "",
+      roleLabel: "Arquitecto / Planificador",
+      profileId: "",
+      skillId: "",
+      customSystemPrompt: "",
+      temperature: 0.35,
+      maxTokens: 2048,
+      numCtx: 8192
+    },
+    agentB: {
+      source: "directml",
+      model: "Phi-3.5-mini-instruct-ONNX",
+      roleLabel: "Implementador / Auditor",
+      profileId: "",
+      skillId: "",
+      customSystemPrompt: "",
+      temperature: 0.25,
+      maxTokens: 2048,
+      numCtx: 4096
+    }
+  };
+}
+
+function normalizeDualConfig(raw = null) {
+  const def = buildDefaultDualConfig();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return def;
+  }
+  const rawPair = String(raw.pair || def.pair).trim().toLowerCase();
+  const validPairs = ["freeai+directml", "freeai+ollama", "ollama+directml"];
+  const pair = validPairs.includes(rawPair) ? rawPair : def.pair;
+
+  const rawWf = String(raw.workflow || def.workflow).trim().toLowerCase();
+  const validWfs = ["pipeline", "parallel", "debate"];
+  const workflow = validWfs.includes(rawWf) ? rawWf : def.workflow;
+
+  let fallbackA = def.agentA;
+  let fallbackB = def.agentB;
+  if (pair === "freeai+ollama") {
+    fallbackB = { ...def.agentB, source: "ollama", model: "qwen2.5-coder:latest", numCtx: 8192 };
+  } else if (pair === "ollama+directml") {
+    fallbackA = { ...def.agentA, source: "ollama", model: "qwen2.5-coder:latest", numCtx: 4096 };
+  }
+
+  return {
+    enabled: Boolean(raw.enabled),
+    pair,
+    workflow,
+    unloadBetweenTurns: raw.unloadBetweenTurns !== undefined ? Boolean(raw.unloadBetweenTurns) : true,
+    agentA: normalizeDualAgentConfig(raw.agentA, fallbackA),
+    agentB: normalizeDualAgentConfig(raw.agentB, fallbackB)
+  };
+}
+
 function buildDefaultProjectState(meta) {
   return {
     project: meta.project || "General",
@@ -593,6 +695,7 @@ function buildDefaultProjectState(meta) {
     lastSessionId: "",
     selectedFiles: [],
     lastContextAnalysis: null,
+    dualConfig: buildDefaultDualConfig(),
     updatedAt: null
   };
 }
@@ -638,7 +741,8 @@ function getProjectState(projectKeyOrPath) {
     ...stored,
     project: stored.project || defaults.project,
     projectPath: stored.projectPath || defaults.projectPath,
-    selectedFiles: Array.isArray(stored.selectedFiles) ? stored.selectedFiles : []
+    selectedFiles: Array.isArray(stored.selectedFiles) ? stored.selectedFiles : [],
+    dualConfig: normalizeDualConfig(stored.dualConfig)
   };
 }
 
@@ -649,12 +753,33 @@ function updateProjectState(projectKeyOrPath, patch = {}) {
   const existing = getProjectState(projectKeyOrPath);
   const nowIso = new Date().toISOString();
 
+  const patchObj = (patch && typeof patch === "object") ? { ...patch } : {};
+  let mergedDualConfig = existing.dualConfig || buildDefaultDualConfig();
+  if (patchObj.dualConfig && typeof patchObj.dualConfig === "object" && !Array.isArray(patchObj.dualConfig)) {
+    mergedDualConfig = normalizeDualConfig({
+      ...mergedDualConfig,
+      ...patchObj.dualConfig,
+      agentA: {
+        ...(mergedDualConfig.agentA || {}),
+        ...(patchObj.dualConfig.agentA || {})
+      },
+      agentB: {
+        ...(mergedDualConfig.agentB || {}),
+        ...(patchObj.dualConfig.agentB || {})
+      }
+    });
+  } else {
+    mergedDualConfig = normalizeDualConfig(mergedDualConfig);
+  }
+  delete patchObj.dualConfig;
+
   const nextState = {
     ...existing,
-    ...(patch && typeof patch === "object" ? patch : {}),
-    project: (patch && patch.project) ? String(patch.project) : (existing.project || meta.project),
-    projectPath: (patch && patch.projectPath !== undefined)
-      ? String(patch.projectPath)
+    ...patchObj,
+    dualConfig: mergedDualConfig,
+    project: (patchObj.project) ? String(patchObj.project) : (existing.project || meta.project),
+    projectPath: (patchObj.projectPath !== undefined)
+      ? String(patchObj.projectPath)
       : (existing.projectPath || meta.projectPath),
     updatedAt: nowIso
   };
@@ -814,6 +939,8 @@ module.exports = {
   getProjectState,
   updateProjectState,
   getAllProjectStates,
+  buildDefaultDualConfig,
+  normalizeDualConfig,
   DEFAULT_MASTER_PROMPT,
   DEFAULT_CONTEXT_ANALYZER_PROMPT,
   getMasterPromptConfig,

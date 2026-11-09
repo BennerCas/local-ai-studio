@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Local AI Studio: Panel híbrido de Ollama, DirectML GPU y Free.ai integrado con Antigravity, GitHub, Netlify y Hugging Face.">
   <title>Local AI Studio - Antigravity</title>
+  <link rel="icon" type="image/png" sizes="128x128" href="/assets/local-ai-studio-icon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-dark: #000000;
@@ -128,29 +130,134 @@
       min-width: 0;
     }
 
-    .brand-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
-      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-      display: flex;
+    .brand-title.vibe-logo-lockup {
+      margin: 0;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: #000000;
-      font-size: 14px;
-      box-shadow: 0 2px 10px rgba(122, 162, 247, 0.35);
-      flex-shrink: 0;
+      gap: 6px;
+      font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: min(var(--font-title), 20px);
+      color: #ffffff;
+      letter-spacing: -0.025em;
+      white-space: nowrap;
+      line-height: 1.15;
+      user-select: none;
+      cursor: default;
     }
 
-    .brand-title {
-      margin: 0;
+    .vibe-word-local {
       font-weight: 600;
-      font-size: min(var(--font-title), 18px);
-      color: var(--text-strong);
-      letter-spacing: 0.2px;
-      white-space: nowrap;
-      line-height: 1.2;
+      color: #ffffff;
+      letter-spacing: -0.025em;
+    }
+
+    .vibe-word-studio {
+      font-weight: 300;
+      color: #94a3b8;
+      letter-spacing: 0.1em;
+      transition: color 0.3s ease;
+    }
+
+    .vibe-logo-lockup:hover .vibe-word-studio {
+      color: #ffffff;
+    }
+
+    .vibe-pill-nav {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      padding: 2.5px 10px 3px 10px;
+      background: linear-gradient(110deg, #0ea5e9 0%, #8b5cf6 25%, #ec4899 50%, #8b5cf6 75%, #0ea5e9 100%);
+      background-size: 200% auto;
+      animation: vibeFlow 4s linear infinite;
+      box-shadow:
+        0 4px 16px -4px rgba(139, 92, 246, 0.55),
+        inset 0 1px 2px rgba(255, 255, 255, 0.42),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.35s ease;
+    }
+
+    .vibe-logo-lockup:hover .vibe-pill-nav {
+      transform: scale(1.06);
+      animation: vibeFlow 1.5s linear infinite;
+      box-shadow:
+        0 6px 22px -4px rgba(236, 72, 153, 0.65),
+        inset 0 1px 2px rgba(255, 255, 255, 0.5),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+    }
+
+    .vibe-pill-clip {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .vibe-pill-glass {
+      display: block;
+      width: 100%;
+      height: 44%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 100%);
+    }
+
+    .vibe-status-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #67e8f9;
+      border: 1.5px solid #050507;
+      box-shadow: 0 0 8px #22d3ee, 0 0 15px #22d3ee;
+      animation: vibeBreathe 2.5s ease-in-out infinite;
+      z-index: 3;
+    }
+
+    .vibe-pill-core {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 0.92em;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: #0a0a0f;
+    }
+
+    .vibe-pill-ai {
+      text-transform: lowercase;
+    }
+
+    .vibe-cursor-blink {
+      display: inline-block;
+      width: 2.5px;
+      height: 0.88em;
+      background: #0a0a0f;
+      margin-left: 2px;
+      border-radius: 1px;
+      animation: vibeBlink 1s step-end infinite;
+    }
+
+    @keyframes vibeFlow {
+      0% { background-position: 0% center; }
+      100% { background-position: -200% center; }
+    }
+
+    @keyframes vibeBreathe {
+      0%, 100% { opacity: 0.72; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.22); }
+    }
+
+    @keyframes vibeBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
     .top-action-buttons {
@@ -1540,6 +1647,363 @@
     #toast.error { border-color: var(--accent-red); color: var(--accent-red); }
     #toast.success { border-color: var(--accent-green); color: var(--accent-green); }
 
+    /* ======================================================= */
+    /* Modo Dual Orquestado + Telemetría / Advisor de Hardware */
+    /* ======================================================= */
+    .btn-dual-toggle {
+      background: rgba(187, 154, 247, 0.14);
+      border-color: rgba(187, 154, 247, 0.42);
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+    .btn-dual-toggle:hover {
+      background: rgba(187, 154, 247, 0.25);
+      border-color: var(--accent-purple);
+      color: #ffffff;
+    }
+    .btn-dual-toggle.active {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(187, 154, 247, 0.32));
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(125, 207, 255, 0.26);
+    }
+
+    .single-mode-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .dual-bar-strip {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .dual-pair-pills {
+      display: flex;
+      align-items: center;
+      background: #000000;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 3px;
+      flex-wrap: wrap;
+      max-width: 100%;
+    }
+
+    .dual-pair-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 9px;
+      font-size: var(--chrome-font-small);
+      font-weight: 500;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .dual-pair-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.06); }
+    .dual-pair-btn.active {
+      background: rgba(125, 207, 255, 0.2);
+      color: var(--accent-cyan);
+      font-weight: 600;
+      box-shadow: inset 0 0 0 1px rgba(125, 207, 255, 0.42);
+    }
+
+    .dual-strip-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .dual-hw-badge {
+      border-radius: 14px;
+      padding: 3px 9px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: rgba(158, 206, 106, 0.14);
+      color: var(--accent-green);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      transition: all 0.18s;
+    }
+    .dual-hw-badge.risk-optimal { border-color: rgba(158, 206, 106, 0.48); background: rgba(158, 206, 106, 0.14); color: var(--accent-green); }
+    .dual-hw-badge.risk-caution { border-color: rgba(224, 175, 104, 0.55); background: rgba(224, 175, 104, 0.16); color: var(--accent-yellow); }
+    .dual-hw-badge.risk-critical { border-color: rgba(247, 118, 142, 0.6); background: rgba(247, 118, 142, 0.18); color: var(--accent-red); }
+
+    #dual-config-panel {
+      display: none;
+      background: #050508;
+      border-bottom: 1px solid var(--border-strong);
+      flex-shrink: 0;
+      max-height: 0;
+      overflow: hidden;
+    }
+    #dual-config-panel.active {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 14px;
+      max-height: min(54vh, 455px);
+      overflow-y: auto;
+    }
+
+    .dual-toolbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .dual-toolbar-left, .dual-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .dual-field-select, .dual-field-input, .dual-field-textarea {
+      background: #020204;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: var(--chrome-font-small);
+      outline: none;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .dual-field-select:focus, .dual-field-input:focus, .dual-field-textarea:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .dual-hw-card {
+      background: rgba(8, 10, 16, 0.96);
+      border: 1px solid rgba(125, 207, 255, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .dual-hw-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .dual-hw-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+    .dual-hw-warn-item { color: var(--accent-yellow); }
+    .dual-hw-crit-item { color: var(--accent-red); font-weight: 600; }
+    .dual-hw-rec-item { color: var(--accent-cyan); }
+    .dual-hw-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .dual-agents-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      min-width: 0;
+    }
+    .dual-agent-card {
+      background: #040407;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .dual-agent-card.slot-a { border-top: 2px solid var(--accent-cyan); }
+    .dual-agent-card.slot-b { border-top: 2px solid var(--accent-purple); }
+    .dual-agent-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--text-strong);
+      flex-wrap: wrap;
+    }
+    .dual-form-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      min-width: 0;
+    }
+    .dual-form-row.three-col {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .dual-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .dual-form-field label {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dual-field-textarea {
+      width: 100%;
+      min-height: 36px;
+      max-height: 76px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    /* Turnos Duales dentro de #chat-container */
+    .message.dual-turn-wrap {
+      align-self: stretch;
+      width: 100%;
+      max-width: 100%;
+      background: rgba(6, 7, 11, 0.85);
+      border: 1px solid rgba(125, 207, 255, 0.25);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .dual-turn-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(122, 162, 247, 0.16);
+    }
+    .dual-turn-notices {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .dual-system-notice {
+      background: rgba(224, 175, 104, 0.12);
+      border: 1px solid rgba(224, 175, 104, 0.45);
+      border-left: 3px solid var(--accent-yellow);
+      color: var(--accent-yellow);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .dual-turn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      min-width: 0;
+      width: 100%;
+    }
+    .dual-agent-pane {
+      background: #020205;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .dual-agent-pane.pane-a { border-top: 2px solid var(--accent-cyan); }
+    .dual-agent-pane.pane-b { border-top: 2px solid var(--accent-purple); }
+    .dual-agent-pane.pane-active {
+      box-shadow: 0 0 14px rgba(125, 207, 255, 0.18);
+    }
+    .dual-agent-pane.pane-error {
+      border-color: rgba(247, 118, 142, 0.55);
+    }
+    .dual-pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11.5px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid rgba(122, 162, 247, 0.14);
+    }
+    .dual-pane-title {
+      font-weight: 600;
+      color: var(--text-strong);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .dual-pane-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .dual-pane-body {
+      font-size: var(--chat-font-size);
+      line-height: 1.5;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .dual-pane-footer {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      padding-top: 5px;
+      border-top: 1px solid rgba(122, 162, 247, 0.12);
+      flex-wrap: wrap;
+    }
+    .history-mode-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10.5px;
+      font-weight: 600;
+      background: rgba(187, 154, 247, 0.18);
+      border: 1px solid rgba(187, 154, 247, 0.42);
+      color: var(--accent-purple);
+      margin-left: 4px;
+    }
+
     /* Modales */
     .modal-backdrop {
       position: fixed;
@@ -1714,24 +2178,89 @@
       font-size: 11.5px;
     }
 
+    @media (max-width: 820px) {
+      .dual-agents-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .dual-turn-grid {
+        grid-template-columns: 1fr;
+      }
+      .dual-form-row, .dual-form-row.three-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 680px) {
+      header, .model-control-bar, .skills-bar, .project-bar {
+        padding: 4px 10px;
+        gap: 5px;
+      }
+      .header-btn {
+        padding: 3px 7px;
+        font-size: 11.5px;
+      }
+      .dual-pair-pills {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        width: 100%;
+      }
+      .dual-pair-pills::-webkit-scrollbar {
+        height: 0;
+      }
+      .dual-pair-btn {
+        padding: 3px 7px;
+        font-size: 11.5px;
+      }
+      #dual-config-panel.active {
+        max-height: min(44vh, 330px);
+        padding: 7px 10px;
+        gap: 6px;
+      }
+      #chat-container {
+        min-height: 96px;
+        padding: 10px;
+        gap: 8px;
+      }
+      footer {
+        padding: 5px 10px 6px 10px;
+        gap: 4px;
+      }
+      .pill {
+        padding: 2px 8px;
+        font-size: 11.5px;
+      }
+      .pill-compound .pill-gear {
+        padding: 2px 8px;
+      }
       .integrations-bar {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        padding: 3px 5px;
         gap: 4px;
       }
       .int-bar-group {
-        flex-wrap: wrap;
-        overflow-x: visible;
+        flex-wrap: nowrap;
+        overflow-x: auto;
       }
       .int-env-status {
-        border-left: none;
-        padding-left: 2px;
+        padding-left: 5px;
+        font-size: 10.5px;
       }
       textarea#prompt-input {
-        min-height: 48px;
-        height: 48px;
-        font-size: 14px;
-        line-height: 1.35;
+        min-height: 38px;
+        height: 38px;
+        padding: 6px 10px;
+        font-size: 13.5px;
+        line-height: 1.3;
+      }
+      button.send-btn {
+        padding: 0 12px;
+      }
+      .legal-signature {
+        font-size: 10px;
       }
     }
 
@@ -1756,8 +2285,7 @@
 
   <header>
     <div class="brand">
-      <div class="brand-icon" aria-hidden="true">⚡</div>
-      <h1 class="brand-title">Local AI Studio</h1>
+      <h1 class="brand-title vibe-logo-lockup" aria-label="Local AI Studio"><span class="vibe-word-local">Local</span> <span class="vibe-pill-nav"><span class="vibe-pill-clip" aria-hidden="true"><span class="vibe-pill-glass"></span></span><span class="vibe-status-dot" aria-hidden="true"></span><span class="vibe-pill-core"><span class="vibe-pill-ai">AI</span><span class="vibe-cursor-blink" aria-hidden="true"></span></span></span> <span class="vibe-word-studio">Studio</span></h1>
     </div>
     <div class="top-action-buttons">
       <button type="button" id="btn-new-chat" class="header-btn btn-primary" title="Iniciar nuevo chat limpio">
@@ -1796,32 +2324,60 @@
     </div>
   </header>
 
-  <!-- Barra de Motor AI (Ollama Local, DirectML Nativo, Free.ai Cloud) -->
+  <!-- Barra de Motor AI (Ollama Local, DirectML Nativo, Free.ai Cloud + Modo Dual) -->
   <div class="model-control-bar">
-    <div class="ai-source-toggle" role="group" aria-label="Motor de Inteligencia Artificial">
-      <button type="button" id="src-local-btn" class="source-btn active source-local" data-source="local" title="Agente Ollama Local (GGUF | Port 11434)">
-        <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Agente Ollama</span>
+    <button type="button" id="btn-dual-mode" class="header-btn btn-dual-toggle" aria-pressed="false" title="Activar Modo Dual: colaboracion orquestada de 2 agentes independientes con evaluación de hardware">
+      <span>⚡ Modo Dual</span>
+    </button>
+
+    <div id="single-mode-controls" class="single-mode-controls">
+      <div class="ai-source-toggle" role="group" aria-label="Motor de Inteligencia Artificial">
+        <button type="button" id="src-local-btn" class="source-btn active source-local" data-source="local" title="Agente Ollama Local (GGUF | Port 11434)">
+          <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Agente Ollama</span>
+        </button>
+        <button type="button" id="src-directml-btn" class="source-btn source-directml" data-source="directml" title="Agente DirectML Nativo (ONNX GPU AMD DirectX 12 | Port 8002)">
+          <span>⚡</span><span>Agente DirectML</span>
+        </button>
+        <button type="button" id="src-freeai-btn" class="source-btn source-freeai" data-source="freeai" title="Agente Free.ai Cloud">
+          <span>🌐</span><span>Agente Free.ai</span>
+        </button>
+      </div>
+
+      <select id="model-select" class="model-select" aria-label="Seleccionar Modelo AI">
+        <option value="">Cargando modelos...</option>
+      </select>
+
+      <button type="button" id="btn-modelfile" class="header-btn" title="Ver y editar Modelfile del modelo Ollama seleccionado">
+        <span>📄</span><span>Modelfile</span>
       </button>
-      <button type="button" id="src-directml-btn" class="source-btn source-directml" data-source="directml" title="Agente DirectML Nativo (ONNX GPU AMD DirectX 12 | Port 8002)">
-        <span>⚡</span><span>Agente DirectML</span>
-      </button>
-      <button type="button" id="src-freeai-btn" class="source-btn source-freeai" data-source="freeai" title="Agente Free.ai Cloud">
-        <span>🌐</span><span>Agente Free.ai</span>
+
+      <button type="button" id="btn-dml-control" class="header-btn" style="display:none;" title="Control y estado del servidor DirectML">
+        <span id="dml-icon">⚡</span>
+        <span id="dml-label">DirectML GPU</span>
       </button>
     </div>
 
-    <select id="model-select" class="model-select" aria-label="Seleccionar Modelo AI">
-      <option value="">Cargando modelos...</option>
-    </select>
-
-    <button type="button" id="btn-modelfile" class="header-btn" title="Ver y editar Modelfile del modelo Ollama seleccionado">
-      <span>📄</span><span>Modelfile</span>
-    </button>
-
-    <button type="button" id="btn-dml-control" class="header-btn" style="display:none;" title="Control y estado del servidor DirectML">
-      <span id="dml-icon">⚡</span>
-      <span id="dml-label">DirectML GPU</span>
-    </button>
+    <div id="dual-bar-strip" class="dual-bar-strip">
+      <div id="dual-pair-pills" class="dual-pair-pills" role="group" aria-label="Combinación de Agentes Dual">
+        <button type="button" id="dual-pair-freeai-directml" class="dual-pair-btn active" data-dual-pair="freeai+directml" title="Modo 1: Cloud Free.ai + DirectML GPU (0 contención GPU)">
+          <span>🌐 Free.ai + ⚡ DirectML</span>
+        </button>
+        <button type="button" id="dual-pair-freeai-ollama" class="dual-pair-btn" data-dual-pair="freeai+ollama" title="Modo 2: Cloud Free.ai + Ollama Local/Cloud">
+          <span>🌐 Free.ai +</span><img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Ollama</span>
+        </button>
+        <button type="button" id="dual-pair-ollama-directml" class="dual-pair-btn" data-dual-pair="ollama+directml" title="Modo 3: Ollama + DirectML GPU (con guard de VRAM y Pipeline secuencial)">
+          <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Ollama + ⚡ DirectML</span>
+        </button>
+      </div>
+      <div class="dual-strip-actions">
+        <button type="button" id="dual-hw-health-badge" class="dual-hw-badge risk-optimal" title="Ver evaluación de VRAM, RAM y variables Windows">
+          🟢 Óptimo
+        </button>
+        <button type="button" id="btn-dual-config-toggle" class="header-btn" aria-expanded="false" title="Abrir configuración independiente de Agente A / B y tuning del sistema">
+          <span>⚙️ Configurar Dual</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Barra de Perfiles Cognitivos (Perfil > Skill) y Habilidades -->
@@ -1877,6 +2433,183 @@
       </button>
     </div>
   </div>
+
+  <!-- Panel Colapsable de Configuración Dual Independiente & Hardware Advisor -->
+  <section id="dual-config-panel" aria-label="Configuración de Agentes en Modo Dual" aria-hidden="true">
+    <div class="dual-toolbar-row">
+      <div class="dual-toolbar-left">
+        <label for="dual-workflow-select" style="font-size:12px; color:var(--accent-cyan); font-weight:600;">Flujo:</label>
+        <select id="dual-workflow-select" class="dual-field-select" aria-label="Flujo de colaboración Dual">
+          <option value="pipeline">🔄 Pipeline (A → B Refina)</option>
+          <option value="parallel">⚡ Paralelo (A ∥ B)</option>
+          <option value="debate">⚔️ Debate (A → B → A Consolida)</option>
+        </select>
+        <button type="button" id="btn-dual-swap" class="header-btn" title="Intercambiar completamente Agente A ↔ Agente B (motor, modelo, rol, perfil, skill y parámetros)">
+          ⇄ Invertir A ↔ B
+        </button>
+        <label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text-main); cursor:pointer;">
+          <input type="checkbox" id="dual-unload-check" checked style="accent-color:var(--accent-cyan);">
+          <span>Liberar Ollama entre turnos</span>
+        </label>
+      </div>
+      <div class="dual-toolbar-right">
+        <button type="button" id="btn-dual-stop-dml" class="header-btn" title="Detener proceso DirectML para liberar VRAM inmediatamente">
+          🛑 Detener DirectML
+        </button>
+        <button type="button" id="btn-dual-unload-ollama" class="header-btn" title="Descargar modelos activos de Ollama de memoria">
+          🧹 Descargar Ollama
+        </button>
+        <button type="button" id="btn-dual-close-panel" class="header-btn" title="Ocultar panel de configuración Dual">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <div id="dual-hw-card" class="dual-hw-card">
+      <div class="dual-hw-header">
+        <div id="dual-hw-summary" style="color:var(--text-strong); font-weight:500;">
+          Analizando telemetría de CPU, Radeon 860M y RAM libre...
+        </div>
+        <span id="dual-hw-risk-pill" class="dual-hw-badge risk-optimal">🟢 Óptimo</span>
+      </div>
+      <div id="dual-hw-warnings" class="dual-hw-list"></div>
+      <div id="dual-hw-recommendations" class="dual-hw-list"></div>
+      <div class="dual-hw-actions">
+        <button type="button" id="btn-dual-apply-recommended" class="header-btn btn-accent-cyan" title="Aplicar flujo, contexto y ajuste sugerido para este hardware y par">
+          ✨ Aplicar Perfil Sugerido
+        </button>
+        <button type="button" id="btn-dual-tune-session" class="header-btn" title="Aplicar variables recomendadas a la sesión actual (y reiniciar DirectML si aplica)">
+          ⚡ Tunear Sesión
+        </button>
+        <button type="button" id="btn-dual-tune-windows" class="header-btn" title="Persistir variables seguras ROCm/Ollama/Olive en Variables de Usuario de Windows">
+          🖥️ Guardar Env Windows
+        </button>
+        <button type="button" id="btn-dual-refresh-hw" class="header-btn" title="Releer telemetría de hardware y modelos en VRAM/RAM">
+          🔄 Actualizar HW
+        </button>
+      </div>
+    </div>
+
+    <div class="dual-agents-grid">
+      <div id="dual-card-a" class="dual-agent-card slot-a">
+        <div class="dual-agent-card-head">
+          <span style="color:var(--accent-cyan);">🧩 Agente A</span>
+          <span id="dual-a-mem-tag" style="font-size:11px; color:var(--text-muted);">-</span>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-a-source">Motor A</label>
+            <select id="dual-a-source" class="dual-field-select">
+              <option value="freeai">🌐 Free.ai Cloud</option>
+              <option value="directml">⚡ DirectML GPU</option>
+              <option value="ollama">🤖 Ollama</option>
+            </select>
+          </div>
+          <div class="dual-form-field">
+            <label for="dual-a-model">Modelo A</label>
+            <select id="dual-a-model" class="dual-field-select"></select>
+          </div>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-a-role">Rol / Etiqueta A</label>
+            <input type="text" id="dual-a-role" class="dual-field-input" value="Arquitecto / Generador" placeholder="Ej. Arquitecto / Generador">
+          </div>
+          <div class="dual-form-field">
+            <label for="dual-a-profile">Perfil Cognitivo A</label>
+            <select id="dual-a-profile" class="dual-field-select">
+              <option value="">🧠 Sin Perfil</option>
+            </select>
+          </div>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-a-skill">Skill Técnico A</label>
+            <select id="dual-a-skill" class="dual-field-select">
+              <option value="">🎯 Sin Skill</option>
+            </select>
+          </div>
+          <div class="dual-form-row three-col">
+            <div class="dual-form-field">
+              <label for="dual-a-temp">Temp</label>
+              <input type="number" id="dual-a-temp" class="dual-field-input" min="0" max="2" step="0.1" value="0.3">
+            </div>
+            <div class="dual-form-field">
+              <label for="dual-a-max-tokens">MaxTok</label>
+              <input type="number" id="dual-a-max-tokens" class="dual-field-input" min="256" max="8192" step="256" value="2048">
+            </div>
+            <div class="dual-form-field">
+              <label for="dual-a-num-ctx">NumCtx</label>
+              <input type="number" id="dual-a-num-ctx" class="dual-field-input" min="1024" max="32768" step="1024" value="8192">
+            </div>
+          </div>
+        </div>
+        <div class="dual-form-field">
+          <label for="dual-a-directive">Directiva Personalizada Agente A</label>
+          <textarea id="dual-a-directive" class="dual-field-textarea" placeholder="Reglas específicas opcionales para Agente A..."></textarea>
+        </div>
+      </div>
+
+      <div id="dual-card-b" class="dual-agent-card slot-b">
+        <div class="dual-agent-card-head">
+          <span style="color:var(--accent-purple);">🛡️ Agente B</span>
+          <span id="dual-b-mem-tag" style="font-size:11px; color:var(--text-muted);">-</span>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-b-source">Motor B</label>
+            <select id="dual-b-source" class="dual-field-select">
+              <option value="freeai">🌐 Free.ai Cloud</option>
+              <option value="directml">⚡ DirectML GPU</option>
+              <option value="ollama">🤖 Ollama</option>
+            </select>
+          </div>
+          <div class="dual-form-field">
+            <label for="dual-b-model">Modelo B</label>
+            <select id="dual-b-model" class="dual-field-select"></select>
+          </div>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-b-role">Rol / Etiqueta B</label>
+            <input type="text" id="dual-b-role" class="dual-field-input" value="Auditor / Crítico" placeholder="Ej. Auditor / Crítico">
+          </div>
+          <div class="dual-form-field">
+            <label for="dual-b-profile">Perfil Cognitivo B</label>
+            <select id="dual-b-profile" class="dual-field-select">
+              <option value="">🧠 Sin Perfil</option>
+            </select>
+          </div>
+        </div>
+        <div class="dual-form-row">
+          <div class="dual-form-field">
+            <label for="dual-b-skill">Skill Técnico B</label>
+            <select id="dual-b-skill" class="dual-field-select">
+              <option value="">🎯 Sin Skill</option>
+            </select>
+          </div>
+          <div class="dual-form-row three-col">
+            <div class="dual-form-field">
+              <label for="dual-b-temp">Temp</label>
+              <input type="number" id="dual-b-temp" class="dual-field-input" min="0" max="2" step="0.1" value="0.2">
+            </div>
+            <div class="dual-form-field">
+              <label for="dual-b-max-tokens">MaxTok</label>
+              <input type="number" id="dual-b-max-tokens" class="dual-field-input" min="256" max="8192" step="256" value="2048">
+            </div>
+            <div class="dual-form-field">
+              <label for="dual-b-num-ctx">NumCtx</label>
+              <input type="number" id="dual-b-num-ctx" class="dual-field-input" min="1024" max="32768" step="1024" value="4096">
+            </div>
+          </div>
+        </div>
+        <div class="dual-form-field">
+          <label for="dual-b-directive">Directiva Personalizada Agente B</label>
+          <textarea id="dual-b-directive" class="dual-field-textarea" placeholder="Reglas específicas opcionales para Agente B..."></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Cajón Desplegable de Contexto del Proyecto -->
   <div id="context-drawer" aria-hidden="true">
@@ -2457,6 +3190,42 @@
     let currentVersionBuild = null;
     let activeSpeechBtn = null;
     let toastTimeout = null;
+
+    function buildDefaultDualConfigClient() {
+      return {
+        enabled: false,
+        pair: 'freeai+directml',
+        workflow: 'parallel',
+        unloadBetweenTurns: false,
+        agentA: {
+          source: 'freeai',
+          model: '',
+          roleLabel: 'Arquitecto / Generador',
+          profileId: '',
+          skillId: '',
+          customSystemPrompt: '',
+          temperature: 0.3,
+          maxTokens: 2048,
+          numCtx: 8192
+        },
+        agentB: {
+          source: 'directml',
+          model: '',
+          roleLabel: 'Auditor / Crítico',
+          profileId: '',
+          skillId: '',
+          customSystemPrompt: '',
+          temperature: 0.2,
+          maxTokens: 2048,
+          numCtx: 4096
+        }
+      };
+    }
+
+    let dualConfig = buildDefaultDualConfigClient();
+    let dualConfigPanelOpen = false;
+    let dualHwTimer = null;
+    let dualLastEvalData = null;
 
     // =========================================================================
     // 2. Utilidades de Seguridad (AUDITORIA.md), HTTP y Formato
@@ -3112,6 +3881,26 @@
         } else if (act === 'retry') {
           retryFromAiMessage(msgDiv);
         }
+        return;
+      }
+
+      const dualPaneBtn = event.target.closest('[data-dual-pane-act]');
+      if (dualPaneBtn) {
+        const paneEl = dualPaneBtn.closest('.dual-agent-pane');
+        if (!paneEl) return;
+        const act = dualPaneBtn.dataset.dualPaneAct;
+        if (act === 'copy') {
+          try {
+            await navigator.clipboard.writeText(paneEl._rawText || '');
+            const old = dualPaneBtn.textContent;
+            dualPaneBtn.textContent = '✅ Copiado';
+            setTimeout(() => { dualPaneBtn.textContent = old; }, 1500);
+          } catch (_e) {
+            showToast('No se pudo copiar al portapapeles.', 'error');
+          }
+        } else if (act === 'tts') {
+          toggleSpeechForMessage(dualPaneBtn, paneEl);
+        }
       }
     });
 
@@ -3261,7 +4050,7 @@
       });
     }
 
-    async function executeFileCardAction(blockId, btnEl, { batchMode = false } = {}) {
+    async function executeFileCardAction(blockId, btnEl, { batchMode = false, modelOverride = null, sourceOverride = null } = {}) {
       const block = renderedCodeBlocks.get(blockId);
       if (!block || block.applied) return { ok: false, skipped: true };
 
@@ -3270,6 +4059,8 @@
       btnEl.textContent = block.kind === 'patch' ? '⏳ Parcheando...' : '⏳ Guardando...';
 
       const proj = getActiveProjectDescriptor();
+      const effectiveModel = modelOverride || currentModelName;
+      const effectiveSource = sourceOverride || currentSource;
       const doSyncGh = !batchMode && Boolean(githubToggle && selectedGithubRepo);
       const doDeployNf = !batchMode && Boolean(isNetlifyAutoDeployActive() && proj.path);
 
@@ -3283,8 +4074,8 @@
               projectPath: proj.path || undefined,
               filePath: block.filePath,
               content: block.code,
-              model: currentModelName,
-              source: currentSource,
+              model: effectiveModel,
+              source: effectiveSource,
               syncGithub: doSyncGh,
               githubRepo: selectedGithubRepo || undefined,
               deployNetlify: doDeployNf,
@@ -3320,8 +4111,8 @@
               filePath: block.filePath,
               search: block.search,
               replace: block.replace,
-              model: currentModelName,
-              source: currentSource,
+              model: effectiveModel,
+              source: effectiveSource,
               syncGithub: doSyncGh,
               githubRepo: selectedGithubRepo || undefined,
               deployNetlify: doDeployNf,
@@ -3386,6 +4177,7 @@
         const data = await fetchJson('/api/tags');
         allModels = Array.isArray(data.models) ? data.models : [];
         populateModelSelect();
+        syncDualModelSelectsFromCatalog();
       } catch (_e) {
         modelSelect.innerHTML = '<option value="">⚠️ Error cargando modelos</option>';
       }
@@ -3613,6 +4405,7 @@
         populateProfilesSelect();
         populateSkillCategoriesSelect();
         renderSkillsSelect();
+        populateDualProfilesAndSkills();
 
         if (activeProfileId && allProfiles.some((p) => p.id === activeProfileId)) {
           profileSelect.value = activeProfileId;
@@ -3749,6 +4542,562 @@
         openModal('preview-modal');
       } catch (err) {
         showToast(`Error leyendo ${kind}: ${err.message}`, 'error');
+      }
+    }
+
+    // =========================================================================
+    // 6B. Modo Dual Orquestado & Telemetría / Advisor de Hardware
+    // =========================================================================
+    function normalizeDualSourceClient(rawSource) {
+      const s = String(rawSource || '').trim().toLowerCase();
+      if (s === 'directml' || s === 'dml' || s === 'onnx') return 'directml';
+      if (s === 'freeai' || s === 'free.ai' || s === 'free-ai' || s === 'cloud') return 'freeai';
+      return 'ollama';
+    }
+
+    function getDualDefaultsForPairClient(pair) {
+      if (pair === 'freeai+ollama') {
+        return { sourceA: 'freeai', sourceB: 'ollama', workflow: 'pipeline', unloadBetweenTurns: false };
+      }
+      if (pair === 'ollama+directml') {
+        return { sourceA: 'ollama', sourceB: 'directml', workflow: 'pipeline', unloadBetweenTurns: true };
+      }
+      return { sourceA: 'freeai', sourceB: 'directml', workflow: 'parallel', unloadBetweenTurns: false };
+    }
+
+    function normalizeDualPairClient(rawPair, agentA, agentB) {
+      const cleaned = String(rawPair || '').trim().toLowerCase().replace(/free\.ai/g, 'freeai').replace(/local/g, 'ollama');
+      if (cleaned === 'freeai+directml' || cleaned === 'directml+freeai') return 'freeai+directml';
+      if (cleaned === 'freeai+ollama' || cleaned === 'ollama+freeai') return 'freeai+ollama';
+      if (cleaned === 'ollama+directml' || cleaned === 'directml+ollama') return 'ollama+directml';
+      if (agentA && agentB) {
+        const pairKey = [normalizeDualSourceClient(agentA.source), normalizeDualSourceClient(agentB.source)].sort().join('+');
+        if (pairKey === 'directml+freeai') return 'freeai+directml';
+        if (pairKey === 'freeai+ollama') return 'freeai+ollama';
+        if (pairKey === 'directml+ollama') return 'ollama+directml';
+      }
+      return 'freeai+directml';
+    }
+
+    function normalizeDualConfigClient(raw) {
+      const base = buildDefaultDualConfigClient();
+      if (!raw || typeof raw !== 'object') return base;
+      const pair = normalizeDualPairClient(raw.pair || '', raw.agentA, raw.agentB);
+      const defs = getDualDefaultsForPairClient(pair);
+      const wf = ['pipeline', 'parallel', 'debate'].includes(String(raw.workflow || '').trim().toLowerCase())
+        ? String(raw.workflow).trim().toLowerCase()
+        : defs.workflow;
+
+      const normSlot = (srcObj, fallbackObj) => {
+        const obj = (srcObj && typeof srcObj === 'object') ? srcObj : {};
+        return {
+          source: normalizeDualSourceClient(obj.source || fallbackObj.source),
+          model: typeof obj.model === 'string' ? obj.model.trim() : '',
+          roleLabel: typeof obj.roleLabel === 'string' && obj.roleLabel.trim() ? obj.roleLabel.trim() : fallbackObj.roleLabel,
+          profileId: typeof obj.profileId === 'string' ? obj.profileId.trim() : '',
+          skillId: typeof obj.skillId === 'string' ? obj.skillId.trim() : '',
+          customSystemPrompt: typeof obj.customSystemPrompt === 'string' ? obj.customSystemPrompt : '',
+          temperature: Number.isFinite(Number(obj.temperature)) ? Number(obj.temperature) : fallbackObj.temperature,
+          maxTokens: Number.isFinite(Number(obj.maxTokens)) && Number(obj.maxTokens) > 0 ? Number(obj.maxTokens) : fallbackObj.maxTokens,
+          numCtx: Number.isFinite(Number(obj.numCtx)) && Number(obj.numCtx) > 0 ? Number(obj.numCtx) : fallbackObj.numCtx
+        };
+      };
+
+      const a = normSlot(raw.agentA, { ...base.agentA, source: defs.sourceA });
+      const b = normSlot(raw.agentB, { ...base.agentB, source: defs.sourceB });
+      if (a.source === b.source) {
+        a.source = defs.sourceA;
+        b.source = defs.sourceB;
+      }
+
+      return {
+        enabled: Boolean(raw.enabled),
+        pair,
+        workflow: wf,
+        unloadBetweenTurns: raw.unloadBetweenTurns !== undefined ? Boolean(raw.unloadBetweenTurns) : defs.unloadBetweenTurns,
+        agentA: a,
+        agentB: b
+      };
+    }
+
+    function getModelsForDualSource(source) {
+      const s = normalizeDualSourceClient(source);
+      if (s === 'directml') return allModels.filter((m) => m && m.isDirectML);
+      if (s === 'freeai') return allModels.filter((m) => m && m.isFreeAi);
+      return allModels.filter((m) => m && m.isLocal);
+    }
+
+    function populateDualModelSelectForSlot(slot) {
+      const key = slot === 'B' ? 'agentB' : 'agentA';
+      const prefix = slot === 'B' ? 'dual-b' : 'dual-a';
+      const sel = document.getElementById(`${prefix}-model`);
+      if (!sel) return;
+
+      const agentCfg = dualConfig[key];
+      const list = getModelsForDualSource(agentCfg.source);
+      sel.innerHTML = '';
+
+      if (list.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        if (agentCfg.source === 'directml') opt.textContent = '⚠️ Sin modelos DirectML';
+        else if (agentCfg.source === 'freeai') opt.textContent = '⚠️ Sin modelos Free.ai';
+        else opt.textContent = '⚠️ Ollama sin modelos';
+        sel.appendChild(opt);
+        return;
+      }
+
+      list.forEach((m) => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        const sizeLabel = m.size ? ` (${m.size})` : '';
+        opt.textContent = `${m.displayName || m.name}${sizeLabel}`;
+        sel.appendChild(opt);
+      });
+
+      if (agentCfg.model && list.some((m) => m.name === agentCfg.model)) {
+        sel.value = agentCfg.model;
+      } else {
+        let pick = list[0].name;
+        if (agentCfg.source === 'directml') {
+          const light = list.find((m) => /phi-3\.5|int4/i.test(m.name));
+          if (light) pick = light.name;
+        } else if (agentCfg.source === 'freeai') {
+          const coder = list.find((m) => /qwen|coder|gpt|deepseek/i.test(m.name));
+          if (coder) pick = coder.name;
+        }
+        sel.value = pick;
+        agentCfg.model = pick;
+      }
+    }
+
+    function syncDualModelSelectsFromCatalog() {
+      populateDualModelSelectForSlot('A');
+      populateDualModelSelectForSlot('B');
+      if (dualConfig.enabled) scheduleDualHwEvaluation(60);
+    }
+
+    function populateDualProfilesAndSkills() {
+      ['a', 'b'].forEach((s) => {
+        const key = s === 'b' ? 'agentB' : 'agentA';
+        const profSel = document.getElementById(`dual-${s}-profile`);
+        const skSel = document.getElementById(`dual-${s}-skill`);
+
+        if (profSel) {
+          profSel.innerHTML = `<option value="">🧠 Sin Perfil (${allProfiles.length})</option>`;
+          allProfiles.forEach((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.emoji || '🎭'} ${p.name || p.id}`;
+            profSel.appendChild(opt);
+          });
+          profSel.value = (dualConfig[key].profileId && allProfiles.some((p) => p.id === dualConfig[key].profileId))
+            ? dualConfig[key].profileId
+            : '';
+        }
+
+        if (skSel) {
+          skSel.innerHTML = `<option value="">🎯 Sin Skill (${allSkills.length})</option>`;
+          const frag = document.createDocumentFragment();
+          allSkills.forEach((sk) => {
+            const opt = document.createElement('option');
+            opt.value = sk.id;
+            opt.textContent = `${sk.name} [${sk.category || 'general'}]`;
+            frag.appendChild(opt);
+          });
+          skSel.appendChild(frag);
+          skSel.value = (dualConfig[key].skillId && allSkills.some((sk) => sk.id === dualConfig[key].skillId))
+            ? dualConfig[key].skillId
+            : '';
+        }
+      });
+    }
+
+    function syncDualUiFromState() {
+      const modeBtn = document.getElementById('btn-dual-mode');
+      if (modeBtn) {
+        modeBtn.classList.toggle('active', Boolean(dualConfig.enabled));
+        modeBtn.setAttribute('aria-pressed', String(Boolean(dualConfig.enabled)));
+      }
+
+      document.querySelectorAll('.dual-pair-btn[data-dual-pair]').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.dualPair === dualConfig.pair);
+      });
+
+      const wfSel = document.getElementById('dual-workflow-select');
+      if (wfSel) wfSel.value = dualConfig.workflow;
+      const unloadChk = document.getElementById('dual-unload-check');
+      if (unloadChk) unloadChk.checked = Boolean(dualConfig.unloadBetweenTurns);
+
+      const fillSlot = (s, cfg) => {
+        const srcEl = document.getElementById(`dual-${s}-source`);
+        const roleEl = document.getElementById(`dual-${s}-role`);
+        const profEl = document.getElementById(`dual-${s}-profile`);
+        const skillEl = document.getElementById(`dual-${s}-skill`);
+        const dirEl = document.getElementById(`dual-${s}-directive`);
+        const tempEl = document.getElementById(`dual-${s}-temp`);
+        const maxEl = document.getElementById(`dual-${s}-max-tokens`);
+        const ctxEl = document.getElementById(`dual-${s}-num-ctx`);
+
+        if (srcEl) srcEl.value = cfg.source;
+        populateDualModelSelectForSlot(s.toUpperCase());
+        if (roleEl) roleEl.value = cfg.roleLabel || '';
+        if (profEl) profEl.value = cfg.profileId || '';
+        if (skillEl) skillEl.value = cfg.skillId || '';
+        if (dirEl) dirEl.value = cfg.customSystemPrompt || '';
+        if (tempEl) tempEl.value = String(cfg.temperature ?? 0.3);
+        if (maxEl) maxEl.value = String(cfg.maxTokens ?? 2048);
+        if (ctxEl) ctxEl.value = String(cfg.numCtx ?? 4096);
+      };
+
+      fillSlot('a', dualConfig.agentA);
+      fillSlot('b', dualConfig.agentB);
+      updateDualModeBarVisibility();
+    }
+
+    function updateDualModeBarVisibility() {
+      const singleWrap = document.getElementById('single-mode-controls');
+      const dualStrip = document.getElementById('dual-bar-strip');
+      if (singleWrap) singleWrap.style.display = dualConfig.enabled ? 'none' : 'flex';
+      if (dualStrip) dualStrip.style.display = dualConfig.enabled ? 'flex' : 'none';
+      if (!dualConfig.enabled) {
+        toggleDualConfigPanel(false);
+      }
+      promptInput.placeholder = dualConfig.enabled
+        ? `Pregunta al equipo Dual (${dualConfig.pair} • ${dualConfig.workflow})...`
+        : 'Pregunta a tu modelo local sobre el proyecto activo...';
+    }
+
+    function toggleDualConfigPanel(forceOpen = null) {
+      const panel = document.getElementById('dual-config-panel');
+      const toggleBtn = document.getElementById('btn-dual-config-toggle');
+      if (!panel) return;
+      dualConfigPanelOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('active');
+      panel.classList.toggle('active', dualConfigPanelOpen);
+      panel.setAttribute('aria-hidden', String(!dualConfigPanelOpen));
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(dualConfigPanelOpen));
+      if (dualConfigPanelOpen) {
+        refreshDualHardwareEvaluation(false);
+      }
+    }
+
+    async function persistDualConfigToProject() {
+      const proj = getActiveProjectDescriptor();
+      const snapshot = JSON.parse(JSON.stringify(dualConfig));
+      currentProjectState = { ...(currentProjectState || {}), dualConfig: snapshot };
+      try {
+        await fetchJson('/api/memory/project-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.name,
+            projectPath: proj.path || undefined,
+            dualConfig: snapshot
+          })
+        });
+      } catch (err) {
+        console.warn('Error persistiendo dualConfig por proyecto:', err);
+      }
+    }
+
+    function readDualFormIntoConfig({ evaluate = true, persist = true } = {}) {
+      const wfSel = document.getElementById('dual-workflow-select');
+      const unloadChk = document.getElementById('dual-unload-check');
+      if (wfSel && ['pipeline', 'parallel', 'debate'].includes(wfSel.value)) {
+        dualConfig.workflow = wfSel.value;
+      }
+      if (unloadChk) {
+        dualConfig.unloadBetweenTurns = Boolean(unloadChk.checked);
+      }
+
+      const readSlot = (s, key) => {
+        const target = dualConfig[key];
+        const srcEl = document.getElementById(`dual-${s}-source`);
+        const modEl = document.getElementById(`dual-${s}-model`);
+        const roleEl = document.getElementById(`dual-${s}-role`);
+        const profEl = document.getElementById(`dual-${s}-profile`);
+        const skEl = document.getElementById(`dual-${s}-skill`);
+        const dirEl = document.getElementById(`dual-${s}-directive`);
+        const tempEl = document.getElementById(`dual-${s}-temp`);
+        const maxEl = document.getElementById(`dual-${s}-max-tokens`);
+        const ctxEl = document.getElementById(`dual-${s}-num-ctx`);
+
+        if (srcEl) target.source = normalizeDualSourceClient(srcEl.value);
+        if (modEl) target.model = modEl.value || '';
+        if (roleEl) target.roleLabel = roleEl.value.trim() || (key === 'agentA' ? 'Arquitecto / Generador' : 'Auditor / Crítico');
+        if (profEl) target.profileId = profEl.value || '';
+        if (skEl) target.skillId = skEl.value || '';
+        if (dirEl) target.customSystemPrompt = dirEl.value || '';
+        if (tempEl && Number.isFinite(Number(tempEl.value))) target.temperature = Number(tempEl.value);
+        if (maxEl && Number.isFinite(Number(maxEl.value)) && Number(maxEl.value) > 0) target.maxTokens = Number(maxEl.value);
+        if (ctxEl && Number.isFinite(Number(ctxEl.value)) && Number(ctxEl.value) > 0) target.numCtx = Number(ctxEl.value);
+      };
+
+      readSlot('a', 'agentA');
+      readSlot('b', 'agentB');
+      dualConfig.pair = normalizeDualPairClient('', dualConfig.agentA, dualConfig.agentB);
+      document.querySelectorAll('.dual-pair-btn[data-dual-pair]').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.dualPair === dualConfig.pair);
+      });
+
+      if (evaluate) scheduleDualHwEvaluation(90);
+      if (persist) persistDualConfigToProject();
+    }
+
+    async function toggleDualMode() {
+      dualConfig.enabled = !dualConfig.enabled;
+      if (dualConfig.enabled) {
+        if (!dualConfig.agentA.model) populateDualModelSelectForSlot('A');
+        if (!dualConfig.agentB.model) populateDualModelSelectForSlot('B');
+      }
+      syncDualUiFromState();
+      if (dualConfig.enabled) {
+        toggleDualConfigPanel(true);
+        await refreshDualHardwareEvaluation(false);
+        showToast(`⚡ Modo Dual activado (${dualConfig.pair}).`, 'info');
+      } else {
+        showToast('Modo Dual desactivado (modo agente único).', 'info');
+      }
+      await persistDualConfigToProject();
+    }
+
+    async function selectDualPair(rawPair) {
+      const nextPair = normalizeDualPairClient(rawPair);
+      const defs = getDualDefaultsForPairClient(nextPair);
+      dualConfig.pair = nextPair;
+      dualConfig.workflow = defs.workflow;
+      dualConfig.unloadBetweenTurns = defs.unloadBetweenTurns;
+
+      if (dualConfig.agentA.source !== defs.sourceA) {
+        dualConfig.agentA.source = defs.sourceA;
+        dualConfig.agentA.model = '';
+      }
+      if (dualConfig.agentB.source !== defs.sourceB) {
+        dualConfig.agentB.source = defs.sourceB;
+        dualConfig.agentB.model = '';
+      }
+      dualConfig.agentA.numCtx = defs.sourceA === 'ollama' && nextPair === 'ollama+directml' ? 4096 : 8192;
+      dualConfig.agentB.numCtx = defs.sourceB === 'ollama' && nextPair === 'ollama+directml' ? 4096 : 8192;
+
+      syncDualUiFromState();
+      await refreshDualHardwareEvaluation(false);
+      await persistDualConfigToProject();
+    }
+
+    async function swapDualAgents() {
+      const prevA = { ...dualConfig.agentA };
+      const prevB = { ...dualConfig.agentB };
+      dualConfig.agentA = prevB;
+      dualConfig.agentB = prevA;
+      dualConfig.pair = normalizeDualPairClient('', dualConfig.agentA, dualConfig.agentB);
+      syncDualUiFromState();
+      await refreshDualHardwareEvaluation(false);
+      await persistDualConfigToProject();
+      showToast('⇄ Agentes A y B invertidos.', 'info');
+    }
+
+    function onDualAgentSourceChanged(slot) {
+      const selfEl = document.getElementById(slot === 'B' ? 'dual-b-source' : 'dual-a-source');
+      const otherEl = document.getElementById(slot === 'B' ? 'dual-a-source' : 'dual-b-source');
+      const selfKey = slot === 'B' ? 'agentB' : 'agentA';
+      const otherKey = slot === 'B' ? 'agentA' : 'agentB';
+      if (!selfEl || !otherEl) return;
+
+      const nextSelf = normalizeDualSourceClient(selfEl.value);
+      dualConfig[selfKey].source = nextSelf;
+      dualConfig[selfKey].model = '';
+
+      if (nextSelf === normalizeDualSourceClient(otherEl.value)) {
+        const altSource = nextSelf === 'freeai' ? 'directml' : (nextSelf === 'directml' ? 'freeai' : 'directml');
+        dualConfig[otherKey].source = altSource;
+        dualConfig[otherKey].model = '';
+        otherEl.value = altSource;
+      }
+
+      dualConfig.pair = normalizeDualPairClient('', dualConfig.agentA, dualConfig.agentB);
+      syncDualUiFromState();
+      refreshDualHardwareEvaluation(false);
+      persistDualConfigToProject();
+    }
+
+    function scheduleDualHwEvaluation(delayMs = 150) {
+      if (dualHwTimer) clearTimeout(dualHwTimer);
+      dualHwTimer = setTimeout(() => {
+        refreshDualHardwareEvaluation(false);
+      }, delayMs);
+    }
+
+    async function refreshDualHardwareEvaluation(forceRefresh = false) {
+      try {
+        const data = await fetchJson('/api/system/hardware-evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pair: dualConfig.pair,
+            workflow: dualConfig.workflow,
+            unloadBetweenTurns: dualConfig.unloadBetweenTurns,
+            agentA: {
+              source: dualConfig.agentA.source,
+              model: dualConfig.agentA.model,
+              numCtx: dualConfig.agentA.numCtx
+            },
+            agentB: {
+              source: dualConfig.agentB.source,
+              model: dualConfig.agentB.model,
+              numCtx: dualConfig.agentB.numCtx
+            },
+            forceRefresh: Boolean(forceRefresh)
+          })
+        });
+        dualLastEvalData = data;
+        renderHardwareAdvisorCard(data);
+      } catch (err) {
+        console.warn('Error evaluando hardware Dual:', err);
+      }
+    }
+
+    function renderHardwareAdvisorCard(data) {
+      if (!data || !data.evaluation) return;
+      const ev = data.evaluation;
+      const tel = data.telemetry || {};
+      const ramFree = Number(tel.ram?.freeGb ?? ev.freeRamGb ?? 0);
+      const ramTotal = Number(tel.ram?.totalGb ?? 0);
+      const cpuName = (tel.cpu && tel.cpu.name) || 'CPU';
+      const gpuName = (tel.gpu && tel.gpu.name) || 'GPU Integrada';
+
+      const riskMap = {
+        optimal: { cls: 'risk-optimal', label: '🟢 Óptimo' },
+        caution: { cls: 'risk-caution', label: '🟡 Ajuste' },
+        critical: { cls: 'risk-critical', label: '🔴 Riesgo VRAM' }
+      };
+      const riskUi = riskMap[ev.riskLevel] || riskMap.optimal;
+
+      [document.getElementById('dual-hw-health-badge'), document.getElementById('dual-hw-risk-pill')].forEach((badge) => {
+        if (!badge) return;
+        badge.classList.remove('risk-optimal', 'risk-caution', 'risk-critical');
+        badge.classList.add(riskUi.cls);
+        badge.textContent = `${riskUi.label} • ${ramFree.toFixed(1)} GB libres`;
+      });
+
+      const sumEl = document.getElementById('dual-hw-summary');
+      if (sumEl) {
+        const eff = (tel.env && tel.env.effective) || {};
+        const dmlLim = eff.OLIVE_GPU_MEMORY_LIMIT || '20';
+        const igpuOn = eff.OLLAMA_IGPU_ENABLE === '1' ? 'ON' : 'OFF';
+        sumEl.textContent =
+          `${cpuName} • ${gpuName} • RAM libre: ${ramFree.toFixed(2)}/${ramTotal.toFixed(1)} GB • ` +
+          `Pico Dual est.: ${ev.estimatedPeakLocalGb} GB • iGPU=${igpuOn} • DML=${dmlLim} GB`;
+      }
+
+      const memTagA = document.getElementById('dual-a-mem-tag');
+      if (memTagA && ev.agentA) {
+        memTagA.textContent = ev.agentA.isCloud ? '0 GB VRAM (Cloud)' : `~${ev.agentA.totalGb} GB (${ev.agentA.weightGb}+KV)`;
+      }
+      const memTagB = document.getElementById('dual-b-mem-tag');
+      if (memTagB && ev.agentB) {
+        memTagB.textContent = ev.agentB.isCloud ? '0 GB VRAM (Cloud)' : `~${ev.agentB.totalGb} GB (${ev.agentB.weightGb}+KV)`;
+      }
+
+      const warnEl = document.getElementById('dual-hw-warnings');
+      if (warnEl) {
+        warnEl.innerHTML = '';
+        (ev.warnings || []).forEach((w) => {
+          const line = document.createElement('div');
+          line.className = ev.riskLevel === 'critical' ? 'dual-hw-crit-item' : 'dual-hw-warn-item';
+          line.textContent = `⚠️ ${w}`;
+          warnEl.appendChild(line);
+        });
+      }
+
+      const recEl = document.getElementById('dual-hw-recommendations');
+      if (recEl) {
+        recEl.innerHTML = '';
+        (ev.recommendations || []).forEach((r) => {
+          const line = document.createElement('div');
+          line.className = 'dual-hw-rec-item';
+          line.textContent = `💡 ${r}`;
+          recEl.appendChild(line);
+        });
+      }
+    }
+
+    async function applyRecommendedDualPreset() {
+      if (!dualLastEvalData || !dualLastEvalData.evaluation) {
+        await refreshDualHardwareEvaluation(false);
+      }
+      const ev = dualLastEvalData && dualLastEvalData.evaluation;
+      if (!ev || !ev.suggestedRuntime) return;
+
+      dualConfig.workflow = ev.suggestedRuntime.workflow || dualConfig.workflow;
+      dualConfig.unloadBetweenTurns = Boolean(ev.suggestedRuntime.unloadBetweenTurns);
+      dualConfig.agentA.numCtx = ev.suggestedRuntime.agentANumCtx || dualConfig.agentA.numCtx;
+      dualConfig.agentB.numCtx = ev.suggestedRuntime.agentBNumCtx || dualConfig.agentB.numCtx;
+      if (dualConfig.agentA.source === 'directml') {
+        dualConfig.agentA.maxTokens = ev.suggestedRuntime.directmlMaxTokens || 1536;
+      }
+      if (dualConfig.agentB.source === 'directml') {
+        dualConfig.agentB.maxTokens = ev.suggestedRuntime.directmlMaxTokens || 1536;
+      }
+
+      if (dualConfig.pair === 'ollama+directml' && ev.riskLevel === 'critical') {
+        const dmlSlot = dualConfig.agentA.source === 'directml' ? dualConfig.agentA : dualConfig.agentB;
+        const dmlList = getModelsForDualSource('directml');
+        const lightDml = dmlList.find((m) => /phi-3\.5|int4/i.test(m.name));
+        if (lightDml) dmlSlot.model = lightDml.name;
+      }
+
+      syncDualUiFromState();
+      await applyDualSystemTuning('session', { silentSuccess: true });
+      await persistDualConfigToProject();
+      showToast(`✨ Perfil sugerido aplicado (${dualConfig.pair} • flujo ${dualConfig.workflow}).`, 'success');
+    }
+
+    async function applyDualSystemTuning(scope = 'session', { silentSuccess = false } = {}) {
+      const btnId = scope === 'windows_user' ? 'btn-dual-tune-windows' : 'btn-dual-tune-session';
+      const btn = document.getElementById(btnId);
+      if (btn) btn.disabled = true;
+      try {
+        const data = await fetchJson('/api/system/apply-tuning', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scope,
+            pair: dualConfig.pair,
+            unloadOllama: dualConfig.pair === 'ollama+directml',
+            restartDirectML: false,
+            restartOllama: false
+          })
+        });
+        await refreshDualHardwareEvaluation(true);
+        if (!silentSuccess) {
+          const scopeText = data.persistedToWindows ? 'Windows User Env + Sesión' : 'Sesión actual';
+          showToast(`⚡ Tuning aplicado en ${scopeText}: ${(data.appliedKeys || []).join(', ')}`, 'success');
+        }
+      } catch (err) {
+        showToast(`❌ Error aplicando tuning: ${err.message}`, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function stopDirectmlFromDual() {
+      try {
+        const data = await fetchJson('/api/directml/stop', { method: 'POST' });
+        showToast(data.ok ? '🛑 DirectML detenido y VRAM liberada.' : 'DirectML no estaba activo.', 'info');
+        checkDirectMLStatus();
+        refreshDualHardwareEvaluation(true);
+      } catch (err) {
+        showToast(`Error deteniendo DirectML: ${err.message}`, 'error');
+      }
+    }
+
+    async function unloadOllamaFromDual() {
+      try {
+        await fetchJson('/api/ollama/unload', { method: 'POST', body: '{}' });
+        showToast('🧹 Modelos Ollama descargados de VRAM/RAM.', 'success');
+        refreshDualHardwareEvaluation(true);
+      } catch (err) {
+        showToast(`Error descargando Ollama: ${err.message}`, 'error');
       }
     }
 
@@ -3909,6 +5258,9 @@
       netlifyPublishDir = currentProjectState.netlifyPublishDir || '';
 
       updateIntegrationPillsUI();
+
+      dualConfig = normalizeDualConfigClient(currentProjectState.dualConfig);
+      syncDualUiFromState();
 
       const pubInput = document.getElementById('nf-publish-dir');
       if (pubInput) pubInput.value = netlifyPublishDir || '';
@@ -4522,6 +5874,25 @@
         : 'Conversación Local AI';
 
       const proj = getActiveProjectDescriptor();
+      const hasDualMsgs = chatHistory.some((m) => m && m.role === 'assistant_dual');
+      const sessionMode = (dualConfig.enabled || hasDualMsgs) ? 'dual' : 'single';
+      const dualConfigSummary = sessionMode === 'dual'
+        ? {
+            enabled: Boolean(dualConfig.enabled),
+            pair: dualConfig.pair,
+            workflow: dualConfig.workflow,
+            agentA: {
+              source: dualConfig.agentA.source,
+              model: dualConfig.agentA.model,
+              roleLabel: dualConfig.agentA.roleLabel
+            },
+            agentB: {
+              source: dualConfig.agentB.source,
+              model: dualConfig.agentB.model,
+              roleLabel: dualConfig.agentB.roleLabel
+            }
+          }
+        : undefined;
 
       try {
         await fetchJson('/api/memory/chats', {
@@ -4533,8 +5904,12 @@
             project: proj.name,
             projectPath: proj.path || undefined,
             convId: currentConversationId || undefined,
-            model: currentModelName,
-            source: currentSource,
+            mode: sessionMode,
+            dualConfigSummary,
+            model: sessionMode === 'dual'
+              ? `${dualConfig.agentA.model || dualConfig.agentA.source} + ${dualConfig.agentB.model || dualConfig.agentB.source}`
+              : currentModelName,
+            source: sessionMode === 'dual' ? dualConfig.pair : currentSource,
             skillId: activeSkillId || undefined,
             profileId: activeProfileId || undefined,
             customSystemPrompt: (modelfileCustomPrompt || customSystemPrompt || undefined),
@@ -4599,6 +5974,13 @@
 
         const metaLeft = document.createElement('span');
         metaLeft.textContent = `📁 ${s.project || 'General'} • 💬 ${Number(s.messageCount || 0)}`;
+        if (s.mode === 'dual') {
+          const dualBadge = document.createElement('span');
+          dualBadge.className = 'history-mode-badge';
+          const pairLabel = (s.dualConfigSummary && s.dualConfigSummary.pair) ? ` (${s.dualConfigSummary.pair})` : '';
+          dualBadge.textContent = `DUAL${pairLabel}`;
+          metaLeft.appendChild(dualBadge);
+        }
         top.appendChild(metaLeft);
 
         const delBtn = document.createElement('button');
@@ -4653,11 +6035,15 @@
         );
 
         chatHistory.forEach((m) => {
-          const role = m.role === 'assistant' ? 'ai' : (m.role === 'user' ? 'user' : 'info');
-          appendMessage(role, m.content || '', true, {
-            telemetry: m.telemetry || null,
-            fallback: Boolean(m.fallback)
-          });
+          if (m && m.role === 'assistant_dual') {
+            appendDualTurnFromHistory(m, true);
+          } else {
+            const role = m.role === 'assistant' ? 'ai' : (m.role === 'user' ? 'user' : 'info');
+            appendMessage(role, m.content || '', true, {
+              telemetry: m.telemetry || null,
+              fallback: Boolean(m.fallback)
+            });
+          }
         });
         restoreAppliedCardStatesInChat();
         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -5776,9 +7162,493 @@
       }
     }
 
+    function formatEngineIcon(source) {
+      const s = normalizeDualSourceClient(source);
+      if (s === 'freeai') return '🌐';
+      if (s === 'directml') return '⚡';
+      return '🤖';
+    }
+
+    function createDualTurnScaffold(meta = {}) {
+      const wrap = document.createElement('div');
+      wrap.className = 'message dual-turn-wrap';
+
+      const header = document.createElement('div');
+      header.className = 'dual-turn-header';
+      const titleEl = document.createElement('span');
+      titleEl.innerHTML =
+        `⚡ <strong>Modo Dual</strong> • <span class="dual-turn-pair">${escapeHtml(meta.pair || dualConfig.pair)}</span>`;
+      const wfBadge = document.createElement('span');
+      wfBadge.className = 'tel-badge dual-turn-workflow';
+      wfBadge.textContent = `Flujo: ${meta.workflow || dualConfig.workflow}`;
+      header.appendChild(titleEl);
+      header.appendChild(wfBadge);
+
+      const noticesEl = document.createElement('div');
+      noticesEl.className = 'dual-turn-notices';
+
+      const grid = document.createElement('div');
+      grid.className = 'dual-turn-grid';
+
+      const buildPane = (slot, slotMeta) => {
+        const pane = document.createElement('div');
+        pane.className = `dual-agent-pane pane-${slot.toLowerCase()}`;
+        pane.dataset.agentSlot = slot;
+        pane._rawText = '';
+
+        const pHead = document.createElement('div');
+        pHead.className = 'dual-pane-header';
+
+        const pTitle = document.createElement('div');
+        pTitle.className = 'dual-pane-title';
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = `${formatEngineIcon(slotMeta.source)} Agente ${slot}:`;
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'dual-pane-role';
+        roleSpan.style.color = slot === 'A' ? 'var(--accent-cyan)' : 'var(--accent-purple)';
+        roleSpan.textContent = slotMeta.roleLabel || (slot === 'A' ? 'Arquitecto' : 'Auditor');
+        const modSpan = document.createElement('code');
+        modSpan.className = 'dual-pane-model';
+        modSpan.style.fontSize = '11px';
+        modSpan.textContent = slotMeta.model || slotMeta.source || '';
+        pTitle.appendChild(iconSpan);
+        pTitle.appendChild(roleSpan);
+        pTitle.appendChild(modSpan);
+
+        const pMeta = document.createElement('div');
+        pMeta.className = 'dual-pane-meta';
+        const stagePill = document.createElement('span');
+        stagePill.className = 'tel-badge dual-pane-stage';
+        stagePill.textContent = slotMeta.stageLabel || (slot === 'A' ? 'En cola' : 'En espera');
+        const elapsedSpan = document.createElement('span');
+        elapsedSpan.className = 'dual-pane-elapsed';
+        elapsedSpan.textContent = '';
+        pMeta.appendChild(stagePill);
+        pMeta.appendChild(elapsedSpan);
+
+        pHead.appendChild(pTitle);
+        pHead.appendChild(pMeta);
+
+        const pBody = document.createElement('div');
+        pBody.className = 'dual-pane-body';
+        pBody.innerHTML = '<span style="color:var(--text-muted);">⏳ Esperando ejecución...</span>';
+
+        const pFoot = document.createElement('div');
+        pFoot.className = 'dual-pane-footer';
+        pFoot.innerHTML =
+          `<button type="button" class="btn-msg-action" data-dual-pane-act="copy" title="Copiar respuesta de Agente ${slot}">📋 Copiar ${slot}</button>` +
+          `<button type="button" class="btn-msg-action" data-dual-pane-act="tts" title="Leer en voz alta Agente ${slot}">🔊 Leer ${slot}</button>`;
+
+        pane.appendChild(pHead);
+        pane.appendChild(pBody);
+        pane.appendChild(pFoot);
+        return { pane, pBody, stagePill, elapsedSpan, roleSpan, modSpan };
+      };
+
+      const paneA = buildPane('A', meta.agentA || dualConfig.agentA);
+      const paneB = buildPane('B', meta.agentB || dualConfig.agentB);
+      grid.appendChild(paneA.pane);
+      grid.appendChild(paneB.pane);
+
+      const turnFooter = document.createElement('div');
+      turnFooter.className = 'msg-actions';
+      turnFooter.innerHTML =
+        `<button type="button" class="btn-msg-action" data-msg-act="retry" title="Reenviar prompt en Modo Dual">🔄 Reenviar</button>`;
+
+      wrap.appendChild(header);
+      wrap.appendChild(noticesEl);
+      wrap.appendChild(grid);
+      wrap.appendChild(turnFooter);
+
+      return { wrap, header, wfBadge, noticesEl, paneA, paneB };
+    }
+
+    function appendDualTurnFromHistory(msg, skipScroll = false) {
+      const dual = (msg && msg.dual && typeof msg.dual === 'object') ? msg.dual : {};
+      const aMeta = dual.agentA || {};
+      const bMeta = dual.agentB || {};
+      const scaffold = createDualTurnScaffold({
+        pair: dual.pair || dualConfig.pair,
+        workflow: dual.workflow || 'pipeline',
+        agentA: aMeta,
+        agentB: bMeta
+      });
+
+      if (Array.isArray(dual.notices)) {
+        dual.notices.forEach((msgText) => {
+          const notice = document.createElement('div');
+          notice.className = 'dual-system-notice';
+          notice.textContent = `⚠️ ${msgText}`;
+          scaffold.noticesEl.appendChild(notice);
+        });
+      }
+
+      const populateSavedPane = (paneObj, saved) => {
+        const txt = String((saved && saved.text) || '');
+        paneObj.pane._rawText = txt;
+        paneObj.stagePill.textContent = (saved && saved.stageLabel) || (saved && saved.error ? 'Error' : 'Completado');
+        if (saved && saved.elapsedMs) {
+          paneObj.elapsedSpan.textContent = `${(saved.elapsedMs / 1000).toFixed(1)}s`;
+        }
+        if (saved && saved.error) {
+          paneObj.pane.classList.add('pane-error');
+          const errBanner = `<div class="tel-badge warn" style="margin-bottom:6px; border-color:var(--accent-red); color:var(--accent-red);">❌ ${escapeHtml(saved.error)}</div>`;
+          paneObj.pBody.innerHTML = errBanner + (txt ? formatMarkdown(txt, { streaming: false }) : '');
+        } else {
+          paneObj.pBody.innerHTML = formatMarkdown(txt || '_Sin salida registrada._', { streaming: false });
+        }
+      };
+
+      populateSavedPane(scaffold.paneA, aMeta);
+      populateSavedPane(scaffold.paneB, bMeta);
+
+      chatContainer.appendChild(scaffold.wrap);
+      if (!skipScroll) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+      return scaffold.wrap;
+    }
+
+    async function autoApplyDualTurn(turnWrap, effectiveWorkflow, paneState) {
+      if (!autoApplyEnabled || !turnWrap) return;
+      const paneAEl = turnWrap.querySelector('.dual-agent-pane[data-agent-slot="A"]');
+      const paneBEl = turnWrap.querySelector('.dual-agent-pane[data-agent-slot="B"]');
+
+      let orderedPanes = [paneAEl, paneBEl];
+      if (effectiveWorkflow === 'pipeline') {
+        orderedPanes = [paneBEl, paneAEl];
+      } else if (effectiveWorkflow === 'debate') {
+        const stageA = Number((paneState && paneState.A && paneState.A.stage) || 1);
+        orderedPanes = stageA >= 3 ? [paneAEl, paneBEl] : [paneBEl, paneAEl];
+      }
+
+      const seenWritePaths = new Set();
+      let appliedCount = 0;
+      const filesModified = [];
+
+      for (const paneEl of orderedPanes) {
+        if (!paneEl) continue;
+        const slot = paneEl.dataset.agentSlot || 'A';
+        const slotMeta = (paneState && paneState[slot]) || {};
+        const buttons = Array.from(paneEl.querySelectorAll('.btn-apply-action:not(.applied)'));
+
+        for (const btn of buttons) {
+          const blockId = btn.dataset.blockId;
+          const block = renderedCodeBlocks.get(blockId);
+          if (!block) continue;
+
+          const normRel = String(block.filePath || '').trim().replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+          if (block.kind === 'write' && normRel) {
+            if (seenWritePaths.has(normRel)) {
+              btn.disabled = true;
+              btn.classList.add('applied');
+              btn.textContent = '⏭️ Superado';
+              renderCardSyncNote(blockId, 'Omitido: prevaleció la versión final consolidada del otro agente.', null, null);
+              continue;
+            }
+            seenWritePaths.add(normRel);
+          }
+
+          const result = await executeFileCardAction(blockId, btn, {
+            batchMode: true,
+            modelOverride: slotMeta.model || undefined,
+            sourceOverride: slotMeta.source || undefined
+          });
+          if (result && result.ok) {
+            appliedCount++;
+            filesModified.push(
+              result.content !== undefined
+                ? { relPath: result.relPath, content: result.content }
+                : { relPath: result.relPath }
+            );
+          }
+        }
+      }
+
+      if (appliedCount > 0) {
+        const proj = getActiveProjectDescriptor();
+
+        let ghSummary = '';
+        if (githubToggle && selectedGithubRepo) {
+          const ghRes = await syncGithubManual(
+            filesModified,
+            `Auto-sync Dual ${appliedCount} cambio(s) via Local AI Studio`
+          );
+          ghSummary = ghRes.ok ? ' + GitHub Sync OK' : ' (⚠️ GitHub Sync falló)';
+        }
+
+        let nfSummary = '';
+        if (isNetlifyAutoDeployActive() && proj.path) {
+          const nfRes = await deployNetlifyManual(`Auto-deploy Dual (${appliedCount} cambios) via Local AI Studio`);
+          nfSummary = nfRes.ok ? ' + Netlify Deploy OK' : ' (⚠️ Netlify Deploy falló)';
+        }
+
+        showToast(`⚡ Autoguardado Dual: ${appliedCount} archivo(s) aplicados en disco${ghSummary}${nfSummary}.`, 'success');
+        await saveCurrentSessionToStorage();
+
+        try {
+          const modelPairLabel = `${(paneState.A && paneState.A.model) || dualConfig.agentA.model} + ${(paneState.B && paneState.B.model) || dualConfig.agentB.model}`;
+          await fetchJson('/api/project/log-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project: proj.name,
+              tool: 'Local AI Studio (Dual)',
+              model: modelPairLabel,
+              task: `Autoguardado Dual (${appliedCount} cambios)`,
+              summary: `Aplicados ${appliedCount} bloque(s) únicos en flujo '${effectiveWorkflow}'${ghSummary}${nfSummary}.`,
+              filesModified: filesModified.map((f) => f.relPath)
+            })
+          });
+        } catch (_e) {}
+
+        await loadProjectContext();
+      }
+    }
+
+    async function sendDualMessage(prompt) {
+      readDualFormIntoConfig({ evaluate: false, persist: false });
+      promptInput.value = '';
+      appendMessage('user', prompt);
+      chatHistory.push({ role: 'user', content: prompt });
+
+      const enterBtn = document.getElementById('btn-enter-context');
+      if (enterBtn) enterBtn.disabled = true;
+      isStreaming = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Orquestando...';
+
+      const scaffold = createDualTurnScaffold({
+        pair: dualConfig.pair,
+        workflow: dualConfig.workflow,
+        agentA: dualConfig.agentA,
+        agentB: dualConfig.agentB
+      });
+      chatContainer.appendChild(scaffold.wrap);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      const proj = getActiveProjectDescriptor();
+      const effectiveCustomPrompt = modelfileCustomPrompt || customSystemPrompt || '';
+
+      const paneState = {
+        A: {
+          source: dualConfig.agentA.source,
+          model: dualConfig.agentA.model,
+          roleLabel: dualConfig.agentA.roleLabel,
+          stage: 1,
+          stageLabel: 'Propuesta',
+          text: '',
+          elapsedMs: 0,
+          error: null
+        },
+        B: {
+          source: dualConfig.agentB.source,
+          model: dualConfig.agentB.model,
+          roleLabel: dualConfig.agentB.roleLabel,
+          stage: 1,
+          stageLabel: 'Auditoría',
+          text: '',
+          elapsedMs: 0,
+          error: null
+        }
+      };
+      const noticesCollected = [];
+      let effectiveWorkflow = dualConfig.workflow;
+      let requestedWorkflow = dualConfig.workflow;
+      let preflightSummary = null;
+
+      try {
+        const res = await fetch('/api/chat/dual', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pair: dualConfig.pair,
+            workflow: dualConfig.workflow,
+            unloadBetweenTurns: dualConfig.unloadBetweenTurns,
+            messages: chatHistory,
+            project: proj.name,
+            projectPath: proj.path || undefined,
+            conversationId: currentConversationId || undefined,
+            customSystemPrompt: effectiveCustomPrompt || undefined,
+            agentA: { ...dualConfig.agentA },
+            agentB: { ...dualConfig.agentB }
+          })
+        });
+
+        if (!res.ok) {
+          let errMsg = `HTTP ${res.status}`;
+          try {
+            const errJson = await res.json();
+            errMsg = errJson.error || errMsg;
+          } catch (_e) {}
+          throw new Error(errMsg);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const processDualEvent = (ev) => {
+          if (!ev || typeof ev !== 'object') return;
+          if (ev.type === 'dual_preflight') {
+            preflightSummary = ev;
+            effectiveWorkflow = ev.workflow || effectiveWorkflow;
+            requestedWorkflow = ev.requestedWorkflow || requestedWorkflow;
+            scaffold.wfBadge.textContent = ev.downgradedFromParallel
+              ? `Flujo: ${effectiveWorkflow} (auto-seguro)`
+              : `Flujo: ${effectiveWorkflow}`;
+            if (ev.evaluation) {
+              renderHardwareAdvisorCard({ evaluation: ev.evaluation, telemetry: dualLastEvalData?.telemetry || null });
+            }
+            return;
+          }
+
+          if (ev.type === 'system_notice') {
+            if (ev.message) noticesCollected.push(ev.message);
+            const noteEl = document.createElement('div');
+            noteEl.className = 'dual-system-notice';
+            noteEl.textContent = `⚠️ ${ev.message || ev.code || 'Aviso del sistema'}`;
+            scaffold.noticesEl.appendChild(noteEl);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
+          const slot = ev.agent === 'B' ? 'B' : 'A';
+          const paneObj = slot === 'B' ? scaffold.paneB : scaffold.paneA;
+          const st = paneState[slot];
+
+          if (ev.type === 'agent_start') {
+            st.stage = Number(ev.stage || 1);
+            st.stageLabel = ev.stageLabel || `Etapa ${st.stage}`;
+            if (ev.model) {
+              st.model = ev.model;
+              paneObj.modSpan.textContent = ev.model;
+            }
+            if (ev.source) st.source = ev.source;
+            if (st.stage >= 3 && st.text) {
+              st.text = `${st.text}\n\n---\n### Etapa ${st.stage}: ${st.stageLabel}\n\n`;
+            } else if (st.stage === 1) {
+              st.text = '';
+            }
+            paneObj.pane.classList.add('pane-active');
+            paneObj.pane.classList.remove('pane-error');
+            paneObj.stagePill.textContent = `${st.stageLabel} (en curso)`;
+            paneObj.pBody.innerHTML = st.text
+              ? formatMarkdown(st.text, { streaming: true })
+              : '<span style="color:var(--accent-cyan);">⏳ Generando respuesta...</span>';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
+          if (ev.type === 'agent_chunk') {
+            st.text += String(ev.delta || '');
+            paneObj.pane._rawText = st.text;
+            paneObj.pBody.innerHTML = formatMarkdown(st.text, { streaming: true });
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
+          if (ev.type === 'agent_done') {
+            if (typeof ev.text === 'string' && ev.text.length > 0 && Number(ev.stage || 1) < 3 && !st.text) {
+              st.text = ev.text;
+            }
+            st.elapsedMs = Number(ev.elapsedMs || 0);
+            paneObj.pane.classList.remove('pane-active');
+            paneObj.pane._rawText = st.text;
+            paneObj.stagePill.textContent = `${st.stageLabel} ✓`;
+            paneObj.elapsedSpan.textContent = `${(st.elapsedMs / 1000).toFixed(1)}s`;
+            paneObj.pBody.innerHTML = formatMarkdown(st.text || '_Sin texto._', { streaming: false });
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
+          if (ev.type === 'agent_error') {
+            st.error = ev.error || 'Error ejecutando agente';
+            st.elapsedMs = Number(ev.elapsedMs || 0);
+            if (ev.partialText && !st.text) st.text = ev.partialText;
+            paneObj.pane.classList.remove('pane-active');
+            paneObj.pane.classList.add('pane-error');
+            paneObj.pane._rawText = st.text;
+            paneObj.stagePill.textContent = 'Error';
+            paneObj.elapsedSpan.textContent = st.elapsedMs ? `${(st.elapsedMs / 1000).toFixed(1)}s` : '';
+            const errHtml = `<div class="tel-badge warn" style="margin-bottom:6px; border-color:var(--accent-red); color:var(--accent-red);">❌ ${escapeHtml(st.error)}</div>`;
+            paneObj.pBody.innerHTML = errHtml + (st.text ? formatMarkdown(st.text, { streaming: false }) : '');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
+          if (ev.type === 'dual_done') {
+            effectiveWorkflow = ev.workflow || effectiveWorkflow;
+            requestedWorkflow = ev.requestedWorkflow || requestedWorkflow;
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              processDualEvent(JSON.parse(trimmed));
+            } catch (_e) {}
+          }
+        }
+
+        if (buffer.trim()) {
+          try {
+            processDualEvent(JSON.parse(buffer.trim()));
+          } catch (_e) {}
+        }
+
+        const combinedSummary = [
+          `[Agente A (${paneState.A.model}):\n${paneState.A.text}]`,
+          `[Agente B (${paneState.B.model}):\n${paneState.B.text}]`
+        ].join('\n\n');
+
+        chatHistory.push({
+          role: 'assistant_dual',
+          content: combinedSummary,
+          dual: {
+            pair: dualConfig.pair,
+            workflow: effectiveWorkflow,
+            requestedWorkflow,
+            notices: noticesCollected,
+            preflight: preflightSummary ? { workflow: preflightSummary.workflow, downgradedFromParallel: preflightSummary.downgradedFromParallel } : null,
+            agentA: { ...paneState.A },
+            agentB: { ...paneState.B }
+          }
+        });
+
+        await saveCurrentSessionToStorage();
+
+        if (autoApplyEnabled) {
+          await autoApplyDualTurn(scaffold.wrap, effectiveWorkflow, paneState);
+        }
+      } catch (err) {
+        const noticeEl = document.createElement('div');
+        noticeEl.className = 'dual-system-notice';
+        noticeEl.style.borderColor = 'var(--accent-red)';
+        noticeEl.style.color = 'var(--accent-red)';
+        noticeEl.textContent = `❌ Error en orquestación Dual: ${err.message}`;
+        scaffold.noticesEl.appendChild(noticeEl);
+      } finally {
+        isStreaming = false;
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Enviar';
+        if (enterBtn) enterBtn.disabled = false;
+      }
+    }
+
     async function sendMessage() {
       const prompt = promptInput.value.trim();
       if (!prompt || isStreaming) return;
+      if (dualConfig.enabled) {
+        return sendDualMessage(prompt);
+      }
       if (!currentModelName) {
         showToast('Selecciona primero un modelo AI disponible.', 'warn');
         return;
@@ -5971,10 +7841,41 @@
       document.getElementById('font-inc-btn').addEventListener('click', () => stepFontSize(1));
       fontSizeSelect.addEventListener('change', (e) => applyFontSize(e.target.value));
 
-      // Motores & Modelfile
+      // Motores, Modo Dual & Modelfile
       document.querySelectorAll('.source-btn[data-source]').forEach((btn) => {
         btn.addEventListener('click', () => switchAiSource(btn.dataset.source));
       });
+      document.getElementById('btn-dual-mode').addEventListener('click', toggleDualMode);
+      document.querySelectorAll('.dual-pair-btn[data-dual-pair]').forEach((btn) => {
+        btn.addEventListener('click', () => selectDualPair(btn.dataset.dualPair));
+      });
+      document.getElementById('dual-hw-health-badge').addEventListener('click', () => toggleDualConfigPanel(true));
+      document.getElementById('btn-dual-config-toggle').addEventListener('click', () => toggleDualConfigPanel());
+      document.getElementById('btn-dual-close-panel').addEventListener('click', () => toggleDualConfigPanel(false));
+      document.getElementById('btn-dual-swap').addEventListener('click', swapDualAgents);
+      document.getElementById('dual-workflow-select').addEventListener('change', () => readDualFormIntoConfig({ evaluate: true, persist: true }));
+      document.getElementById('dual-unload-check').addEventListener('change', () => readDualFormIntoConfig({ evaluate: true, persist: true }));
+      document.getElementById('btn-dual-stop-dml').addEventListener('click', stopDirectmlFromDual);
+      document.getElementById('btn-dual-unload-ollama').addEventListener('click', unloadOllamaFromDual);
+      document.getElementById('btn-dual-apply-recommended').addEventListener('click', applyRecommendedDualPreset);
+      document.getElementById('btn-dual-tune-session').addEventListener('click', () => applyDualSystemTuning('session'));
+      document.getElementById('btn-dual-tune-windows').addEventListener('click', () => applyDualSystemTuning('windows_user'));
+      document.getElementById('btn-dual-refresh-hw').addEventListener('click', () => refreshDualHardwareEvaluation(true));
+
+      document.getElementById('dual-a-source').addEventListener('change', () => onDualAgentSourceChanged('A'));
+      document.getElementById('dual-b-source').addEventListener('change', () => onDualAgentSourceChanged('B'));
+      ['a', 'b'].forEach((s) => {
+        ['model', 'profile', 'skill'].forEach((field) => {
+          document.getElementById(`dual-${s}-${field}`).addEventListener('change', () => readDualFormIntoConfig({ evaluate: true, persist: true }));
+        });
+        ['role', 'directive'].forEach((field) => {
+          document.getElementById(`dual-${s}-${field}`).addEventListener('input', debounce(() => readDualFormIntoConfig({ evaluate: false, persist: true }), 260));
+        });
+        ['temp', 'max-tokens', 'num-ctx'].forEach((field) => {
+          document.getElementById(`dual-${s}-${field}`).addEventListener('change', () => readDualFormIntoConfig({ evaluate: true, persist: true }));
+        });
+      });
+
       modelSelect.addEventListener('change', onModelChanged);
       document.getElementById('btn-modelfile').addEventListener('click', openModelfileModal);
       document.getElementById('btn-dml-control').addEventListener('click', handleDirectMLControl);
@@ -6251,6 +8152,7 @@
     async function initApp() {
       applyFontSize(localStorage.getItem(STORAGE_KEYS.FONT_SIZE) || '16');
       initAutoApply();
+      syncDualUiFromState();
       bindEventListeners();
       switchAiSource(currentSource);
 
