@@ -894,7 +894,8 @@ function evaluateDualConfiguration({
   modelsCatalog = [],
   telemetry = null,
   ollamaPs = [],
-  directmlStatus = {}
+  directmlStatus = {},
+  projectCompatibility = null
 } = {}) {
   const effectiveTelemetry = telemetry || {
     ram: { totalGb: 29.66, freeGb: 7.2, usedGb: 22.46 },
@@ -1190,6 +1191,36 @@ function evaluateDualConfiguration({
     recommendations.push("Ollama utiliza modelo :cloud (0 GB VRAM local): puedes usar Paralelo o Pipeline sin contención física.");
   }
 
+  // Verificar compatibilidad de prompt/contexto del proyecto activo con la ventana KV DirectML (8192 / guardia 6144)
+  const hasProjectCompat = Boolean(projectCompatibility && typeof projectCompatibility === "object");
+  const directmlIncompatibleWithProject = Boolean(hasDirectml && hasProjectCompat && projectCompatibility.compatible === false);
+  const directmlTightWithProject = Boolean(
+    hasDirectml &&
+    hasProjectCompat &&
+    !directmlIncompatibleWithProject &&
+    projectCompatibility.status === "tight"
+  );
+
+  if (directmlIncompatibleWithProject) {
+    elevateRisk("caution");
+    const approxTok = Number(projectCompatibility.approxPromptTokens || 0);
+    const safeLim = Number(projectCompatibility.safePromptLimit || 6144);
+    const kvLim = Number(projectCompatibility.kvContextLimit || 8192);
+    const projName = String(projectCompatibility.projectName || "activo");
+    warnings.push(
+      `Proyecto "${projName}" incompatible con DirectML: ~${approxTok.toLocaleString("en-US")} tokens > límite seguro DirectML ${safeLim.toLocaleString("en-US")} / caché KV ${kvLim.toLocaleString("en-US")} (dispara HTTP 400).`
+    );
+    recommendations.push(
+      "Cambia el par dual a Free.ai + Ollama para este proyecto, o reduce archivos seleccionados / Prompt Maestro / Skill debajo de 6,144 tokens."
+    );
+  } else if (directmlTightWithProject) {
+    const approxTok = Number(projectCompatibility.approxPromptTokens || 0);
+    const safeLim = Number(projectCompatibility.safePromptLimit || 6144);
+    recommendations.push(
+      `Margen ajustado para DirectML (~${approxTok.toLocaleString("en-US")}/${safeLim.toLocaleString("en-US")} tokens): evita historiales largos para prevenir HTTP 400.`
+    );
+  }
+
   return {
     pair,
     workflow,
@@ -1197,6 +1228,9 @@ function evaluateDualConfiguration({
     bothLocalModels,
     allowParallelLocal: !bothLocalModels || (projectedHeadroomGb >= 4.5 && combinedWeights < 5.5),
     unloadBetweenTurns: bothLocalModels ? Boolean(unloadBetweenTurns) : false,
+    directmlIncompatibleWithProject,
+    directmlTightWithProject,
+    directmlProjectCompatibility: hasProjectCompat ? projectCompatibility : null,
     freeRamGb,
     estimatedPeakLocalGb,
     additionalNeededGb,

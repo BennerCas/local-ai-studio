@@ -368,4 +368,85 @@ describe("context-bridge, skills-bridge, context-analyzer & freeai-bridge", () =
     delete process.env.FREEAI_BASE_URL;
     assert.equal(freeaiBridge.getBaseUrl(), "https://api.free.ai/v1");
   });
+
+  it("evalúa compatibilidad DirectML con umbral exacto api_openai.py (6144/8192) y detecta proyecto incompatible", () => {
+    assert.equal(contextBridge.DIRECTML_KV_CONTEXT_TOKENS, 8192);
+    assert.equal(contextBridge.DIRECTML_SAFE_PROMPT_TOKENS, 6144);
+    assert.equal(contextBridge.DIRECTML_OUTPUT_RESERVE_TOKENS, 512);
+    assert.equal(contextBridge.DIRECTML_CHARS_PER_TOKEN, 4);
+
+    assert.equal(contextBridge.estimateApproxTokens(0), 0);
+    assert.equal(contextBridge.estimateApproxTokens(24576), 6144);
+    assert.equal(contextBridge.estimateApproxTokens(24577), 6145);
+
+    const exactBoundary = contextBridge.evaluateDirectmlPromptCompatibility({
+      projectName: "BoundaryApp",
+      totalChars: 24576,
+      bySection: { masterPrompt: 2000, codeContextXml: 22576 }
+    });
+    assert.equal(exactBoundary.compatible, true);
+    assert.equal(exactBoundary.status, "tight");
+    assert.equal(exactBoundary.excessTokens, 0);
+
+    const overByOne = contextBridge.evaluateDirectmlPromptCompatibility({
+      projectName: "OverApp",
+      totalChars: 24577,
+      bySection: { masterPrompt: 2000, codeContextXml: 22577 }
+    });
+    assert.equal(overByOne.compatible, false);
+    assert.equal(overByOne.status, "incompatible");
+    assert.equal(overByOne.excessTokens, 1);
+    assert.equal(overByOne.largestSection.key, "codeContextXml");
+    assert.match(overByOne.reason, /6,144/);
+    assert.match(overByOne.reason, /8,192/);
+    assert.match(overByOne.reason, /HTTP 400/);
+
+    const pushedByExtra = contextBridge.evaluateDirectmlPromptCompatibility({
+      projectName: "ChatGrowApp",
+      totalChars: 22000,
+      extraChars: 3000
+    });
+    assert.equal(pushedByExtra.compatible, false);
+    assert.equal(pushedByExtra.approxPromptTokens, 6250);
+
+    // AlphaApp pequeño -> compatible
+    const alphaCtx = contextBridge.buildProjectContext("AlphaApp", null, null, { writeToDisk: false });
+    assert.equal(alphaCtx.directmlCompatibility.compatible, true);
+    assert.equal(alphaCtx.directmlCompatibility.status, "compatible");
+
+    // LargeDmlApp (> 25k chars en src) -> incompatible con DirectML y expuesto en context-bridge + context-analyzer
+    const projLargeDir = path.join(tempProjectsDir, "LargeDmlApp");
+    fs.mkdirSync(path.join(projLargeDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projLargeDir, "package.json"), JSON.stringify({ name: "large-dml-app", version: "1.0.0" }), "utf8");
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_a.js"),
+      "// Module A\n" + "export const chunkA = 'payload_directml_overflow_check';\n".repeat(300),
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_b.js"),
+      "// Module B\n" + "export const chunkB = 'payload_directml_overflow_check';\n".repeat(300),
+      "utf8"
+    );
+
+    const largeCtx = contextBridge.buildProjectContext("LargeDmlApp", null, null, { writeToDisk: false });
+    assert.equal(largeCtx.directmlCompatibility.compatible, false);
+    assert.equal(largeCtx.directmlCompatibility.status, "incompatible");
+    assert.ok(largeCtx.directmlCompatibility.approxPromptTokens > 6144);
+    assert.equal(largeCtx.directmlCompatibility.safePromptLimit, 6144);
+    assert.equal(largeCtx.directmlCompatibility.kvContextLimit, 8192);
+    assert.equal(largeCtx.directmlCompatibility.largestSection.key, "codeContextXml");
+    assert.match(largeCtx.directmlCompatibility.reason, /LargeDmlApp/);
+    assert.match(largeCtx.directmlCompatibility.reason, /HTTP 400/);
+
+    const enterSmallDigest = contextAnalyzer.buildEnterContextPayload({ projectName: "LargeDmlApp" });
+    assert.equal(enterSmallDigest.promptPackage.directmlCompatibility.compatible, true);
+
+    const enterOverloaded = contextAnalyzer.buildEnterContextPayload({
+      projectName: "LargeDmlApp",
+      customSystemPrompt: "Directiva extensa para sobrecargar prompt de analisis.\n".repeat(420)
+    });
+    assert.equal(enterOverloaded.promptPackage.directmlCompatibility.compatible, false);
+    assert.ok(enterOverloaded.promptPackage.directmlCompatibility.approxPromptTokens > 6144);
+  });
 });

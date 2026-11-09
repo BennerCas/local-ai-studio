@@ -9,6 +9,119 @@ const BRAIN_DIR = "C:\\Users\\Benner\\.gemini\\antigravity\\brain";
 const RESOLVER_PY = path.join(__dirname, "resolver.py");
 const CONFIG_FILE = path.join(__dirname, "active_project.json");
 
+// Constantes exactas del backend ONNX DirectML (api_openai.py):
+// DIRECTML_MAX_CONTEXT_TOKENS = 8192, DIRECTML_MAX_PROMPT_TOKENS = 6144,
+// safe_prompt_limit = min(DIRECTML_MAX_PROMPT_TOKENS, max(256, ctx - 512)) => HTTP 400 si prompt_len > 6144.
+const DIRECTML_KV_CONTEXT_TOKENS = 8192;
+const DIRECTML_SAFE_PROMPT_TOKENS = 6144;
+const DIRECTML_OUTPUT_RESERVE_TOKENS = 512;
+const DIRECTML_CHARS_PER_TOKEN = 4;
+const DIRECTML_TIGHT_WARN_RATIO = 0.85;
+
+const SECTION_HUMAN_LABELS = {
+  masterPrompt: "Prompt Maestro",
+  skillPrompt: "Perfil / Skill",
+  stateSummary: "Estado persistido",
+  projectContextXml: "Contexto de proyecto",
+  codeContextXml: "Código fuente inyectado",
+  mutationDirectives: "Directivas de edición",
+  systemPrompt: "System Prompt",
+  userPrompt: "Telemetría / User Prompt"
+};
+
+function estimateApproxTokens(chars = 0) {
+  const numeric = Number(chars);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.ceil(numeric / DIRECTML_CHARS_PER_TOKEN);
+}
+
+function evaluateDirectmlPromptCompatibility(input = {}) {
+  const opts = (input && typeof input === "object") ? input : {};
+  const baseChars = Math.max(0, Math.round(Number(opts.totalChars) || 0));
+  const extraChars = Math.max(0, Math.round(Number(opts.extraChars) || 0));
+  const totalChars = baseChars + extraChars;
+
+  const safePromptLimit = (Number.isFinite(Number(opts.safePromptLimit)) && Number(opts.safePromptLimit) > 0)
+    ? Math.round(Number(opts.safePromptLimit))
+    : DIRECTML_SAFE_PROMPT_TOKENS;
+  const kvContextLimit = (Number.isFinite(Number(opts.kvContextLimit)) && Number(opts.kvContextLimit) > 0)
+    ? Math.round(Number(opts.kvContextLimit))
+    : DIRECTML_KV_CONTEXT_TOKENS;
+  const outputReserveTokens = (Number.isFinite(Number(opts.outputReserveTokens)) && Number(opts.outputReserveTokens) > 0)
+    ? Math.round(Number(opts.outputReserveTokens))
+    : DIRECTML_OUTPUT_RESERVE_TOKENS;
+
+  const approxPromptTokens = (extraChars === 0 && opts.approxTokens !== undefined && Number.isFinite(Number(opts.approxTokens)) && Number(opts.approxTokens) >= 0)
+    ? Math.round(Number(opts.approxTokens))
+    : estimateApproxTokens(totalChars);
+
+  const compatible = approxPromptTokens <= safePromptLimit;
+  const tightThreshold = Math.floor(safePromptLimit * DIRECTML_TIGHT_WARN_RATIO);
+  const status = !compatible ? "incompatible" : (approxPromptTokens >= tightThreshold ? "tight" : "compatible");
+  const excessTokens = Math.max(0, approxPromptTokens - safePromptLimit);
+  const remainingPromptTokens = Math.max(0, safePromptLimit - approxPromptTokens);
+  const utilizationPct = safePromptLimit > 0 ? Math.round((approxPromptTokens / safePromptLimit) * 100) : 0;
+  const kvUtilizationPct = kvContextLimit > 0 ? Math.round((approxPromptTokens / kvContextLimit) * 100) : 0;
+  const recommendedMaxChars = safePromptLimit * DIRECTML_CHARS_PER_TOKEN;
+
+  const bySection = (opts.bySection && typeof opts.bySection === "object") ? opts.bySection : {};
+  let largestSection = null;
+  for (const [key, rawLen] of Object.entries(bySection)) {
+    const chars = Math.max(0, Math.round(Number(rawLen) || 0));
+    if (chars <= 0) continue;
+    if (!largestSection || chars > largestSection.chars) {
+      largestSection = {
+        key,
+        label: SECTION_HUMAN_LABELS[key] || key,
+        chars,
+        approxTokens: estimateApproxTokens(chars)
+      };
+    }
+  }
+
+  const projectName = String(opts.projectName || "General").trim() || "General";
+  const isGeneral = Boolean(opts.isGeneral || projectName.toLowerCase() === "general");
+  const driverNote = largestSection
+    ? ` Mayor peso: ${largestSection.label} (~${largestSection.approxTokens.toLocaleString("en-US")} tokens).`
+    : "";
+
+  let reason = `Compatible con DirectML (~${approxPromptTokens.toLocaleString("en-US")} / ${safePromptLimit.toLocaleString("en-US")} tokens seguros; caché KV ${kvContextLimit.toLocaleString("en-US")}).`;
+  let recommendation = "";
+
+  if (!compatible) {
+    reason = `El proyecto "${projectName}" estima ~${approxPromptTokens.toLocaleString("en-US")} tokens (${totalChars.toLocaleString("en-US")} chars) y supera el límite seguro DirectML de ${safePromptLimit.toLocaleString("en-US")} tokens (caché KV ${kvContextLimit.toLocaleString("en-US")}, +${excessTokens.toLocaleString("en-US")} de exceso -> provoca HTTP 400).${driverNote}`;
+    recommendation = isGeneral
+      ? "Cambia el motor a Ollama o Free.ai, o recorta el Prompt Maestro / Skill / historial debajo de 6,144 tokens."
+      : "Cambia el motor a Ollama o Free.ai para este proyecto, o reduce archivos seleccionados / Prompt Maestro debajo de 6,144 tokens.";
+  } else if (status === "tight") {
+    reason = `Margen ajustado para DirectML (~${approxPromptTokens.toLocaleString("en-US")} / ${safePromptLimit.toLocaleString("en-US")} tokens; caché KV ${kvContextLimit.toLocaleString("en-US")}).${driverNote}`;
+    recommendation = "Queda poco margen antes de HTTP 400; evita chats largos o inyectar más archivos en DirectML.";
+  }
+
+  return {
+    compatible,
+    status,
+    projectName,
+    isGeneral,
+    totalChars,
+    baseChars,
+    extraChars,
+    approxPromptTokens,
+    safePromptLimit,
+    kvContextLimit,
+    outputReserveTokens,
+    charsPerToken: DIRECTML_CHARS_PER_TOKEN,
+    recommendedMaxChars,
+    excessTokens,
+    remainingPromptTokens,
+    utilizationPct,
+    kvUtilizationPct,
+    largestSection,
+    reason,
+    recommendation
+  };
+}
+
 const IGNORED_DIRS = new Set([
   "Modelos -ai-brains",
   "Modelos-ai-brains",
@@ -909,9 +1022,16 @@ ${isGen ? "Modo General activo: no se escanean repositorios ni código fuente. S
   const totalChars = systemPrompt.length;
   const metrics = {
     totalChars,
-    approxTokens: Math.ceil(totalChars / 4),
+    approxTokens: estimateApproxTokens(totalChars),
     bySection
   };
+  const directmlCompatibility = evaluateDirectmlPromptCompatibility({
+    totalChars,
+    approxTokens: metrics.approxTokens,
+    bySection,
+    projectName: proj.name,
+    isGeneral: isGen
+  });
 
   const summaryMarkdown = `# Contexto del Proyecto: ${proj.name}
 > Sincronizado automáticamente desde Antigravity
@@ -952,6 +1072,7 @@ Este agente tiene visibilidad completa del código y la sesión activa en Antigr
     recentPrompts,
     sections,
     metrics,
+    directmlCompatibility,
     projectState,
     systemPrompt,
     summaryMarkdown,
@@ -1199,6 +1320,13 @@ function applyProjectPatch(projectName, relPath, searchBlock, replaceBlock, meta
 }
 
 module.exports = {
+  DIRECTML_KV_CONTEXT_TOKENS,
+  DIRECTML_SAFE_PROMPT_TOKENS,
+  DIRECTML_OUTPUT_RESERVE_TOKENS,
+  DIRECTML_CHARS_PER_TOKEN,
+  DIRECTML_TIGHT_WARN_RATIO,
+  estimateApproxTokens,
+  evaluateDirectmlPromptCompatibility,
   resolveSafeProjectPath,
   getSidebarHierarchy,
   listProjects,

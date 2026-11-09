@@ -546,8 +546,19 @@ function buildEnterContextPayload({
     systemPromptChars: systemPrompt.length,
     userPromptChars: userPrompt.length,
     totalChars: systemPrompt.length + userPrompt.length,
-    approxTokens: Math.ceil((systemPrompt.length + userPrompt.length) / 4)
+    approxTokens: contextBridge.estimateApproxTokens(systemPrompt.length + userPrompt.length)
   };
+
+  const directmlCompatibility = contextBridge.evaluateDirectmlPromptCompatibility({
+    totalChars: metrics.totalChars,
+    approxTokens: metrics.approxTokens,
+    bySection: {
+      systemPrompt: metrics.systemPromptChars,
+      userPrompt: metrics.userPromptChars
+    },
+    projectName: projName,
+    isGeneral: Boolean(telemetry.project && telemetry.project.isGeneral)
+  });
 
   return {
     telemetry,
@@ -555,7 +566,8 @@ function buildEnterContextPayload({
     promptPackage: {
       systemPrompt,
       userPrompt,
-      metrics
+      metrics,
+      directmlCompatibility
     }
   };
 }

@@ -616,6 +616,131 @@
       flex-wrap: wrap;
     }
 
+    /* Indicador y Banner de Compatibilidad DirectML */
+    .project-dml-badge {
+      background: rgba(158, 206, 106, 0.12);
+      border: 1px solid rgba(158, 206, 106, 0.36);
+      color: var(--accent-green);
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 11.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      max-width: 100%;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .project-dml-badge:hover {
+      filter: brightness(1.12);
+    }
+    .project-dml-badge.compat-tight {
+      background: rgba(224, 175, 104, 0.14);
+      border-color: rgba(224, 175, 104, 0.45);
+      color: var(--accent-yellow);
+    }
+    .project-dml-badge.compat-bad {
+      background: rgba(247, 118, 142, 0.16);
+      border-color: rgba(247, 118, 142, 0.55);
+      color: #ffb4c2;
+    }
+
+    .dml-compat-banner {
+      background: linear-gradient(135deg, rgba(247, 118, 142, 0.14), rgba(224, 175, 104, 0.08)), #070204;
+      border-bottom: 1px solid rgba(247, 118, 142, 0.52);
+      border-left: 3px solid var(--accent-red);
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      max-width: 100%;
+    }
+    .dml-compat-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex: 1 1 320px;
+      min-width: 0;
+    }
+    .dml-compat-icon {
+      font-size: 15px;
+      line-height: 1.3;
+      flex-shrink: 0;
+    }
+    .dml-compat-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .dml-compat-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #ffd0d9;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .dml-compat-detail {
+      font-size: 11.5px;
+      color: #f3e4e8;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .dml-compat-actions, .dual-dml-warn-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      max-width: 100%;
+    }
+    .dml-act-btn {
+      font-size: 11.5px;
+      padding: 3px 9px;
+      background: rgba(12, 12, 18, 0.92);
+      border-color: rgba(247, 118, 142, 0.45);
+      color: #ffffff;
+    }
+    .dml-act-btn:hover {
+      background: rgba(247, 118, 142, 0.24);
+      border-color: var(--accent-red);
+      color: #ffffff;
+    }
+    .dml-act-btn.dml-act-primary {
+      background: rgba(14, 165, 233, 0.18);
+      border-color: rgba(125, 207, 255, 0.65);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    .dml-act-btn.dml-act-primary:hover {
+      background: rgba(14, 165, 233, 0.34);
+      color: #ffffff;
+    }
+
+    .dual-dml-project-warn {
+      background: linear-gradient(135deg, rgba(247, 118, 142, 0.16), rgba(224, 175, 104, 0.08)), #0a0305;
+      border: 1px solid rgba(247, 118, 142, 0.55);
+      border-left: 3px solid var(--accent-red);
+      border-radius: 7px;
+      padding: 7px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 100%;
+    }
+    .dual-dml-warn-text {
+      font-size: 11.5px;
+      color: #ffd6de;
+      font-weight: 600;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
     /* Cajón de Contexto Desplegable */
     #context-drawer {
       background: rgba(5, 5, 8, 0.98);
@@ -2357,6 +2482,27 @@
         padding: 4px 10px;
         gap: 5px;
       }
+      .dml-compat-banner {
+        padding: 6px 10px;
+        gap: 6px;
+      }
+      .dml-compat-main {
+        flex-basis: 100%;
+      }
+      .dml-compat-title {
+        font-size: 12px;
+      }
+      .dml-compat-detail {
+        font-size: 11px;
+      }
+      .dml-compat-actions {
+        width: 100%;
+        gap: 5px;
+      }
+      .project-dml-badge {
+        font-size: 11px;
+        padding: 2px 7px;
+      }
       .header-btn {
         padding: 3px 7px;
         font-size: 11.5px;
@@ -2585,6 +2731,9 @@
       <button type="button" id="btn-load-folder" class="header-btn" title="Cargar y vincular carpeta de proyecto específica con inyección de código">
         <span>📂</span><span>Cargar Carpeta</span>
       </button>
+      <button type="button" id="project-dml-compat-badge" class="project-dml-badge compat-ok" title="Estado de compatibilidad de tokens DirectML (límite seguro 6,144 tokens / caché KV 8,192). Clic para inspeccionar contexto." style="display:none;">
+        ⚡ DML OK
+      </button>
     </div>
     <div class="project-right">
       <button type="button" id="btn-preview-context" class="header-btn" title="Previsualizar el código inyectado, System Prompt unificado y métricas exactas">
@@ -2593,6 +2742,23 @@
       <button type="button" id="btn-toggle-context-drawer" class="header-btn" aria-expanded="false" title="Ver detalle técnico del proyecto activo">
         <span>📋</span><span>Detalle</span>
       </button>
+    </div>
+  </div>
+
+  <!-- Advertencia Clara de Incompatibilidad DirectML para Proyecto Activo -->
+  <div id="dml-project-compat-warn" class="dml-compat-banner" role="alert" aria-live="polite" style="display:none;">
+    <div class="dml-compat-main">
+      <span class="dml-compat-icon" aria-hidden="true">⛔</span>
+      <div class="dml-compat-copy">
+        <div id="dml-compat-title" class="dml-compat-title">Proyecto no compatible con DirectML</div>
+        <div id="dml-compat-detail" class="dml-compat-detail"></div>
+      </div>
+    </div>
+    <div id="dml-compat-actions" class="dml-compat-actions">
+      <button type="button" id="btn-dml-switch-ollama" class="header-btn dml-act-btn dml-act-primary">🤖 Cambiar a Ollama</button>
+      <button type="button" id="btn-dml-switch-freeai" class="header-btn dml-act-btn">🌐 Cambiar a Free.ai</button>
+      <button type="button" id="btn-dml-switch-dual-safe" class="header-btn dml-act-btn dml-act-primary" style="display:none;">🌐+🤖 Cambiar par a Free.ai + Ollama</button>
+      <button type="button" id="btn-dml-reduce-context" class="header-btn dml-act-btn">📂 Reducir archivos</button>
     </div>
   </div>
 
@@ -2633,6 +2799,13 @@
           Analizando telemetría de CPU, Radeon 860M y RAM libre...
         </div>
         <span id="dual-hw-risk-pill" class="dual-hw-badge risk-optimal">🟢 Óptimo</span>
+      </div>
+      <div id="dual-dml-project-warn" class="dual-dml-project-warn" role="alert" aria-live="polite" style="display:none;">
+        <div id="dual-dml-project-warn-text" class="dual-dml-warn-text"></div>
+        <div class="dual-dml-warn-actions">
+          <button type="button" id="btn-dual-dml-switch-safe" class="header-btn dml-act-btn dml-act-primary">🌐+🤖 Cambiar a Free.ai + Ollama</button>
+          <button type="button" id="btn-dual-dml-reduce" class="header-btn dml-act-btn">📂 Reducir archivos</button>
+        </div>
       </div>
       <div id="dual-hw-warnings" class="dual-hw-list"></div>
       <div id="dual-hw-recommendations" class="dual-hw-list"></div>
@@ -2791,6 +2964,7 @@
       <div class="ctx-meta-item">📦 <strong>Stack:</strong> <span id="ctx-stack">-</span></div>
       <div class="ctx-meta-item">⚙️ <strong>Scripts:</strong> <span id="ctx-scripts">-</span></div>
       <div class="ctx-meta-item">🔄 <strong>Sesión:</strong> <span id="ctx-task">-</span></div>
+      <div class="ctx-meta-item">⚡ <strong>DirectML KV:</strong> <span id="ctx-dml-compat">-</span></div>
     </div>
     <div id="ctx-state-summary" style="margin-bottom:6px; color:var(--accent-yellow); font-size:12px;"></div>
     <div style="margin-bottom: 4px; font-weight: 500; color: var(--accent-cyan);">Archivos del Proyecto Visibles por el Modelo:</div>
@@ -3321,6 +3495,22 @@
       TTS_VOICE: 'local_ai_tts_voice_v1'
     };
 
+    // Constantes exactas del backend DirectML (api_openai.py):
+    // ventana KV 8,192 tokens, guardia segura de prompt 6,144 tokens, reserva de salida 512 tokens.
+    const DML_KV_CONTEXT_TOKENS = 8192;
+    const DML_SAFE_PROMPT_TOKENS = 6144;
+    const DML_OUTPUT_RESERVE_TOKENS = 512;
+    const DML_CHARS_PER_TOKEN = 4;
+    const DML_TIGHT_WARN_RATIO = 0.85;
+    const DML_SECTION_LABELS = {
+      masterPrompt: 'Prompt Maestro',
+      skillPrompt: 'Perfil / Skill',
+      stateSummary: 'Estado persistido',
+      projectContextXml: 'Contexto de proyecto',
+      codeContextXml: 'Código fuente inyectado',
+      mutationDirectives: 'Directivas de edición'
+    };
+
     const renderedCodeBlocks = new Map();
     let blockSeq = 0;
 
@@ -3501,7 +3691,7 @@
         data = {};
       }
       if (!res.ok) {
-        const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+        const msg = (data && (data.error || data.detail || data.message)) || `HTTP ${res.status}`;
         const err = new Error(msg);
         err.status = res.status;
         err.data = data;
@@ -3892,11 +4082,22 @@
 
       const badges = document.createElement('div');
       badges.className = 'telemetry-badges';
+      let dmlBadgeHtml = '';
+      if (tel.directmlCompatibility && typeof tel.directmlCompatibility === 'object') {
+        const dc = tel.directmlCompatibility;
+        const safeLim = Number(dc.safePromptLimit || DML_SAFE_PROMPT_TOKENS).toLocaleString('en-US');
+        dmlBadgeHtml = !dc.compatible
+          ? `<span class="tel-badge warn">⛔ No DirectML (&gt;${safeLim} tok)</span>`
+          : (dc.status === 'tight'
+            ? '<span class="tel-badge warn">⚠️ DirectML justo</span>'
+            : '<span class="tel-badge ok">⚡ DirectML OK</span>');
+      }
       badges.innerHTML =
         `<span class="tel-badge warn">⏳ Pendientes: ${Number(cs.pending || 0)}</span>` +
         `<span class="tel-badge">🔄 En progreso: ${Number(cs.inProgress || 0)}</span>` +
         `<span class="tel-badge ok">✅ Completadas: ${Number(cs.completed || 0)}</span>` +
-        `<span class="tel-badge">📊 Contexto: ~${tokens} tokens</span>`;
+        `<span class="tel-badge">📊 Contexto: ~${tokens} tokens</span>` +
+        dmlBadgeHtml;
       card.appendChild(badges);
 
       if (tel.digestMarkdown) {
@@ -4774,6 +4975,7 @@
       if (mfBtn) mfBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
 
       populateModelSelect();
+      updateDirectmlCompatBanner();
       if (currentSource === 'directml') {
         checkDirectMLStatus();
       }
@@ -5047,6 +5249,7 @@
       modelfileOptions = opts;
 
       closeModal('modelfile-modal');
+      updateDirectmlCompatBanner();
       showToast('⚡ System Prompt y parámetros del Modelfile aplicados a esta sesión.', 'success');
     }
 
@@ -5172,6 +5375,7 @@
       else localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
       profileSelect.value = activeProfileId;
       updateActiveProfileBadge();
+      loadProjectContext({ preserveDualConfig: true });
     }
 
     function setActiveSkill(id) {
@@ -5180,6 +5384,7 @@
       else localStorage.removeItem(STORAGE_KEYS.ACTIVE_SKILL);
       skillSelect.value = activeSkillId;
       updateActiveSkillBadge();
+      loadProjectContext({ preserveDualConfig: true });
     }
 
     async function inspectActiveItem(kind) {
@@ -5411,6 +5616,7 @@
       fillSlot('a', dualConfig.agentA);
       fillSlot('b', dualConfig.agentB);
       updateDualModeBarVisibility();
+      updateDirectmlCompatBanner();
     }
 
     function updateDualModeBarVisibility() {
@@ -5498,6 +5704,7 @@
         btn.classList.toggle('active', btn.dataset.dualPair === dualConfig.pair);
       });
 
+      updateDirectmlCompatBanner();
       if (evaluate) scheduleDualHwEvaluation(90);
       if (persist) persistDualConfigToProject();
     }
@@ -5587,6 +5794,11 @@
 
     async function refreshDualHardwareEvaluation(forceRefresh = false) {
       try {
+        const proj = getActiveProjectDescriptor();
+        const effectiveCustomPrompt = modelfileCustomPrompt || customSystemPrompt || '';
+        const dmlSlot = normalizeDualSourceClient(dualConfig.agentA.source) === 'directml'
+          ? dualConfig.agentA
+          : (normalizeDualSourceClient(dualConfig.agentB.source) === 'directml' ? dualConfig.agentB : null);
         const data = await fetchJson('/api/system/hardware-evaluate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5594,15 +5806,28 @@
             pair: dualConfig.pair,
             workflow: dualConfig.workflow,
             unloadBetweenTurns: dualConfig.unloadBetweenTurns,
+            project: proj.name,
+            projectPath: proj.path || undefined,
+            conversationId: currentConversationId || undefined,
+            customSystemPrompt: effectiveCustomPrompt || undefined,
+            skillId: (dmlSlot && dmlSlot.skillId) || undefined,
+            profileId: (dmlSlot && dmlSlot.profileId) || undefined,
+            extraChars: computeChatHistoryChars() + 220,
             agentA: {
               source: dualConfig.agentA.source,
               model: dualConfig.agentA.model,
-              numCtx: dualConfig.agentA.numCtx
+              numCtx: dualConfig.agentA.numCtx,
+              skillId: dualConfig.agentA.skillId || undefined,
+              profileId: dualConfig.agentA.profileId || undefined,
+              customSystemPrompt: dualConfig.agentA.customSystemPrompt || undefined
             },
             agentB: {
               source: dualConfig.agentB.source,
               model: dualConfig.agentB.model,
-              numCtx: dualConfig.agentB.numCtx
+              numCtx: dualConfig.agentB.numCtx,
+              skillId: dualConfig.agentB.skillId || undefined,
+              profileId: dualConfig.agentB.profileId || undefined,
+              customSystemPrompt: dualConfig.agentB.customSystemPrompt || undefined
             },
             forceRefresh: Boolean(forceRefresh)
           })
@@ -5625,7 +5850,10 @@
 
       const riskMap = {
         optimal: { cls: 'risk-optimal', label: '🟢 Óptimo' },
-        caution: { cls: 'risk-caution', label: '🟡 Ajuste' },
+        caution: {
+          cls: 'risk-caution',
+          label: ev.directmlIncompatibleWithProject ? '⚠️ >DML KV' : '🟡 Ajuste'
+        },
         critical: { cls: 'risk-critical', label: '🔴 Riesgo VRAM' }
       };
       const riskUi = riskMap[ev.riskLevel] || riskMap.optimal;
@@ -5712,6 +5940,7 @@
       if (restartDirectmlChk && restartDirectmlChk.dataset.userTouched !== '1') {
         restartDirectmlChk.checked = Boolean(ev.requiresDirectmlRestart);
       }
+      updateDirectmlCompatBanner();
     }
 
     async function applyRecommendedDualPreset() {
@@ -5810,8 +6039,287 @@
     }
 
     // =========================================================================
-    // 7. Proyectos, Contexto, Carpeta y Preview Unificado
+    // 7. Proyectos, Contexto, Compatibilidad DirectML, Carpeta y Preview Unificado
     // =========================================================================
+    function computeChatHistoryChars() {
+      if (!Array.isArray(chatHistory) || chatHistory.length === 0) return 0;
+      let total = 0;
+      for (const m of chatHistory) {
+        if (!m) continue;
+        if (m.role === 'assistant_dual' && m.dual && typeof m.dual === 'object') {
+          const aText = String((m.dual.agentA && m.dual.agentA.text) || '');
+          const bText = String((m.dual.agentB && m.dual.agentB.text) || '');
+          if (aText || bText) {
+            total += aText.length + bText.length + 48;
+            continue;
+          }
+        }
+        total += String(m.content || '').length;
+      }
+      return total;
+    }
+
+    function computeClientDirectmlCompatibility() {
+      const proj = getActiveProjectDescriptor();
+      const isDual = Boolean(dualConfig && dualConfig.enabled);
+      const dualHasDirectml = Boolean(
+        isDual &&
+        dualConfig.agentA &&
+        dualConfig.agentB &&
+        (normalizeDualSourceClient(dualConfig.agentA.source) === 'directml' ||
+          normalizeDualSourceClient(dualConfig.agentB.source) === 'directml')
+      );
+      const singleHasDirectml = !isDual && currentSource === 'directml';
+      const hasActiveDirectml = isDual ? dualHasDirectml : singleHasDirectml;
+
+      const ctxCompat = (projectContextData && projectContextData.directmlCompatibility && typeof projectContextData.directmlCompatibility === 'object')
+        ? projectContextData.directmlCompatibility
+        : null;
+      const evalCompat = (
+        isDual &&
+        dualHasDirectml &&
+        dualLastEvalData &&
+        dualLastEvalData.projectCompatibility &&
+        typeof dualLastEvalData.projectCompatibility === 'object'
+      ) ? dualLastEvalData.projectCompatibility : null;
+
+      const evalMatchesProject = Boolean(
+        evalCompat &&
+        String(evalCompat.projectName || '').trim().toLowerCase() === String(proj.name || '').trim().toLowerCase()
+      );
+
+      const historyChars = computeChatHistoryChars();
+      const effectiveOverride = modelfileCustomPrompt || customSystemPrompt || '';
+
+      if (!projectContextData && !evalMatchesProject) {
+        return {
+          hasData: false,
+          projectName: proj.name,
+          isGeneral: proj.isGeneral,
+          isDual,
+          dualHasDirectml,
+          singleHasDirectml,
+          hasActiveDirectml,
+          compatible: true,
+          status: 'compatible',
+          approxPromptTokens: 0,
+          safePromptLimit: DML_SAFE_PROMPT_TOKENS,
+          kvContextLimit: DML_KV_CONTEXT_TOKENS,
+          totalChars: 0,
+          excessTokens: 0,
+          largestSection: null,
+          reason: '',
+          recommendation: ''
+        };
+      }
+
+      const baseTotalChars = Number(
+        (projectContextData && projectContextData.metrics && projectContextData.metrics.totalChars) ||
+        (ctxCompat && ctxCompat.baseChars) ||
+        (evalMatchesProject ? evalCompat.baseChars : 0) ||
+        0
+      );
+      const bySection = {
+        ...((projectContextData && projectContextData.metrics && projectContextData.metrics.bySection) || {})
+      };
+
+      let extraChars = historyChars;
+      if (effectiveOverride.trim()) {
+        const overrideLen = effectiveOverride.trim().length + 24;
+        extraChars += overrideLen;
+        bySection.masterPrompt = Number(bySection.masterPrompt || 0) + overrideLen;
+      }
+      if (isDual && dualHasDirectml) {
+        const dmlAgent = normalizeDualSourceClient(dualConfig.agentA.source) === 'directml'
+          ? dualConfig.agentA
+          : dualConfig.agentB;
+        extraChars += 220;
+        if (dmlAgent && dmlAgent.customSystemPrompt && dmlAgent.customSystemPrompt.trim()) {
+          extraChars += dmlAgent.customSystemPrompt.trim().length + 34;
+        }
+        if (evalMatchesProject && Number(evalCompat.totalChars || 0) > baseTotalChars + extraChars) {
+          const serverDelta = Number(evalCompat.totalChars || 0) - baseTotalChars;
+          if (serverDelta > extraChars) {
+            extraChars = serverDelta;
+          }
+        }
+      }
+
+      let totalChars = baseTotalChars + extraChars;
+      let approxPromptTokens = (extraChars === 0 && ctxCompat && Number.isFinite(Number(ctxCompat.approxPromptTokens)))
+        ? Math.round(Number(ctxCompat.approxPromptTokens))
+        : Math.ceil(totalChars / DML_CHARS_PER_TOKEN);
+
+      const safePromptLimit = Number(
+        (evalMatchesProject ? evalCompat.safePromptLimit : null) ||
+        (ctxCompat && ctxCompat.safePromptLimit) ||
+        DML_SAFE_PROMPT_TOKENS
+      );
+      const kvContextLimit = Number(
+        (evalMatchesProject ? evalCompat.kvContextLimit : null) ||
+        (ctxCompat && ctxCompat.kvContextLimit) ||
+        DML_KV_CONTEXT_TOKENS
+      );
+
+      if (evalMatchesProject && extraChars === 0 && ctxCompat && evalCompat.approxPromptTokens > approxPromptTokens) {
+        approxPromptTokens = Math.round(Number(evalCompat.approxPromptTokens));
+        totalChars = Math.max(totalChars, Number(evalCompat.totalChars || 0));
+      }
+
+      const compatible = approxPromptTokens <= safePromptLimit;
+      const tightThreshold = Math.floor(safePromptLimit * DML_TIGHT_WARN_RATIO);
+      const status = !compatible ? 'incompatible' : (approxPromptTokens >= tightThreshold ? 'tight' : 'compatible');
+      const excessTokens = Math.max(0, approxPromptTokens - safePromptLimit);
+
+      let largestSection = (ctxCompat && ctxCompat.largestSection) || (evalMatchesProject ? evalCompat.largestSection : null) || null;
+      if (!largestSection && bySection && typeof bySection === 'object') {
+        for (const [k, v] of Object.entries(bySection)) {
+          const chars = Math.max(0, Math.round(Number(v) || 0));
+          if (chars <= 0) continue;
+          if (!largestSection || chars > largestSection.chars) {
+            largestSection = {
+              key: k,
+              label: DML_SECTION_LABELS[k] || k,
+              chars,
+              approxTokens: Math.ceil(chars / DML_CHARS_PER_TOKEN)
+            };
+          }
+        }
+      }
+
+      const driverSuffix = largestSection
+        ? ` Mayor peso: ${largestSection.label} (~${Number(largestSection.approxTokens || 0).toLocaleString('en-US')} tokens).`
+        : '';
+
+      return {
+        hasData: true,
+        projectName: proj.name,
+        isGeneral: proj.isGeneral,
+        isDual,
+        dualHasDirectml,
+        singleHasDirectml,
+        hasActiveDirectml,
+        compatible,
+        status,
+        approxPromptTokens,
+        safePromptLimit,
+        kvContextLimit,
+        totalChars,
+        excessTokens,
+        largestSection,
+        reason: compatible
+          ? `Compatible con DirectML (~${approxPromptTokens.toLocaleString('en-US')} / ${safePromptLimit.toLocaleString('en-US')} tokens seguros; caché KV ${kvContextLimit.toLocaleString('en-US')}).${status === 'tight' ? driverSuffix : ''}`
+          : `El proyecto "${proj.name}" estima ~${approxPromptTokens.toLocaleString('en-US')} tokens (${totalChars.toLocaleString('en-US')} chars) y supera el límite seguro DirectML de ${safePromptLimit.toLocaleString('en-US')} tokens (caché KV ${kvContextLimit.toLocaleString('en-US')}, +${excessTokens.toLocaleString('en-US')} tokens de exceso → provoca HTTP 400).${driverSuffix}`,
+        recommendation: proj.isGeneral
+          ? 'Cambia el motor a Ollama / Free.ai o reduce el Prompt Maestro / Skill / historial debajo de 6,144 tokens.'
+          : 'Cambia el motor a Ollama / Free.ai para este proyecto o reduce archivos seleccionados / Prompt Maestro debajo de 6,144 tokens.'
+      };
+    }
+
+    function updateDirectmlCompatBanner() {
+      const badge = document.getElementById('project-dml-compat-badge');
+      const banner = document.getElementById('dml-project-compat-warn');
+      const titleEl = document.getElementById('dml-compat-title');
+      const detailEl = document.getElementById('dml-compat-detail');
+      const btnOllama = document.getElementById('btn-dml-switch-ollama');
+      const btnFreeai = document.getElementById('btn-dml-switch-freeai');
+      const btnDualSafe = document.getElementById('btn-dml-switch-dual-safe');
+      const btnReduce = document.getElementById('btn-dml-reduce-context');
+
+      const dualWarn = document.getElementById('dual-dml-project-warn');
+      const dualWarnText = document.getElementById('dual-dml-project-warn-text');
+      const dualReduceBtn = document.getElementById('btn-dual-dml-reduce');
+      const ctxCompatEl = document.getElementById('ctx-dml-compat');
+
+      const compat = computeClientDirectmlCompatibility();
+
+      if (!compat.hasData) {
+        if (badge) badge.style.display = 'none';
+        if (banner) banner.style.display = 'none';
+        if (dualWarn) dualWarn.style.display = 'none';
+        if (ctxCompatEl) ctxCompatEl.textContent = '-';
+        return compat;
+      }
+
+      const tokFmt = compat.approxPromptTokens.toLocaleString('en-US');
+      const safeFmt = compat.safePromptLimit.toLocaleString('en-US');
+      const kvFmt = compat.kvContextLimit.toLocaleString('en-US');
+
+      if (badge) {
+        badge.classList.remove('compat-ok', 'compat-tight', 'compat-bad');
+        if (!compat.compatible) {
+          badge.classList.add('compat-bad');
+          badge.textContent = `⛔ No DirectML (~${formatCount(compat.approxPromptTokens)}/${formatCount(compat.safePromptLimit)})`;
+          badge.title = `${compat.reason} Clic para inspeccionar el contexto.`;
+        } else if (compat.status === 'tight') {
+          badge.classList.add('compat-tight');
+          badge.textContent = `⚠️ DML justo (~${formatCount(compat.approxPromptTokens)}/${formatCount(compat.safePromptLimit)})`;
+          badge.title = `${compat.reason} Clic para inspeccionar el contexto.`;
+        } else {
+          badge.classList.add('compat-ok');
+          badge.textContent = `⚡ DML OK (~${formatCount(compat.approxPromptTokens)}/${formatCount(compat.safePromptLimit)})`;
+          badge.title = `Compatible con ventana DirectML (${tokFmt} / ${safeFmt} tokens seguros, caché KV ${kvFmt}). Clic para inspeccionar.`;
+        }
+        badge.style.display = 'inline-flex';
+      }
+
+      if (ctxCompatEl) {
+        if (!compat.compatible) {
+          ctxCompatEl.style.color = '#ff8aa3';
+          ctxCompatEl.textContent = `⛔ Incompatible (~${tokFmt} > ${safeFmt} seguros / KV ${kvFmt})`;
+        } else if (compat.status === 'tight') {
+          ctxCompatEl.style.color = 'var(--accent-yellow)';
+          ctxCompatEl.textContent = `⚠️ Justo (~${tokFmt} / ${safeFmt} seguros • KV ${kvFmt})`;
+        } else {
+          ctxCompatEl.style.color = 'var(--accent-green)';
+          ctxCompatEl.textContent = `✅ Compatible (~${tokFmt} / ${safeFmt} seguros • KV ${kvFmt})`;
+        }
+      }
+
+      const showMainWarn = Boolean(!compat.compatible && compat.hasActiveDirectml);
+      if (banner) {
+        if (showMainWarn) {
+          if (titleEl) {
+            titleEl.textContent = compat.isDual
+              ? `Proyecto "${compat.projectName}" incompatible con el agente DirectML del Modo Dual`
+              : `Proyecto "${compat.projectName}" incompatible con DirectML`;
+          }
+          if (detailEl) {
+            detailEl.textContent = `${compat.reason} ${compat.recommendation}`.trim();
+          }
+          if (btnOllama) btnOllama.style.display = compat.isDual ? 'none' : 'inline-flex';
+          if (btnFreeai) btnFreeai.style.display = compat.isDual ? 'none' : 'inline-flex';
+          if (btnDualSafe) btnDualSafe.style.display = compat.isDual ? 'inline-flex' : 'none';
+          if (btnReduce) {
+            btnReduce.textContent = compat.isGeneral ? '👁️ Revisar Contexto' : '📂 Reducir archivos';
+          }
+          banner.style.display = 'flex';
+        } else {
+          banner.style.display = 'none';
+        }
+      }
+
+      const showDualWarn = Boolean(!compat.compatible && compat.isDual && compat.dualHasDirectml);
+      if (dualWarn) {
+        if (showDualWarn) {
+          if (dualWarnText) {
+            dualWarnText.textContent =
+              `⛔ Incompatibilidad de contexto DirectML: "${compat.projectName}" estima ~${tokFmt} tokens ` +
+              `(${compat.totalChars.toLocaleString('en-US')} chars), superando el límite seguro DirectML (${safeFmt} tokens / KV ${kvFmt}; provocará HTTP 400). ` +
+              `Cambia el par a Free.ai + Ollama o reduce el contexto.`;
+          }
+          if (dualReduceBtn) {
+            dualReduceBtn.textContent = compat.isGeneral ? '👁️ Revisar Contexto' : '📂 Reducir archivos';
+          }
+          dualWarn.style.display = 'flex';
+        } else {
+          dualWarn.style.display = 'none';
+        }
+      }
+
+      return compat;
+    }
+
     async function loadProjects() {
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -6023,6 +6531,7 @@
         document.getElementById('ctx-files').textContent = files.length > 0
           ? `${headerNote}${files.slice(0, 60).join('\n')}`
           : 'Sin archivos fuente escaneados en este contexto.';
+        updateDirectmlCompatBanner();
       } catch (_e) {}
     }
 
@@ -6044,6 +6553,7 @@
         currentProjectPath = currentProjectIsGeneral ? '' : ((matched && matched.path) || '');
       }
       projectContextData = null;
+      updateDirectmlCompatBanner();
 
       try {
         const data = await fetchJson('/api/context/select', {
@@ -6086,6 +6596,9 @@
       const nfResEl = document.getElementById('nf-last-result');
       if (nfResEl) nfResEl.innerHTML = '';
       await loadProjectContext();
+      if (dualConfig.enabled) {
+        await refreshDualHardwareEvaluation(false);
+      }
 
       if (githubToggle || integrationsDrawer.classList.contains('active') && activeIntegrationsTab === 'github') {
         fetchGithubRepos(false);
@@ -6262,10 +6775,23 @@
           ? data.selectedFiles.length
           : (Array.isArray(data.files) ? data.files.length : 0);
 
+        const compatPreview = data.directmlCompatibility || {
+          compatible: Number(metrics.approxTokens || 0) <= DML_SAFE_PROMPT_TOKENS,
+          status: Number(metrics.approxTokens || 0) > DML_SAFE_PROMPT_TOKENS ? 'incompatible' : 'compatible',
+          safePromptLimit: DML_SAFE_PROMPT_TOKENS,
+          kvContextLimit: DML_KV_CONTEXT_TOKENS
+        };
+        const dmlBadgeHtml = !compatPreview.compatible
+          ? `<span class="tel-badge warn">⛔ No DirectML (&gt;${Number(compatPreview.safePromptLimit || DML_SAFE_PROMPT_TOKENS).toLocaleString('en-US')} / KV ${Number(compatPreview.kvContextLimit || DML_KV_CONTEXT_TOKENS).toLocaleString('en-US')})</span>`
+          : (compatPreview.status === 'tight'
+            ? '<span class="tel-badge warn">⚠️ DirectML Justo</span>'
+            : '<span class="tel-badge ok">⚡ DirectML OK</span>');
+
         const metricsEl = document.getElementById('preview-metrics');
         metricsEl.innerHTML =
           `<span class="tel-badge">📏 ${Number(metrics.totalChars || 0).toLocaleString()} chars</span>` +
           `<span class="tel-badge ok">🪙 ~${Number(metrics.approxTokens || 0).toLocaleString()} tokens</span>` +
+          dmlBadgeHtml +
           `<span class="tel-badge">📄 Archivos: ${filesCount}</span>` +
           `<span class="tel-badge">${activeProfileId ? `🎭 ${escapeHtml(activeProfileId)}` : '🎭 Perfil: base'}</span>` +
           `<span class="tel-badge">${activeSkillId ? `🎯 ${escapeHtml(activeSkillId)}` : '🎯 Skill: base'}</span>` +
@@ -6343,6 +6869,8 @@
         statusEl.style.color = 'var(--accent-green)';
         statusEl.textContent = '✅ Prompt Maestro guardado y sincronizado con Ollama, DirectML y Free.ai.';
         showToast('🧠 Prompt Maestro actualizado.', 'success');
+        await loadProjectContext({ preserveDualConfig: true });
+        if (dualConfig.enabled) await refreshDualHardwareEvaluation(false);
       } catch (err) {
         statusEl.style.color = 'var(--accent-red)';
         statusEl.textContent = `❌ Error: ${err.message}`;
@@ -6366,6 +6894,8 @@
         statusEl.style.color = 'var(--accent-yellow)';
         statusEl.textContent = '🔄 Restaurado a los valores por defecto XML/CO-STAR.';
         showToast('🔄 Prompt Maestro restaurado a valores por defecto.', 'info');
+        await loadProjectContext({ preserveDualConfig: true });
+        if (dualConfig.enabled) await refreshDualHardwareEvaluation(false);
       } catch (err) {
         showToast(`Error restaurando Prompt Maestro: ${err.message}`, 'error');
       }
@@ -6427,7 +6957,12 @@
         });
 
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+          let errMsg = `HTTP ${res.status}`;
+          try {
+            const errJson = await res.json();
+            errMsg = errJson.error || errJson.detail || errJson.message || errMsg;
+          } catch (_e) {}
+          throw new Error(errMsg);
         }
 
         const reader = res.body.getReader();
@@ -6810,6 +7345,7 @@
         if (typeof s.profileId === 'string') setActiveProfile(s.profileId);
         if (typeof s.skillId === 'string') setActiveSkill(s.skillId);
 
+        updateDirectmlCompatBanner();
         renderHistoryList();
         if (!silent) {
           showToast('💬 Conversación cargada.', 'success');
@@ -8249,7 +8785,7 @@
           let errMsg = `HTTP ${res.status}`;
           try {
             const errJson = await res.json();
-            errMsg = errJson.error || errMsg;
+            errMsg = errJson.error || errJson.detail || errJson.message || errMsg;
           } catch (_e) {}
           throw new Error(errMsg);
         }
@@ -8474,6 +9010,7 @@
         if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
         userAbortedStream = false;
         setStreamingUiState(false);
+        updateDirectmlCompatBanner();
       }
     }
 
@@ -8545,7 +9082,7 @@
           let errMsg = `HTTP ${res.status}`;
           try {
             const errJson = await res.json();
-            errMsg = errJson.error || errMsg;
+            errMsg = errJson.error || errJson.detail || errJson.message || errMsg;
           } catch (_e) {}
           throw new Error(errMsg);
         }
@@ -8673,6 +9210,7 @@
         if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
         userAbortedStream = false;
         setStreamingUiState(false);
+        updateDirectmlCompatBanner();
       }
     }
 
@@ -8697,6 +9235,8 @@
         false,
         { allowHtml: true }
       );
+      updateDirectmlCompatBanner();
+      if (dualConfig.enabled) scheduleDualHwEvaluation(50);
       if (!silent) showToast('✨ Nuevo chat limpio iniciado.', 'info');
     }
 
@@ -8846,6 +9386,45 @@
       document.getElementById('btn-load-folder').addEventListener('click', openFolderModal);
       document.getElementById('btn-preview-context').addEventListener('click', previewCurrentContext);
       document.getElementById('btn-toggle-context-drawer').addEventListener('click', toggleContextDrawer);
+
+      // Compatibilidad DirectML del Proyecto Activo (Single y Dual)
+      const projDmlBadge = document.getElementById('project-dml-compat-badge');
+      if (projDmlBadge) projDmlBadge.addEventListener('click', previewCurrentContext);
+
+      const btnDmlOllama = document.getElementById('btn-dml-switch-ollama');
+      if (btnDmlOllama) {
+        btnDmlOllama.addEventListener('click', () => {
+          switchAiSource('local');
+          showToast('🤖 Motor cambiado a Ollama para soportar este proyecto completo.', 'success');
+        });
+      }
+      const btnDmlFreeai = document.getElementById('btn-dml-switch-freeai');
+      if (btnDmlFreeai) {
+        btnDmlFreeai.addEventListener('click', () => {
+          switchAiSource('freeai');
+          showToast('🌐 Motor cambiado a Free.ai Cloud para soportar este proyecto completo.', 'success');
+        });
+      }
+      const handleDualSafeSwitch = async () => {
+        await selectDualPair('freeai+ollama');
+        showToast('🌐+🤖 Par Dual cambiado a Free.ai + Ollama (sin límite DirectML 8,192).', 'success');
+      };
+      const btnMainDualSafe = document.getElementById('btn-dml-switch-dual-safe');
+      if (btnMainDualSafe) btnMainDualSafe.addEventListener('click', handleDualSafeSwitch);
+      const btnDualPanelSafe = document.getElementById('btn-dual-dml-switch-safe');
+      if (btnDualPanelSafe) btnDualPanelSafe.addEventListener('click', handleDualSafeSwitch);
+
+      const handleReduceContextAction = () => {
+        if (currentProjectIsGeneral) {
+          previewCurrentContext();
+        } else {
+          openFolderModal();
+        }
+      };
+      const btnMainReduce = document.getElementById('btn-dml-reduce-context');
+      if (btnMainReduce) btnMainReduce.addEventListener('click', handleReduceContextAction);
+      const btnDualReduce = document.getElementById('btn-dual-dml-reduce');
+      if (btnDualReduce) btnDualReduce.addEventListener('click', handleReduceContextAction);
 
       // Folder Modal
       document.getElementById('btn-scan-folder').addEventListener('click', scanFolderFromInput);

@@ -1494,4 +1494,225 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
 
     await context.close();
   });
+
+  it("muestra advertencia clara DirectML en Single y Modo Dual cuando el proyecto supera 6,144 tokens, con WCAG AA, acciones rápidas y 0 overflow en 1280x800 y 420x800", async () => {
+    const projLargeDir = path.join(tempProjectsDir, "LargeDmlApp");
+    fs.mkdirSync(path.join(projLargeDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projLargeDir, "package.json"), JSON.stringify({
+      name: "large-dml-app",
+      version: "1.0.0"
+    }), "utf8");
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_a.js"),
+      "// Big Module A\n" + "export const tokenPadA = 'directml_kv_overflow_segment_alpha';\n".repeat(260),
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_b.js"),
+      "// Big Module B\n" + "export const tokenPadB = 'directml_kv_overflow_segment_beta';\n".repeat(260),
+      "utf8"
+    );
+
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+
+    const consoleErrors = [];
+    const pageErrors = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") consoleErrors.push(msg.text());
+    });
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+
+    await page.route("**/api/integrations/github/repos**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: false, repos: [] })
+      });
+    });
+    await page.route("**/api/integrations/netlify/sites**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: false, sites: [] })
+      });
+    });
+
+    await page.goto(studioBaseUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('#project-select option[value="LargeDmlApp"]', { state: "attached" });
+    await page.waitForSelector("#project-dml-compat-badge.compat-ok", { state: "visible" });
+    assert.match(await page.textContent("#project-dml-compat-badge"), /⚡ DML OK/);
+
+    // 1. Cambiar a LargeDmlApp con Ollama activo: badge visible ⛔ No DirectML, banner oculto
+    await page.selectOption("#project-select", "LargeDmlApp");
+    await page.waitForSelector("#project-dml-compat-badge.compat-bad", { state: "visible" });
+    assert.match(await page.textContent("#project-dml-compat-badge"), /⛔ No DirectML/);
+
+    const bannerHiddenOnOllama = await page.evaluate(() => {
+      const b = document.getElementById("dml-project-compat-warn");
+      return !b || getComputedStyle(b).display === "none";
+    });
+    assert.equal(bannerHiddenOnOllama, true, "Banner DirectML no debe mostrarse mientras Ollama está seleccionado");
+
+    // 2. Cambiar a DirectML en modo Single -> banner de advertencia claro aparece con métricas reales
+    await page.click("#src-directml-btn");
+    await page.waitForSelector("#dml-project-compat-warn", { state: "visible" });
+
+    const singleBannerInfo = await page.evaluate(() => {
+      const banner = document.getElementById("dml-project-compat-warn");
+      const title = document.getElementById("dml-compat-title");
+      const detail = document.getElementById("dml-compat-detail");
+      const btnOllama = document.getElementById("btn-dml-switch-ollama");
+      const btnFree = document.getElementById("btn-dml-switch-freeai");
+      const btnDualSafe = document.getElementById("btn-dml-switch-dual-safe");
+
+      const parseRgb = (cssColor) => {
+        const m = String(cssColor || "").match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+      };
+      const relLum = ([r, g, b]) => {
+        const chan = [r, g, b].map((v) => {
+          const s = v / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * chan[0] + 0.7152 * chan[1] + 0.0722 * chan[2];
+      };
+      const contrastRatio = (fgRgb, bgRgb) => {
+        const l1 = relLum(fgRgb);
+        const l2 = relLum(bgRgb);
+        return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      };
+
+      // Fondo real base #070204 y peor caso con gradiente rgba(247,118,142,0.14) -> rgb(41, 18, 23)
+      const bgBase = parseRgb(getComputedStyle(banner).backgroundColor);
+      const bgWorstCase = [41, 18, 23];
+      const titleFg = parseRgb(getComputedStyle(title).color);
+      const detailFg = parseRgb(getComputedStyle(detail).color);
+
+      return {
+        display: getComputedStyle(banner).display,
+        titleText: title.textContent.trim(),
+        detailText: detail.textContent.trim(),
+        btnOllamaVisible: getComputedStyle(btnOllama).display !== "none",
+        btnFreeVisible: getComputedStyle(btnFree).display !== "none",
+        btnDualSafeHidden: getComputedStyle(btnDualSafe).display === "none",
+        titleContrastBase: contrastRatio(titleFg, bgBase),
+        titleContrastWorst: contrastRatio(titleFg, bgWorstCase),
+        detailContrastBase: contrastRatio(detailFg, bgBase),
+        detailContrastWorst: contrastRatio(detailFg, bgWorstCase),
+        overflowDesktop: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        footerText: document.querySelector(".legal-signature")?.textContent?.trim() || ""
+      };
+    });
+
+    assert.equal(singleBannerInfo.display, "flex");
+    assert.match(singleBannerInfo.titleText, /LargeDmlApp/);
+    assert.match(singleBannerInfo.titleText, /incompatible con DirectML/i);
+    assert.match(singleBannerInfo.detailText, /6,144/);
+    assert.match(singleBannerInfo.detailText, /8,192/);
+    assert.match(singleBannerInfo.detailText, /HTTP 400/);
+    assert.match(singleBannerInfo.detailText, /Mayor peso:/);
+    assert.equal(singleBannerInfo.btnOllamaVisible, true);
+    assert.equal(singleBannerInfo.btnFreeVisible, true);
+    assert.equal(singleBannerInfo.btnDualSafeHidden, true);
+    assert.ok(singleBannerInfo.titleContrastWorst >= 4.5, `Contraste WCAG AA título insuficiente: ${singleBannerInfo.titleContrastWorst}`);
+    assert.ok(singleBannerInfo.detailContrastWorst >= 4.5, `Contraste WCAG AA detalle insuficiente: ${singleBannerInfo.detailContrastWorst}`);
+    assert.ok(singleBannerInfo.overflowDesktop <= 1, `Desborde horizontal en 1280x800 con banner DirectML: ${singleBannerInfo.overflowDesktop}`);
+    assert.equal(singleBannerInfo.footerText, "HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®");
+
+    // Verificar Drawer de contexto y Preview modal muestran estado Incompatible
+    await page.click("#btn-toggle-context-drawer");
+    await page.waitForSelector("#context-drawer.active");
+    assert.match(await page.textContent("#ctx-dml-compat"), /Incompatible.*6,144.*8,192/);
+    await page.click("#btn-toggle-context-drawer");
+
+    await page.click("#btn-preview-context");
+    await page.waitForSelector("#preview-modal.active");
+    await page.waitForFunction(() => (document.getElementById("preview-metrics")?.textContent || "").includes("No DirectML"));
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.getElementById("preview-modal").classList.contains("active"));
+
+    // 3. Verificar layout móvil 420x800 sin overflow con el banner visible
+    await page.setViewportSize({ width: 420, height: 800 });
+    await page.waitForTimeout(120);
+    const mobileBannerCheck = await page.evaluate(() => {
+      const b = document.getElementById("dml-project-compat-warn");
+      const rect = b.getBoundingClientRect();
+      return {
+        overflowMobile: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        rightEdge: rect.right,
+        clientW: document.documentElement.clientWidth
+      };
+    });
+    assert.ok(mobileBannerCheck.overflowMobile <= 1, `Desborde horizontal 420x800 en Single DirectML: ${mobileBannerCheck.overflowMobile}`);
+    assert.ok(mobileBannerCheck.rightEdge <= mobileBannerCheck.clientW + 1);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // 4. Acción rápida en Single: cambiar a Ollama -> banner desaparece limpiamente
+    await page.click("#btn-dml-switch-ollama");
+    await page.waitForSelector("#src-local-btn.active");
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("dml-project-compat-warn")).display === "none");
+
+    // Reactivar DirectML y probar acción rápida Free.ai -> desaparece limpiamente
+    await page.click("#src-directml-btn");
+    await page.waitForSelector("#dml-project-compat-warn", { state: "visible" });
+    await page.click("#btn-dml-switch-freeai");
+    await page.waitForSelector("#src-freeai-btn.active");
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("dml-project-compat-warn")).display === "none");
+
+    // 5. Reactivar DirectML y cambiar a proyecto compatible (AlphaApp y luego General) -> banner desaparece
+    await page.click("#src-directml-btn");
+    await page.waitForSelector("#dml-project-compat-warn", { state: "visible" });
+    await page.selectOption("#project-select", "AlphaApp");
+    await page.waitForSelector("#project-dml-compat-badge.compat-ok", { state: "visible" });
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("dml-project-compat-warn")).display === "none");
+
+    await page.selectOption("#project-select", "General");
+    await page.waitForSelector("#project-dml-compat-badge.compat-ok", { state: "visible" });
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("dml-project-compat-warn")).display === "none");
+
+    // 6. Volver a LargeDmlApp y activar Modo Dual (freeai+directml por defecto):
+    //    Deben mostrarse ambos avisos (#dml-project-compat-warn y #dual-dml-project-warn) y pill ⚠️ >DML KV
+    await page.selectOption("#project-select", "LargeDmlApp");
+    await page.waitForSelector("#project-dml-compat-badge.compat-bad", { state: "visible" });
+    await page.click("#btn-dual-mode");
+    await page.waitForSelector("#dual-config-panel.active");
+    await page.waitForSelector("#dml-project-compat-warn", { state: "visible" });
+    await page.waitForSelector("#dual-dml-project-warn", { state: "visible" });
+    await page.waitForFunction(() => (document.getElementById("dual-hw-risk-pill")?.textContent || "").includes(">DML KV"));
+
+    const dualWarnDetails = await page.evaluate(() => ({
+      mainTitle: document.getElementById("dml-compat-title")?.textContent || "",
+      dualWarnText: document.getElementById("dual-dml-project-warn-text")?.textContent || "",
+      overflowDualDesktop: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    }));
+    assert.match(dualWarnDetails.mainTitle, /Modo Dual/i);
+    assert.match(dualWarnDetails.dualWarnText, /LargeDmlApp/);
+    assert.match(dualWarnDetails.dualWarnText, /6,144/);
+    assert.match(dualWarnDetails.dualWarnText, /8,192/);
+    assert.match(dualWarnDetails.dualWarnText, /HTTP 400/);
+    assert.ok(dualWarnDetails.overflowDualDesktop <= 1, `Desborde 1280x800 en Dual con advertencias: ${dualWarnDetails.overflowDualDesktop}`);
+
+    // Verificar también 420x800 con panel Dual + ambos avisos activos
+    await page.setViewportSize({ width: 420, height: 800 });
+    await page.waitForTimeout(120);
+    const dualMobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(dualMobileOverflow <= 1, `Desborde 420x800 en Dual con advertencias: ${dualMobileOverflow}`);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // 7. Acción rápida dentro del panel Dual: cambiar par a Free.ai + Ollama -> ambos avisos se ocultan limpiamente
+    await page.click("#btn-dual-dml-switch-safe");
+    await page.waitForSelector("#dual-pair-freeai-ollama.active");
+    await page.waitForFunction(() => {
+      const mainW = document.getElementById("dml-project-compat-warn");
+      const dualW = document.getElementById("dual-dml-project-warn");
+      return mainW && getComputedStyle(mainW).display === "none" &&
+        dualW && getComputedStyle(dualW).display === "none";
+    });
+
+    assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
+    assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);
+
+    await context.close();
+  });
 });

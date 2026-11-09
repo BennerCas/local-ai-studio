@@ -269,6 +269,14 @@ function createMockAiEngineServer() {
       }
 
       if (req.url === "/v1/chat/completions") {
+        const msgText = (parsed?.messages || []).map((m) => String(m?.content || "")).join("\n");
+        if (msgText.includes("FORCE_DML_400")) {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({
+            detail: "Prompt demasiado largo para DirectML (7000 tokens > limite seguro 6144; max KV 8192)."
+          }));
+          return;
+        }
         res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8" });
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Respuesta DirectML verificada." } }] })}\n\n`);
         res.write("data: [DONE]\n\n");
@@ -1574,5 +1582,158 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
         );
       }
     );
+  });
+
+  it("expone directmlCompatibility real en /api/projects, /api/context, select/load-folder/enter-context, hardware-evaluate, /api/chat/dual y detalle HTTP 400", async () => {
+    const projLargeDir = path.join(tempProjectsDir, "LargeDmlApp");
+    fs.mkdirSync(path.join(projLargeDir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projLargeDir, "package.json"), JSON.stringify({
+      name: "large-dml-app",
+      version: "1.0.0"
+    }), "utf8");
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_a.js"),
+      "// Big A\n" + "export const tokenPadA = 'directml_kv_overflow_segment_alpha';\n".repeat(260),
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(projLargeDir, "src", "big_b.js"),
+      "// Big B\n" + "export const tokenPadB = 'directml_kv_overflow_segment_beta';\n".repeat(260),
+      "utf8"
+    );
+
+    const alphaProjects = await httpReq("/api/projects?project=AlphaApp");
+    assert.equal(alphaProjects.status, 200);
+    assert.equal(alphaProjects.json.directmlCompatibility.compatible, true);
+
+    const largeProjects = await httpReq("/api/projects?project=LargeDmlApp");
+    assert.equal(largeProjects.status, 200);
+    assert.equal(largeProjects.json.directmlCompatibility.compatible, false);
+    assert.equal(largeProjects.json.directmlCompatibility.safePromptLimit, 6144);
+    assert.equal(largeProjects.json.directmlCompatibility.kvContextLimit, 8192);
+    assert.ok(largeProjects.json.directmlCompatibility.approxPromptTokens > 6144);
+
+    const largeCtx = await httpReq("/api/context?project=LargeDmlApp");
+    assert.equal(largeCtx.status, 200);
+    assert.equal(largeCtx.json.directmlCompatibility.compatible, false);
+
+    const largePreview = await httpReq("/api/project/preview-context?project=LargeDmlApp");
+    assert.equal(largePreview.status, 200);
+    assert.equal(largePreview.json.directmlCompatibility.compatible, false);
+
+    const selLarge = await httpReq("/api/context/select", {
+      method: "POST",
+      body: { selection: "LargeDmlApp" }
+    });
+    assert.equal(selLarge.status, 200);
+    assert.equal(selLarge.json.directmlCompatibility.compatible, false);
+
+    const loadLarge = await httpReq("/api/project/load-folder", {
+      method: "POST",
+      body: { folderPath: projLargeDir }
+    });
+    assert.equal(loadLarge.status, 200);
+    assert.equal(loadLarge.json.directmlCompatibility.compatible, false);
+
+    const selSmallSubset = await httpReq("/api/project/select-files", {
+      method: "POST",
+      body: { folderPath: projLargeDir, selectedFiles: ["package.json"] }
+    });
+    assert.equal(selSmallSubset.status, 200);
+    assert.equal(selSmallSubset.json.directmlCompatibility.compatible, true);
+
+    const selBothLarge = await httpReq("/api/project/select-files", {
+      method: "POST",
+      body: { folderPath: projLargeDir, selectedFiles: ["src/big_a.js", "src/big_b.js"] }
+    });
+    assert.equal(selBothLarge.status, 200);
+    assert.equal(selBothLarge.json.directmlCompatibility.compatible, false);
+
+    const hugeEnterDirective = "Regla extendida de auditoría para pruebas DirectML.\n".repeat(450);
+    const enterTel = await httpReq("/api/project/enter-context", {
+      method: "POST",
+      body: { project: "LargeDmlApp", customSystemPrompt: hugeEnterDirective, telemetryOnly: true }
+    });
+    assert.equal(enterTel.status, 200);
+    assert.equal(enterTel.json.directmlCompatibility.compatible, false);
+
+    const enterStream = await httpReq("/api/project/enter-context", {
+      method: "POST",
+      body: {
+        project: "LargeDmlApp",
+        customSystemPrompt: hugeEnterDirective,
+        model: "qwen2.5-coder:latest",
+        source: "local",
+        stream: true
+      }
+    });
+    assert.equal(enterStream.status, 200);
+    const enterEvents = enterStream.text.trim().split("\n").map((l) => JSON.parse(l));
+    const telEv = enterEvents.find((e) => e.type === "telemetry");
+    assert.ok(telEv);
+    assert.equal(telEv.directmlCompatibility.compatible, false);
+
+    const hwDmlBad = await httpReq("/api/system/hardware-evaluate", {
+      method: "POST",
+      body: {
+        project: "LargeDmlApp",
+        pair: "freeai+directml",
+        agentA: { source: "freeai", model: "qwen-2.5-coder" },
+        agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" }
+      }
+    });
+    assert.equal(hwDmlBad.status, 200);
+    assert.equal(hwDmlBad.json.projectCompatibility.compatible, false);
+    assert.equal(hwDmlBad.json.evaluation.directmlIncompatibleWithProject, true);
+    assert.equal(hwDmlBad.json.evaluation.riskLevel, "caution");
+    assert.ok(hwDmlBad.json.evaluation.warnings.some((w) => w.includes("6,144") && w.includes("8,192")));
+
+    const hwSafePair = await httpReq("/api/system/hardware-evaluate", {
+      method: "POST",
+      body: {
+        project: "LargeDmlApp",
+        pair: "freeai+ollama",
+        agentA: { source: "freeai", model: "qwen-2.5-coder" },
+        agentB: { source: "ollama", model: "qwen2.5-coder:latest" }
+      }
+    });
+    assert.equal(hwSafePair.status, 200);
+    assert.equal(hwSafePair.json.evaluation.directmlIncompatibleWithProject, false);
+    assert.equal(hwSafePair.json.evaluation.warnings.some((w) => w.includes("HTTP 400")), false);
+
+    // Restaurar selección a AlphaApp y probar Dual + proxy HTTP 400 .detail
+    process.env.FREEAI_BASE_URL = `http://127.0.0.1:${mockEnginePort}/freeai/v1`;
+    process.env.FREEAI_API_KEY_1 = "mock_freeai_key_dml";
+    const dualDmlRes = await httpReq("/api/chat/dual", {
+      method: "POST",
+      body: {
+        project: "LargeDmlApp",
+        pair: "freeai+directml",
+        workflow: "pipeline",
+        agentA: { source: "freeai", model: "qwen-2.5-coder" },
+        agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+        messages: [{ role: "user", content: "FORCE_DML_400 prueba dual" }]
+      }
+    });
+    assert.equal(dualDmlRes.status, 200);
+    const dualDmlEvents = dualDmlRes.text.trim().split("\n").map((l) => JSON.parse(l));
+    const preflight = dualDmlEvents.find((e) => e.type === "dual_preflight");
+    assert.ok(preflight);
+    assert.equal(preflight.evaluation.directmlIncompatibleWithProject, true);
+    const dmlErrEv = dualDmlEvents.find((e) => e.type === "agent_error" && e.agent === "B");
+    assert.ok(dmlErrEv);
+    assert.match(dmlErrEv.error, /limite seguro 6144/);
+
+    const directml400Res = await httpReq("/api/chat", {
+      method: "POST",
+      body: {
+        project: "AlphaApp",
+        source: "directml",
+        model: "Phi-3.5-mini-instruct-ONNX",
+        messages: [{ role: "user", content: "FORCE_DML_400 prueba single" }]
+      }
+    });
+    assert.equal(directml400Res.status, 400);
+    assert.match(directml400Res.json.detail, /limite seguro 6144/);
   });
 });

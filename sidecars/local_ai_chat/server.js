@@ -57,6 +57,30 @@ function sendJsonError(res, statusCode, errOrMsg, extra = {}) {
   });
 }
 
+function buildProjectCompatibilitySummary(opts = {}) {
+  const ctx = bridge.buildProjectContext(opts.projectName || null, opts.convId || null, opts.token || null, {
+    writeToDisk: false,
+    skillId: opts.skillId || null,
+    profileId: opts.profileId || null,
+    customSystemPrompt: opts.customSystemPrompt || null,
+    modelOverridesPrompt: opts.modelOverridesPrompt || null,
+    selectedFiles: Array.isArray(opts.selectedFiles) ? opts.selectedFiles : undefined
+  });
+  if (!ctx) return { ctx: null, directmlCompatibility: null };
+  const extraChars = Math.max(0, Math.round(Number(opts.extraChars) || 0));
+  if (extraChars > 0) {
+    const compat = bridge.evaluateDirectmlPromptCompatibility({
+      totalChars: ctx.metrics ? ctx.metrics.totalChars : 0,
+      extraChars,
+      bySection: ctx.metrics ? ctx.metrics.bySection : {},
+      projectName: ctx.project ? ctx.project.name : "General",
+      isGeneral: Boolean(ctx.project && ctx.project.isGeneral)
+    });
+    return { ctx, directmlCompatibility: compat };
+  }
+  return { ctx, directmlCompatibility: ctx.directmlCompatibility || null };
+}
+
 function readJsonBody(req, maxBytes = 10 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -1308,7 +1332,12 @@ function createStudioServer(options = {}) {
             upstreamRes.on("data", (c) => { errBody += c; });
             upstreamRes.on("error", (err) => doneReject(err.message));
             upstreamRes.on("end", () => {
-              doneReject(`DirectML HTTP ${upstreamRes.statusCode}${errBody ? `: ${errBody.slice(0, 200)}` : ""}`);
+              let cleanErr = errBody;
+              try {
+                const parsedErr = JSON.parse(errBody);
+                cleanErr = parsedErr.detail || parsedErr.error?.message || parsedErr.error || errBody;
+              } catch (_e) {}
+              doneReject(`DirectML HTTP ${upstreamRes.statusCode}${cleanErr ? `: ${String(cleanErr).slice(0, 320)}` : ""}`);
             });
             return;
           }
@@ -1634,12 +1663,28 @@ function createStudioServer(options = {}) {
       const projects = bridge.listProjects();
       const convId = query.conversationId || null;
       const token = query.token || null;
-      const active = bridge.getActiveProject(query.project || null, convId, token);
+      const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
+        projectName: query.project || null,
+        convId,
+        token,
+        skillId: query.skillId || null,
+        profileId: query.profileId || null,
+        customSystemPrompt: query.customSystemPrompt || null
+      });
+      const active = (ctx && ctx.project) || bridge.getActiveProject(query.project || null, convId, token);
       const stateKey = (!active || active.isGeneral || String(active.name || "").toLowerCase() === "general")
         ? "General"
         : (active.path || active.name);
       const projectState = memoryStore.getProjectState(stateKey);
-      sendJson(res, 200, { ok: true, hierarchy, projects, active, projectState });
+      sendJson(res, 200, {
+        ok: true,
+        hierarchy,
+        projects,
+        active,
+        projectState,
+        metrics: ctx ? ctx.metrics : null,
+        directmlCompatibility
+      });
       return;
     }
 
@@ -1714,7 +1759,13 @@ function createStudioServer(options = {}) {
         ? memoryStore.updateProjectState(stateKey, statePatch)
         : memoryStore.getProjectState(stateKey);
 
-      sendJson(res, 200, { ok: true, active: activeProj, projectState });
+      sendJson(res, 200, {
+        ok: true,
+        active: activeProj,
+        projectState,
+        metrics: ctx ? ctx.metrics : null,
+        directmlCompatibility: ctx ? ctx.directmlCompatibility : null
+      });
       return;
     }
 
@@ -1754,13 +1805,19 @@ function createStudioServer(options = {}) {
       const files = bridge.scanProjectFolderDeep(resolvedFolder, "", 0, 4, 100);
       const selected = bridge.getSelectedFiles(resolvedFolder);
       memoryStore.updateProjectState(resolvedFolder, { selectedFiles: selected });
+      const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
+        projectName: resolvedFolder,
+        selectedFiles: selected
+      });
 
       sendJson(res, 200, {
         ok: true,
         folderPath: resolvedFolder,
         name: path.basename(resolvedFolder),
         files,
-        selectedFiles: selected
+        selectedFiles: selected,
+        metrics: ctx ? ctx.metrics : null,
+        directmlCompatibility
       });
       return;
     }
@@ -1777,7 +1834,16 @@ function createStudioServer(options = {}) {
         : (Array.isArray(payload.files) ? payload.files : []);
       bridge.setSelectedFiles(folderPath, files);
       memoryStore.updateProjectState(path.resolve(folderPath), { selectedFiles: files });
-      sendJson(res, 200, { ok: true, count: files.length });
+      const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
+        projectName: path.resolve(folderPath),
+        selectedFiles: files
+      });
+      sendJson(res, 200, {
+        ok: true,
+        count: files.length,
+        metrics: ctx ? ctx.metrics : null,
+        directmlCompatibility
+      });
       return;
     }
 
@@ -2156,6 +2222,7 @@ function createStudioServer(options = {}) {
           telemetry: enterPayload.telemetry,
           digestMarkdown: enterPayload.digestMarkdown,
           promptPackage: enterPayload.promptPackage,
+          directmlCompatibility: enterPayload.promptPackage.directmlCompatibility,
           fallbackReport,
           projectState
         });
@@ -2180,6 +2247,7 @@ function createStudioServer(options = {}) {
         project: enterPayload.telemetry.project,
         digestMarkdown: enterPayload.digestMarkdown,
         metrics: enterPayload.promptPackage.metrics,
+        directmlCompatibility: enterPayload.promptPackage.directmlCompatibility,
         checklistSummary
       }) + "\n");
 
@@ -2464,6 +2532,29 @@ function createStudioServer(options = {}) {
       const rawAgentA = (payload.agentA && typeof payload.agentA === "object") ? payload.agentA : {};
       const rawAgentB = (payload.agentB && typeof payload.agentB === "object") ? payload.agentB : {};
       const pair = hardwareAdvisor.normalizeDualPair(payload.pair || "", rawAgentA, rawAgentB);
+      const defaults = hardwareAdvisor.getDefaultAgentsForPair(pair);
+      const normSrcA = hardwareAdvisor.normalizeEngineSource(rawAgentA.source || defaults.sourceA);
+      const normSrcB = hardwareAdvisor.normalizeEngineSource(rawAgentB.source || defaults.sourceB);
+      const dmlAgent = normSrcA === "directml" ? rawAgentA : (normSrcB === "directml" ? rawAgentB : null);
+      const combinedDirective = [
+        typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "",
+        (dmlAgent && typeof dmlAgent.customSystemPrompt === "string") ? dmlAgent.customSystemPrompt.trim() : ""
+      ].filter(Boolean).join("\n\n");
+
+      const { directmlCompatibility: computedProjectCompat } = buildProjectCompatibilitySummary({
+        projectName: payload.project || payload.projectPath || null,
+        convId: payload.conversationId || null,
+        token: payload.token || null,
+        skillId: (dmlAgent && dmlAgent.skillId) || payload.skillId || null,
+        profileId: (dmlAgent && dmlAgent.profileId) || payload.profileId || null,
+        customSystemPrompt: combinedDirective || null,
+        modelOverridesPrompt: (dmlAgent && dmlAgent.modelSystemPrompt) || null,
+        extraChars: Number(payload.extraChars || payload.chatHistoryChars || 0)
+      });
+      const projectCompatibility = (payload.directmlCompatibility && typeof payload.directmlCompatibility === "object")
+        ? payload.directmlCompatibility
+        : computedProjectCompat;
+
       const evaluation = hardwareAdvisor.evaluateDualConfiguration({
         pair,
         agentA: rawAgentA,
@@ -2473,13 +2564,15 @@ function createStudioServer(options = {}) {
         modelsCatalog: catalog.models,
         telemetry,
         ollamaPs,
-        directmlStatus
+        directmlStatus,
+        projectCompatibility
       });
 
       sendJson(res, 200, {
         ok: true,
         telemetry,
         evaluation,
+        projectCompatibility,
         profiles: hardwareAdvisor.getRecommendedProfiles(telemetry)
       });
       return;
@@ -2870,6 +2963,27 @@ function createStudioServer(options = {}) {
 
       const evalNumCtxA = Number(rawA.numCtx || rawA.num_ctx);
       const evalNumCtxB = Number(rawB.numCtx || rawB.num_ctx);
+      const rawProjIdentifier = payload.project || payload.projectPath || null;
+      const convId = payload.conversationId || null;
+      const globalDirective = typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "";
+
+      let dualProjectCompatibility = null;
+      if (srcA === "directml" || srcB === "directml") {
+        const dmlRawSlot = srcA === "directml" ? rawA : rawB;
+        const dmlOwnPrompt = typeof dmlRawSlot.customSystemPrompt === "string" ? dmlRawSlot.customSystemPrompt.trim() : "";
+        const dmlCombinedDirective = [globalDirective, dmlOwnPrompt].filter(Boolean).join("\n\n");
+        const baseHistoryChars = baseHistory.reduce((acc, m) => acc + String((m && m.content) || "").length, 0) + 220;
+        dualProjectCompatibility = buildProjectCompatibilitySummary({
+          projectName: rawProjIdentifier,
+          convId,
+          token: payload.token || null,
+          skillId: dmlRawSlot.skillId || null,
+          profileId: dmlRawSlot.profileId || null,
+          customSystemPrompt: dmlCombinedDirective || null,
+          modelOverridesPrompt: dmlRawSlot.modelSystemPrompt || null,
+          extraChars: baseHistoryChars
+        }).directmlCompatibility;
+      }
 
       const evaluation = hardwareAdvisor.evaluateDualConfiguration({
         pair,
@@ -2888,7 +3002,8 @@ function createStudioServer(options = {}) {
         modelsCatalog: catalog.models,
         telemetry,
         ollamaPs,
-        directmlStatus
+        directmlStatus,
+        projectCompatibility: dualProjectCompatibility
       });
 
       let effectiveWorkflow = requestedWorkflow;
@@ -2901,9 +3016,6 @@ function createStudioServer(options = {}) {
 
       const roleLabelA = String(rawA.roleLabel || rawA.role || "Arquitecto / Generador").trim();
       const roleLabelB = String(rawB.roleLabel || rawB.role || "Auditor / Crítico").trim();
-      const rawProjIdentifier = payload.project || payload.projectPath || null;
-      const convId = payload.conversationId || null;
-      const globalDirective = typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "";
 
       const webSearch = await runWebSearchForChat(payload, baseHistory);
       const dualWebSearchSuffix = (webSearch && webSearch.contextSuffix) ? webSearch.contextSuffix.trim() : "";

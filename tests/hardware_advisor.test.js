@@ -437,4 +437,78 @@ describe("hardware-advisor.js", () => {
     assert.equal(evalOptimalGpu.requiresOllamaRestart, false);
     assert.equal(evalOptimalGpu.requiresDirectmlRestart, false);
   });
+
+  it("evaluateDualConfiguration eleva riesgo y advierte incompatibilidad DirectML del proyecto activo", () => {
+    const baseTel = makeMockTelemetry({
+      freeGb: 10.5,
+      envEffective: {
+        OLLAMA_IGPU_ENABLE: "1",
+        HSA_OVERRIDE_GFX_VERSION: "11.0.0",
+        OLLAMA_FLASH_ATTENTION: "1",
+        OLLAMA_KV_CACHE_TYPE: "q8_0",
+        OLIVE_GPU_MEMORY_LIMIT: "20",
+        OLIVE_CPU_THREADS: "12"
+      }
+    });
+
+    const badProjectCompat = {
+      compatible: false,
+      status: "incompatible",
+      projectName: "LargeDmlApp",
+      approxPromptTokens: 7420,
+      safePromptLimit: 6144,
+      kvContextLimit: 8192,
+      excessTokens: 1276,
+      largestSection: { key: "codeContextXml", label: "Código fuente inyectado", approxTokens: 5800 }
+    };
+
+    const evalWithDmlBad = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "freeai+directml",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+      workflow: "pipeline",
+      telemetry: baseTel,
+      projectCompatibility: badProjectCompat
+    });
+    assert.equal(evalWithDmlBad.directmlIncompatibleWithProject, true);
+    assert.equal(evalWithDmlBad.directmlTightWithProject, false);
+    assert.equal(evalWithDmlBad.riskLevel, "caution");
+    assert.ok(evalWithDmlBad.warnings.some((w) => w.includes("7,420") && w.includes("6,144") && w.includes("8,192") && w.includes("HTTP 400")));
+    assert.ok(evalWithDmlBad.recommendations.some((r) => r.includes("Free.ai + Ollama")));
+    assert.equal(evalWithDmlBad.directmlProjectCompatibility.projectName, "LargeDmlApp");
+
+    const evalNoDml = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "freeai+ollama",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "ollama", model: "qwen2.5-coder:latest" },
+      workflow: "pipeline",
+      ollamaPs: [{ name: "qwen2.5-coder:latest", size: 4000000000, size_vram: 4000000000 }],
+      telemetry: baseTel,
+      projectCompatibility: badProjectCompat
+    });
+    assert.equal(evalNoDml.directmlIncompatibleWithProject, false);
+    assert.equal(evalNoDml.riskLevel, "optimal");
+    assert.equal(evalNoDml.warnings.some((w) => w.includes("HTTP 400")), false);
+
+    const tightCompat = {
+      compatible: true,
+      status: "tight",
+      projectName: "TightDmlApp",
+      approxPromptTokens: 5600,
+      safePromptLimit: 6144,
+      kvContextLimit: 8192
+    };
+    const evalTight = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "freeai+directml",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+      workflow: "pipeline",
+      telemetry: baseTel,
+      projectCompatibility: tightCompat
+    });
+    assert.equal(evalTight.directmlIncompatibleWithProject, false);
+    assert.equal(evalTight.directmlTightWithProject, true);
+    assert.equal(evalTight.riskLevel, "optimal");
+    assert.ok(evalTight.recommendations.some((r) => r.includes("5,600") && r.includes("6,144")));
+  });
 });
