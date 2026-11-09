@@ -93,6 +93,44 @@
       filter: none;
     }
 
+    /* Logo tipográfico Free.ai con fondo transparente */
+    .freeai-logo-lockup {
+      display: inline-flex;
+      align-items: baseline;
+      font-family: "Arial Black", "Impact", "Helvetica Neue", Helvetica, sans-serif;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      transform: scaleY(1.05);
+      line-height: 1;
+      background-color: transparent;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .freeai-logo-lockup.freeai-logo-sm {
+      font-size: 12px;
+    }
+
+    .freeai-logo-lockup.freeai-logo-xs {
+      font-size: 11.5px;
+    }
+
+    .freeai-logo-lockup .freeai-text-green {
+      color: #1e803c;
+    }
+
+    .freeai-logo-lockup .freeai-text-white {
+      color: #efefef;
+      margin-left: 0.015em;
+    }
+
+    .dual-pane-agent-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     button, input, select, textarea {
       font-family: inherit;
     }
@@ -2339,7 +2377,7 @@
           <span>⚡</span><span>Agente DirectML</span>
         </button>
         <button type="button" id="src-freeai-btn" class="source-btn source-freeai" data-source="freeai" title="Agente Free.ai Cloud">
-          <span>🌐</span><span>Agente Free.ai</span>
+          <span>Agente</span><span class="freeai-logo-lockup" aria-label="Free.ai"><span class="freeai-text-green">Free</span><span class="freeai-text-white">.ai</span></span>
         </button>
       </div>
 
@@ -2360,10 +2398,10 @@
     <div id="dual-bar-strip" class="dual-bar-strip">
       <div id="dual-pair-pills" class="dual-pair-pills" role="group" aria-label="Combinación de Agentes Dual">
         <button type="button" id="dual-pair-freeai-directml" class="dual-pair-btn active" data-dual-pair="freeai+directml" title="Modo 1: Cloud Free.ai + DirectML GPU (0 contención GPU)">
-          <span>🌐 Free.ai + ⚡ DirectML</span>
+          <span class="freeai-logo-lockup freeai-logo-sm" aria-label="Free.ai"><span class="freeai-text-green">Free</span><span class="freeai-text-white">.ai</span></span><span>+ ⚡ DirectML</span>
         </button>
         <button type="button" id="dual-pair-freeai-ollama" class="dual-pair-btn" data-dual-pair="freeai+ollama" title="Modo 2: Cloud Free.ai + Ollama Local/Cloud">
-          <span>🌐 Free.ai +</span><img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Ollama</span>
+          <span class="freeai-logo-lockup freeai-logo-sm" aria-label="Free.ai"><span class="freeai-text-green">Free</span><span class="freeai-text-white">.ai</span></span><span>+</span><img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Ollama</span>
         </button>
         <button type="button" id="dual-pair-ollama-directml" class="dual-pair-btn" data-dual-pair="ollama+directml" title="Modo 3: Ollama + DirectML GPU (con guard de VRAM y Pipeline secuencial)">
           <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Ollama + ⚡ DirectML</span>
@@ -7164,9 +7202,11 @@
 
     function formatEngineIcon(source) {
       const s = normalizeDualSourceClient(source);
-      if (s === 'freeai') return '🌐';
+      if (s === 'freeai') {
+        return '<span class="freeai-logo-lockup freeai-logo-xs" aria-label="Free.ai"><span class="freeai-text-green">Free</span><span class="freeai-text-white">.ai</span></span>';
+      }
       if (s === 'directml') return '⚡';
-      return '🤖';
+      return '<img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-xs icon-amoled-light">';
     }
 
     function createDualTurnScaffold(meta = {}) {
@@ -7202,7 +7242,8 @@
         const pTitle = document.createElement('div');
         pTitle.className = 'dual-pane-title';
         const iconSpan = document.createElement('span');
-        iconSpan.textContent = `${formatEngineIcon(slotMeta.source)} Agente ${slot}:`;
+        iconSpan.className = 'dual-pane-agent-label';
+        iconSpan.innerHTML = `${formatEngineIcon(slotMeta.source)}<span>Agente ${escapeHtml(slot)}:</span>`;
         const roleSpan = document.createElement('span');
         roleSpan.className = 'dual-pane-role';
         roleSpan.style.color = slot === 'A' ? 'var(--accent-cyan)' : 'var(--accent-purple)';

@@ -903,7 +903,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.match(uiRes.headers.get("cache-control") || "", /no-store/);
 
     // Assets de marca sin fondo + validación 404 segura
-    for (const iconFile of ["github-icon.png", "netlify-icon.png", "ollama-icon.png"]) {
+    for (const iconFile of ["github-icon.png", "netlify-icon.png", "ollama-icon.png", "freeai-icon.png"]) {
       const iconRes = await fetch(`${studioBaseUrl}/assets/${iconFile}`);
       assert.equal(iconRes.status, 200, `Asset ${iconFile} debe responder 200`);
       assert.equal(iconRes.headers.get("content-type"), "image/png");

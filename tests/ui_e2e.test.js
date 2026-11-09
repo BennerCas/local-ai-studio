@@ -507,6 +507,19 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
         hasVibePill: Boolean(document.querySelector(".vibe-pill-nav")),
         hasVibeDot: Boolean(document.querySelector(".vibe-status-dot")),
         hasVibeCursor: Boolean(document.querySelector(".vibe-cursor-blink")),
+        freeaiLockup: (() => {
+          const el = document.querySelector("#src-freeai-btn .freeai-logo-lockup");
+          if (!el) return null;
+          const green = el.querySelector(".freeai-text-green");
+          const white = el.querySelector(".freeai-text-white");
+          return {
+            text: el.textContent.replace(/\s+/g, ""),
+            bg: getComputedStyle(el).backgroundColor,
+            greenColor: green ? getComputedStyle(green).color : "",
+            whiteColor: white ? getComputedStyle(white).color : ""
+          };
+        })(),
+        dualFreeaiCount: document.querySelectorAll("#dual-bar-strip .freeai-logo-lockup").length,
         faviconHref: document.querySelector('link[rel="icon"]')?.getAttribute("href") || "",
         hasMain: Boolean(document.querySelector("main#chat-container")),
         hasMetaDesc: Boolean(document.querySelector('meta[name="description"]')?.getAttribute("content")),
@@ -545,6 +558,13 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("ollama-icon.png")));
     assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("github-icon.png")));
     assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("netlify-icon.png")));
+    assert.ok(seoMetrics.freeaiLockup, "#src-freeai-btn debe usar .freeai-logo-lockup");
+    assert.equal(seoMetrics.freeaiLockup.text, "Free.ai");
+    assert.equal(seoMetrics.freeaiLockup.bg, "rgba(0, 0, 0, 0)", "Logo Free.ai debe tener fondo transparente");
+    assert.equal(seoMetrics.freeaiLockup.greenColor, "rgb(30, 128, 60)");
+    assert.equal(seoMetrics.freeaiLockup.whiteColor, "rgb(239, 239, 239)");
+    assert.equal(seoMetrics.dualFreeaiCount, 2, "Botones Dual Free.ai deben usar .freeai-logo-lockup");
+    await page.screenshot({ path: path.join(process.env.LOCAL_AI_E2E_SCREENSHOT_DIR || tempRoot, "desktop_single.png") });
     assert.equal(seoMetrics.autoActive, true, "Autoguardado debe iniciar activo (ON)");
     assert.equal(seoMetrics.autoPressed, "true");
     assert.equal(seoMetrics.autoLabel, "Autoguardado: ON");
@@ -908,6 +928,8 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     });
 
     await page.screenshot({ path: path.join(shotDir, "desktop_dual.png") });
+    const paneFreeaiCount = await page.locator('.dual-agent-pane[data-agent-slot="A"] .freeai-logo-lockup').count();
+    assert.equal(paneFreeaiCount, 1, "Pane dual de Free.ai debe renderizar .freeai-logo-lockup");
 
     // Verificar en sidecar 420x800 también con tarjetas duales renderizadas
     await page.setViewportSize({ width: 420, height: 800 });
