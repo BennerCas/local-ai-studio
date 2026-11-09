@@ -1,0 +1,3042 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Studio - Antigravity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #12141d;
+      --bg-card: rgba(26, 29, 45, 0.85);
+      --bg-bubble-user: #2d3558;
+      --bg-bubble-ai: #1a1e32;
+      --border-color: rgba(122, 162, 247, 0.2);
+      --accent-blue: #7aa2f7;
+      --accent-cyan: #7dcfff;
+      --accent-purple: #bb9af7;
+      --accent-green: #9ece6a;
+      --accent-red: #f7768e;
+      --accent-orange: #ff9e3b;
+      --text-main: #c0caf5;
+      --text-muted: #7982a9;
+      --code-bg: #161824;
+      --chat-font-size: 16px;
+      --font-title: calc(var(--chat-font-size) * 1.05);
+      --font-ui: calc(var(--chat-font-size) * 0.88);
+      --font-ui-small: calc(var(--chat-font-size) * 0.78);
+      --font-pill: calc(var(--chat-font-size) * 0.82);
+      --code-font-size: calc(var(--chat-font-size) * 0.9);
+      --input-font-size: var(--chat-font-size);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    header {
+      padding: 9px 14px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(122, 162, 247, 0.4);
+    }
+
+    .brand-title {
+      font-size: var(--font-title);
+      font-weight: 600;
+    }
+
+    .top-action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    /* Barra de Motor AI (Selector de Fuente + Selector de Modelo) */
+    .model-control-bar {
+      padding: 7px 14px;
+      background: rgba(18, 20, 31, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .model-control-bar .ai-source-toggle {
+      flex-shrink: 0;
+    }
+
+    .model-control-bar select.model-select {
+      flex: 1;
+      min-width: 180px;
+      background: #181b2a;
+      color: var(--accent-cyan);
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: var(--font-ui);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Selector de Fuente: Modelos Locales vs Free.ai Cloud */
+    .ai-source-toggle {
+      display: inline-flex;
+      background: #141724;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .source-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .source-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .source-btn.active.source-local {
+      background: rgba(122, 162, 247, 0.2);
+      color: #7dcfff;
+      border: 1px solid rgba(122, 162, 247, 0.5);
+      box-shadow: 0 0 10px rgba(122, 162, 247, 0.25);
+    }
+
+    .source-btn.active.source-directml {
+      background: rgba(42, 195, 222, 0.22);
+      color: #73daca;
+      border: 1px solid rgba(42, 195, 222, 0.6);
+      box-shadow: 0 0 12px rgba(42, 195, 222, 0.35);
+    }
+
+    .source-btn.active.source-freeai {
+      background: rgba(187, 154, 247, 0.2);
+      color: #bb9af7;
+      border: 1px solid rgba(187, 154, 247, 0.5);
+      box-shadow: 0 0 10px rgba(187, 154, 247, 0.25);
+    }
+
+    /* Barra de Habilidades (Antigravity Awesome Skills) */
+    .skills-bar {
+      padding: 6px 14px;
+      background: rgba(14, 16, 26, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .skill-select-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .skill-category-select, .skill-select {
+      background: #181b2a;
+      color: #e0af68;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: var(--font-ui-small);
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .skill-select {
+      flex: 1;
+      color: #7aa2f7;
+    }
+
+    .active-skill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(224, 175, 104, 0.15);
+      border: 1px solid rgba(224, 175, 104, 0.4);
+      color: #e0af68;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+    }
+
+    .btn-clear-skill {
+      background: none;
+      border: none;
+      color: #f7768e;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0 2px;
+    }
+
+    .header-btn {
+      background: #181b2a;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .header-btn:hover {
+      background: rgba(122, 162, 247, 0.15);
+      border-color: var(--accent-cyan);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .header-btn.btn-primary {
+      background: linear-gradient(135deg, #ff7a00, #ff0055);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(255, 122, 0, 0.35);
+    }
+
+    .header-btn.btn-primary:hover {
+      box-shadow: 0 0 16px rgba(255, 122, 0, 0.55);
+    }
+
+    .header-btn.btn-auto-apply {
+      background: #181b2a;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .header-btn.btn-auto-apply:hover {
+      border-color: #10b981;
+      color: #fff;
+      background: rgba(16, 185, 129, 0.12);
+    }
+
+    .header-btn.btn-auto-apply.active {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.35));
+      border: 1px solid #10b981;
+      color: #6ee7b7;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+    }
+
+    .header-btn.btn-auto-apply.active:hover {
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.55);
+      color: #fff;
+    }
+
+    /* Selector Dinámico de Tamaño de Letra */
+    .font-size-control {
+      display: inline-flex;
+      align-items: center;
+      background: #181b2a;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      overflow: hidden;
+      padding: 1px;
+    }
+
+    .font-size-btn {
+      background: transparent;
+      border: none;
+      color: var(--accent-cyan);
+      padding: 3px 8px;
+      font-size: var(--font-ui);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .font-size-btn:hover {
+      background: rgba(122, 162, 247, 0.25);
+      color: #fff;
+    }
+
+    .font-size-select {
+      background: transparent;
+      border: none;
+      border-left: 1px solid rgba(122, 162, 247, 0.2);
+      border-right: 1px solid rgba(122, 162, 247, 0.2);
+      color: var(--text-main);
+      padding: 3px 6px;
+      font-family: inherit;
+      font-size: var(--font-ui);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .font-size-select option {
+      background: #1a1e32;
+      color: #fff;
+    }
+
+    /* Barra de Contexto de Proyecto */
+    .project-bar {
+      padding: 7px 14px;
+      background: rgba(18, 20, 29, 0.95);
+      border-bottom: 1px solid rgba(122, 162, 247, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: var(--font-ui);
+      gap: 8px;
+    }
+
+    .project-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .project-select {
+      background: #181b2a;
+      color: var(--accent-cyan);
+      border: 1px solid rgba(125, 207, 255, 0.3);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: var(--font-ui);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .context-tag {
+      background: rgba(122, 162, 247, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(122, 162, 247, 0.3);
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-size: var(--font-ui-small);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Cajón de Contexto Expandible */
+    #context-drawer {
+      display: none;
+      background: #151824;
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 14px;
+      font-size: var(--font-ui);
+      line-height: 1.5;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    #context-drawer.active { display: block; }
+
+    .ctx-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 6px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .ctx-meta-item strong { color: var(--accent-cyan); }
+
+    .ctx-files-box {
+      background: #0e1017;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      max-height: 60px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message {
+      max-width: 90%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: var(--chat-font-size);
+      line-height: 1.55;
+      word-break: break-word;
+      animation: fadeIn 0.2s ease-out;
+      position: relative;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: var(--bg-bubble-user);
+      border: 1px solid rgba(122, 162, 247, 0.3);
+      color: #fff;
+    }
+
+    .message.ai {
+      align-self: flex-start;
+      background: var(--bg-bubble-ai);
+      border: 1px solid var(--border-color);
+    }
+
+    .message.info {
+      align-self: center;
+      background: rgba(122, 162, 247, 0.08);
+      border: 1px dashed rgba(122, 162, 247, 0.25);
+      color: var(--accent-cyan);
+      font-size: calc(var(--chat-font-size) - 1.5px);
+      line-height: 1.5;
+      text-align: center;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .message-content {
+      margin-bottom: 6px;
+    }
+
+    /* Bloques de Código con Botón Guardar en Proyecto */
+    .code-wrapper {
+      background: #0e1017;
+      border: 1px solid rgba(122, 162, 247, 0.2);
+      border-radius: 8px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #161824;
+      padding: 4px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+    }
+
+    .code-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-code-action {
+      background: #202438;
+      border: 1px solid rgba(122, 162, 247, 0.25);
+      color: #c0caf5;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .btn-code-action:hover {
+      background: rgba(122, 162, 247, 0.25);
+      color: #fff;
+    }
+
+    .btn-code-save {
+      background: rgba(158, 206, 106, 0.15);
+      border-color: rgba(158, 206, 106, 0.4);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .btn-code-save:hover {
+      background: rgba(158, 206, 106, 0.3);
+      color: #fff;
+    }
+
+    pre {
+      background: transparent;
+      padding: 8px 12px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--code-font-size);
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-cyan);
+      font-size: var(--code-font-size);
+    }
+
+    /* Tarjetas de Acción de Archivo (Crear / Editar / Parche) */
+    .file-action-card {
+      background: #0d111c;
+      border: 1px solid rgba(122, 162, 247, 0.35);
+      border-radius: 9px;
+      margin: 10px 0;
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    }
+
+    .file-action-card.card-create {
+      border-color: rgba(158, 206, 106, 0.45);
+    }
+
+    .file-action-card.card-patch {
+      border-color: rgba(224, 175, 104, 0.45);
+    }
+
+    .fac-header {
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      background: #141829;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .fac-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: var(--font-ui-small);
+      flex-wrap: wrap;
+    }
+
+    .fac-badge {
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .fac-badge.badge-create {
+      background: rgba(158, 206, 106, 0.2);
+      color: #9ece6a;
+      border: 1px solid rgba(158, 206, 106, 0.4);
+    }
+
+    .fac-badge.badge-patch {
+      background: rgba(224, 175, 104, 0.2);
+      color: #e0af68;
+      border: 1px solid rgba(224, 175, 104, 0.4);
+    }
+
+    .fac-path {
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .fac-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-apply-action {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: none;
+      color: #fff;
+      padding: 4px 11px;
+      border-radius: 5px;
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-apply-action:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-apply-action.applied {
+      background: #1f2937;
+      color: #9ece6a;
+      border: 1px solid rgba(158, 206, 106, 0.5);
+      cursor: default;
+    }
+
+    .btn-apply-action.patch-btn {
+      background: linear-gradient(135deg, #d97706, #b45309);
+    }
+    .btn-apply-action.patch-btn:hover {
+      box-shadow: 0 2px 8px rgba(217, 119, 6, 0.4);
+    }
+
+    .diff-section {
+      padding: 8px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--code-font-size);
+      line-height: 1.45;
+    }
+
+    .diff-box-search {
+      background: rgba(247, 118, 142, 0.08);
+      border-left: 3px solid #f7768e;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      border-radius: 0 4px 4px 0;
+      color: #f7768e;
+      white-space: pre-wrap;
+    }
+
+    .diff-box-replace {
+      background: rgba(158, 206, 106, 0.08);
+      border-left: 3px solid #9ece6a;
+      padding: 6px 10px;
+      border-radius: 0 4px 4px 0;
+      color: #9ece6a;
+      white-space: pre-wrap;
+    }
+
+    .diff-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      opacity: 0.85;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .auto-apply-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: var(--font-ui-small);
+      color: #9ece6a;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .auto-apply-container:hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+    .auto-apply-container input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: #10b981;
+    }
+
+    .msg-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .btn-msg-action {
+      background: rgba(122, 162, 247, 0.08);
+      border: 1px solid rgba(122, 162, 247, 0.2);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+
+    .btn-msg-action:hover {
+      background: rgba(122, 162, 247, 0.22);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-msg-action.speaking {
+      background: rgba(158, 206, 106, 0.2);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.04); }
+    }
+
+    /* Barra Lateral de Historial */
+    #history-drawer {
+      position: absolute;
+      top: 0;
+      right: -320px;
+      width: 320px;
+      height: 100%;
+      background: #141724;
+      border-left: 1px solid var(--border-color);
+      box-shadow: -8px 0 24px rgba(0,0,0,0.6);
+      transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #history-drawer.active { right: 0; }
+
+    .history-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(26, 29, 45, 0.9);
+    }
+
+    .history-title { font-size: var(--font-title); font-weight: 600; color: #fff; }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      background: #1a1e32;
+      border: 1px solid rgba(122, 162, 247, 0.15);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .history-item:hover {
+      border-color: var(--accent-cyan);
+      background: #20263f;
+    }
+
+    .history-item-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .history-item-title {
+      font-size: var(--font-ui);
+      color: #fff;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-del-session {
+      background: none;
+      border: none;
+      color: var(--accent-red);
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    footer {
+      padding: 9px 14px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .quick-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .pill {
+      background: rgba(122, 162, 247, 0.1);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: var(--font-pill);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .pill:hover {
+      background: rgba(122, 162, 247, 0.25);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+
+    .input-box {
+      display: flex;
+      gap: 8px;
+    }
+
+    textarea {
+      flex: 1;
+      background: #151824;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 9px 12px;
+      color: #fff;
+      font-family: inherit;
+      font-size: var(--input-font-size);
+      resize: none;
+      min-height: 48px;
+      height: 48px;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(125, 207, 255, 0.2);
+    }
+
+    button.send-btn {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 20px;
+      font-weight: 600;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.send-btn:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 12px rgba(122, 162, 247, 0.35);
+    }
+
+    .legal-signature {
+      text-align: center;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1e32;
+      border: 1px solid var(--accent-blue);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      display: none;
+      z-index: 2000;
+    }
+    /* Modales y Paneles Flotantes */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 12, 20, 0.82);
+      backdrop-filter: blur(8px);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal-card {
+      background: #161928;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 760px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(14px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+      padding: 12px 18px;
+      background: rgba(26, 29, 45, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-title {
+      font-size: var(--font-title);
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+    .modal-close-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .modal-body {
+      padding: 16px 18px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-footer {
+      padding: 12px 18px;
+      background: rgba(20, 23, 36, 0.95);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .folder-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .chip-btn {
+      background: rgba(122, 162, 247, 0.12);
+      border: 1px solid rgba(122, 162, 247, 0.3);
+      color: var(--accent-cyan);
+      padding: 3px 10px;
+      border-radius: 14px;
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip-btn:hover {
+      background: rgba(122, 162, 247, 0.25);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+    .file-tree-container {
+      background: #0f111a;
+      border: 1px solid rgba(122, 162, 247, 0.2);
+      border-radius: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 6px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--code-font-size);
+    }
+    .file-item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .file-item-row:hover {
+      background: rgba(122, 162, 247, 0.12);
+    }
+    .file-item-row input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-blue);
+    }
+    .file-item-name {
+      color: var(--text-main);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-item-size {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .mf-textarea {
+      width: 100%;
+      height: 260px;
+      background: #0f111a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: #7dcfff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--code-font-size);
+      line-height: 1.5;
+      padding: 10px;
+      resize: vertical;
+      outline: none;
+    }
+    .mf-textarea:focus {
+      border-color: var(--accent-cyan);
+    }
+    .path-input-group {
+      display: flex;
+      gap: 8px;
+    }
+    .path-input-group input {
+      flex: 1;
+      background: #0f111a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--font-ui);
+      outline: none;
+    }
+    .path-input-group input:focus {
+      border-color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Local AI Studio</div>
+      </div>
+    </div>
+    <div class="top-action-buttons">
+      <button class="header-btn btn-primary" onclick="newChat()" title="Iniciar nuevo chat limpio">
+        <span>+ Nuevo Chat</span>
+      </button>
+      <button id="btn-auto-apply" class="header-btn btn-auto-apply" onclick="toggleAutoApply()" title="Si está activo, guarda o edita automáticamente en disco los archivos creados o modificados por los modelos">
+        <span id="auto-apply-icon">💾</span>
+        <span id="auto-apply-label">Autoguardado: OFF</span>
+      </button>
+      <button class="header-btn" onclick="toggleHistory()" title="Ver historial de chats guardados">
+        <span>📜</span>
+        <span>Historial</span>
+      </button>
+      <button class="header-btn" onclick="clearChat()" title="Limpiar pantalla de chat">
+        <span>🧹</span>
+        <span>Limpiar</span>
+      </button>
+      <div class="font-size-control" title="Ajustar tamaño de letra de toda la interfaz">
+        <button class="font-size-btn" onclick="adjustFontSize(-1)" title="Reducir letra (A-)">A-</button>
+        <select id="font-size-select" class="font-size-select" onchange="setFontSize(this.value)" title="Tamaño de letra de toda la interfaz">
+          <option value="13">Aa 13px (Compacto)</option>
+          <option value="14">Aa 14px (Estándar)</option>
+          <option value="16" selected>Aa 16px (Recomendado)</option>
+          <option value="18">Aa 18px (Grande)</option>
+          <option value="20">Aa 20px (Muy Grande)</option>
+          <option value="22">Aa 22px (Extra Grande)</option>
+          <option value="24">Aa 24px (Máximo)</option>
+        </select>
+        <button class="font-size-btn" onclick="adjustFontSize(1)" title="Aumentar letra (A+)">A+</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Barra Superior de Configuración de Motor AI (3 Agentes: Ollama Local, DirectML Nativo, Free.ai Cloud) -->
+  <div class="model-control-bar">
+    <div class="ai-source-toggle" title="Elegir Agente Especializado">
+      <button id="src-local-btn" class="source-btn active source-local" onclick="switchAiSource('local')" title="Agente Ollama Local (GGUF | Port 11434)">
+        <span>🤖</span>
+        <span>Agente Ollama</span>
+      </button>
+      <button id="src-directml-btn" class="source-btn source-directml" onclick="switchAiSource('directml')" title="Agente DirectML Nativo (ONNX GPU AMD DirectX 12 | Port 8002)">
+        <span>⚡</span>
+        <span>Agente DirectML</span>
+      </button>
+      <button id="src-freeai-btn" class="source-btn source-freeai" onclick="switchAiSource('freeai')" title="Agente Free.ai Cloud (467+ Modelos en la Nube)">
+        <span>🌐</span>
+        <span>Agente Free.ai</span>
+      </button>
+    </div>
+
+    <select id="model-select" class="model-select" title="Seleccionar Modelo AI" onchange="onModelChanged()">
+      <option value="">Cargando modelos...</option>
+    </select>
+
+    <!-- Botón de Modelfile (Ollama) -->
+    <button id="btn-modelfile" class="header-btn" onclick="openModelfileModal()" title="Ver y editar Modelfile del modelo Ollama seleccionado">
+      <span>📄</span>
+      <span>Modelfile</span>
+    </button>
+
+    <!-- Control y Estado de DirectML -->
+    <button id="btn-dml-control" class="header-btn" style="display:none;" onclick="handleDirectMlControlClick()" title="Control y estado del servidor DirectML">
+      <span id="dml-icon">⚡</span>
+      <span id="dml-label">DirectML GPU</span>
+    </button>
+  </div>
+
+  <!-- Barra de Conexión de Habilidades (Antigravity Awesome Skills: 1,435 Habilidades) -->
+  <div class="skills-bar">
+    <div class="skill-select-group">
+      <span style="font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 600;">🎯 Habilidad:</span>
+      <select id="skill-category-select" class="skill-category-select" onchange="onSkillCategoryChanged()" title="Filtrar por Categoría">
+        <option value="">Todas las Categorías</option>
+      </select>
+      <select id="skill-select" class="skill-select" onchange="onSkillSelected()" title="Seleccionar Habilidad Especializada de C:\antigravityAS\antigravity-awesome-skills">
+        <option value="">(Ninguna habilidad activa - Modo Base)</option>
+      </select>
+    </div>
+    <div id="active-skill-container" style="display: none;">
+      <span class="active-skill-badge" id="active-skill-badge">
+        <span id="active-skill-name">🎯 Skill</span>
+        <button class="btn-clear-skill" onclick="clearActiveSkill()" title="Quitar habilidad">✖</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- Barra de Sincronización de Proyecto -->
+  <div class="project-bar">
+    <div class="project-left">
+      <span>📁 Proyecto:</span>
+      <select id="project-select" class="project-select" onchange="onProjectChanged()">
+        <option value="">Detectando proyectos...</option>
+      </select>
+      <div class="context-tag">
+        <span>🧠</span>
+        <span id="sync-status">Sincronizado</span>
+      </div>
+      <button class="header-btn" onclick="openFolderModal()" title="Cargar y vincular carpeta de proyecto específica con inyección de código">
+        <span>📂</span>
+        <span>Cargar Carpeta</span>
+      </button>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button class="header-btn" onclick="previewCurrentContext()" title="Previsualizar código fuente inyectado en el contexto">
+        <span>👁️</span>
+        <span>Código Inyectado</span>
+      </button>
+      <button class="header-btn" onclick="toggleContextDrawer()">📋 Detalle</button>
+    </div>
+  </div>
+
+  <!-- Cajón Desplegable de Contexto del Proyecto -->
+  <div id="context-drawer">
+    <div class="ctx-meta">
+      <div class="ctx-meta-item">📁 <strong>Ruta:</strong> <span id="ctx-path">-</span></div>
+      <div class="ctx-meta-item">📦 <strong>Stack:</strong> <span id="ctx-stack">-</span></div>
+      <div class="ctx-meta-item">⚙️ <strong>Scripts:</strong> <span id="ctx-scripts">-</span></div>
+      <div class="ctx-meta-item">🔄 <strong>Sesión Antigravity:</strong> <span id="ctx-task">-</span></div>
+    </div>
+    <div style="margin-bottom: 4px; font-weight: 500; color: var(--accent-cyan);">Archivos del Proyecto Visibles por el Modelo:</div>
+    <div class="ctx-files-box" id="ctx-files">Cargando árbol de archivos...</div>
+  </div>
+
+  <div id="chat-container">
+    <div class="message info">
+      👋 ¡Hola Benner! Este chat local está <strong>vinculado dinámicamente a tu conversación y proyecto de Antigravity</strong>. Todo código generado puede <strong>guardarse directamente en el proyecto con un clic</strong> y queda registrado en <code style="color:var(--accent-green);">AVANCES_LOCAL_AI.md</code>.
+    </div>
+  </div>
+
+  <!-- Barra Lateral de Historial -->
+  <div id="history-drawer">
+    <div class="history-header">
+      <div class="history-title">📜 Historial de Chats Locales</div>
+      <button class="header-btn" onclick="toggleHistory()">✕ Cerrar</button>
+    </div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Modal de Modelfile (Ollama) -->
+  <div id="modelfile-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📄</span>
+          <span>Gestor de Modelfile - Ollama (<span id="mf-model-name" style="color:var(--accent-cyan);">modelo</span>)</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeModelfileModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:var(--font-ui-small); color:var(--text-muted);">
+          <span>Inspecciona y personaliza el System Prompt, template o parámetros (num_ctx, temperature):</span>
+          <span id="mf-model-details" style="color:var(--accent-purple); font-weight:600;">Ollama Local</span>
+        </div>
+        <textarea id="mf-editor" class="mf-textarea" placeholder="Cargando Modelfile desde Ollama..."></textarea>
+        <div id="mf-compile-status" style="display:none; padding:8px 12px; border-radius:6px; background:#0e1017; font-size:var(--font-ui-small); color:var(--accent-green); font-family:'JetBrains Mono',monospace;"></div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex; gap:6px;">
+          <button class="header-btn" onclick="copyModelfileText()">📋 Copiar</button>
+          <button class="header-btn" onclick="downloadModelfile()">💾 Descargar</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="header-btn" onclick="applyModelfileToSession()" style="background:rgba(125,207,255,0.15); color:var(--accent-cyan); border-color:var(--accent-cyan);" title="Aplica el System Prompt y parámetros a la sesión actual">
+            ⚡ Aplicar a la Sesión Actual
+          </button>
+          <button class="header-btn btn-primary" onclick="compileNewOllamaModel()" title="Compila un nuevo modelo en Ollama con este Modelfile">
+            🔨 Compilar Nuevo Modelo Ollama
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Cargar Carpeta de Proyecto -->
+  <div id="folder-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📂</span>
+          <span>Cargar Carpeta de Proyecto para Contexto Real</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeFolderModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:var(--font-ui); color:var(--text-muted);">
+          Selecciona o escribe la ruta de la carpeta de tu proyecto. El asistente escaneará todos sus archivos de código para inyectarlos en el contexto del modelo:
+        </div>
+        <div class="path-input-group">
+          <input type="text" id="folder-path-input" placeholder="C:\antigravityAS\SynthIA" value="C:\antigravityAS\SynthIA" onkeydown="if(event.key==='Enter') scanFolderFromInput()">
+          <button class="header-btn btn-primary" onclick="scanFolderFromInput()">🔍 Escanear</button>
+        </div>
+        <div>
+          <div style="font-size:var(--font-ui-small); color:var(--accent-cyan); margin-bottom:4px; font-weight:600;">Proyectos Detectados en C:\antigravityAS:</div>
+          <div id="folder-quick-chips" class="folder-chips">Cargando proyectos...</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+          <span style="font-weight:600; color:var(--accent-blue); font-size:var(--font-ui);">Archivos de Código: (<span id="folder-file-count">0</span>)</span>
+          <div style="display:flex; gap:6px;">
+            <button class="chip-btn" onclick="selectRecommendedFiles()">⭐ Seleccionar Clave</button>
+            <button class="chip-btn" onclick="selectAllFolderFiles(true)">Marcar Todo</button>
+            <button class="chip-btn" onclick="selectAllFolderFiles(false)">Limpiar</button>
+          </div>
+        </div>
+        <input type="text" id="folder-file-filter" placeholder="Filtrar archivos (ej: .py, .js, server, index)..." oninput="filterFolderFilesList()" style="background:#0e1017; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; color:#fff; font-size:var(--font-ui-small); outline:none;">
+        <div id="folder-file-list" class="file-tree-container">
+          <div style="color:var(--text-muted); padding:10px; text-align:center;">Haz clic en "Escanear" o selecciona un proyecto para listar archivos.</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:var(--font-ui-small); color:var(--text-muted);">
+          <span>Archivos seleccionados serán inyectados como código real en el contexto del modelo.</span>
+          <span id="folder-selection-badge" style="color:var(--accent-green); font-weight:600;">0 archivos seleccionados</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="header-btn" onclick="previewCurrentContext()">👁️ Previsualizar Código Inyectado</button>
+        <button class="header-btn btn-primary" onclick="applyFolderSelectionToContext()">
+          ✅ Inyectar Carpeta y Código al Modelo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Previsualización de Código Inyectado -->
+  <div id="preview-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>👁️</span>
+          <span>Previsualización del Contexto y Código Inyectado</span>
+        </div>
+        <button class="modal-close-btn" onclick="closePreviewModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:var(--font-ui-small); color:var(--text-muted); margin-bottom:6px;">
+          Este es el contexto exacto y fragmentos de código fuente que recibirá el modelo AI:
+        </div>
+        <pre id="preview-content" style="background:#0e1017; border:1px solid var(--border-color); border-radius:8px; padding:12px; max-height:420px; overflow:auto; color:var(--accent-cyan); font-family:'JetBrains Mono',monospace; font-size:var(--code-font-size); white-space:pre-wrap;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="header-btn" onclick="copyPreviewContext()">📋 Copiar Contexto</button>
+        <button class="header-btn btn-primary" onclick="closePreviewModal()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="quick-pills">
+      <div class="pill" onclick="quickPrompt('Explica la arquitectura general y dependencias de este proyecto.')">⚡ Arquitectura del Proyecto</div>
+      <div class="pill" onclick="quickPrompt('Revisa las tareas recientes de la sesión de Antigravity y dime qué paso sigue.')">🚀 Continuar Avance</div>
+      <div class="pill" onclick="quickPrompt('Genera una prueba unitaria para los módulos principales del proyecto.')">🧪 Generar Tests</div>
+      <div class="pill" onclick="quickPrompt('Examina el proyecto en busca de optimizaciones de código y rendimiento.')">🔍 Optimizar Código</div>
+    </div>
+    <div class="input-box">
+      <textarea id="prompt-input" placeholder="Pregunta a tu modelo local sobre el proyecto activo..." onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">Enviar</button>
+    </div>
+    <div class="legal-signature">
+      HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®
+    </div>
+  </footer>
+
+  <script>
+    let chatHistory = [];
+    let currentProject = null;
+    let projectContextData = null;
+    let currentSessionId = 'local_ai_' + Date.now();
+    const STORAGE_KEY = 'local_ai_sessions_v1';
+    const FONT_STORAGE_KEY = 'antigravity_local_ai_font_size';
+    const convId = new URLSearchParams(window.location.search).get('conversationId') || '';
+
+    // Manejo Dinámico del Tamaño de Letra de Toda la Interfaz
+    function setFontSize(size, showNotification = true) {
+      const numSize = parseInt(size, 10) || 16;
+      document.documentElement.style.setProperty('--chat-font-size', numSize + 'px');
+      document.documentElement.style.setProperty('--font-title', Math.round(numSize * 1.05) + 'px');
+      document.documentElement.style.setProperty('--font-ui', Math.max(12, Math.round(numSize * 0.88)) + 'px');
+      document.documentElement.style.setProperty('--font-ui-small', Math.max(11, Math.round(numSize * 0.78)) + 'px');
+      document.documentElement.style.setProperty('--font-pill', Math.max(11, Math.round(numSize * 0.82)) + 'px');
+      document.documentElement.style.setProperty('--code-font-size', Math.max(12, Math.round(numSize * 0.9)) + 'px');
+      document.documentElement.style.setProperty('--input-font-size', numSize + 'px');
+      if (document.body) {
+        document.body.style.fontSize = Math.max(12, Math.round(numSize * 0.88)) + 'px';
+      }
+
+      const select = document.getElementById('font-size-select');
+      if (select) {
+        let found = false;
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].value === String(numSize)) {
+            select.selectedIndex = i;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = String(numSize);
+          opt.textContent = 'Aa ' + numSize + 'px';
+          opt.selected = true;
+          select.appendChild(opt);
+        }
+      }
+
+      try {
+        localStorage.setItem(FONT_STORAGE_KEY, String(numSize));
+      } catch (e) {}
+
+      if (showNotification) {
+        showToast('🔤 Tamaño general: ' + numSize + 'px');
+      }
+    }
+
+    function adjustFontSize(delta) {
+      let current = 16;
+      try {
+        current = parseInt(localStorage.getItem(FONT_STORAGE_KEY) || '16', 10);
+      } catch (e) {}
+      let next = current + delta;
+      if (next < 13) next = 13;
+      if (next > 26) next = 26;
+      setFontSize(next, true);
+    }
+
+    function initFontSize() {
+      let saved = '16';
+      try {
+        saved = localStorage.getItem(FONT_STORAGE_KEY) || '16';
+      } catch (e) {}
+      setFontSize(saved, false);
+    }
+    initFontSize();
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 2500);
+    }
+
+    function toggleContextDrawer() {
+      document.getElementById('context-drawer').classList.toggle('active');
+    }
+
+    function toggleHistory() {
+      const d = document.getElementById('history-drawer');
+      d.classList.toggle('active');
+      if (d.classList.contains('active')) {
+        renderHistoryList();
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const queryParams = new URLSearchParams(window.location.search);
+        const url = `/api/projects?${queryParams.toString()}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const select = document.getElementById('project-select');
+        select.innerHTML = '';
+
+        let matchedSelected = false;
+
+        // 1. Pinned Conversations
+        if (data.hierarchy && data.hierarchy.pinned && data.hierarchy.pinned.length) {
+          const grpPinned = document.createElement('optgroup');
+          grpPinned.label = '📌 Pinned Conversations';
+          data.hierarchy.pinned.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = 'conv:' + c.id;
+            opt.textContent = `📌 ${c.title} (${c.project || 'General'})`;
+            if (convId && c.id === convId) {
+              opt.selected = true;
+              matchedSelected = true;
+            }
+            grpPinned.appendChild(opt);
+          });
+          select.appendChild(grpPinned);
+        }
+
+        // 2. Projects (con conversaciones anidadas)
+        if (data.hierarchy && data.hierarchy.projects && data.hierarchy.projects.length) {
+          const grpProjects = document.createElement('optgroup');
+          grpProjects.label = '📁 Projects';
+          data.hierarchy.projects.forEach(p => {
+            const optRoot = document.createElement('option');
+            optRoot.value = 'proj:' + p.name;
+            optRoot.textContent = `📁 ${p.name}`;
+            if (!matchedSelected && data.active && !data.active.isGeneral && p.name.toLowerCase() === data.active.name.toLowerCase()) {
+              optRoot.selected = true;
+              matchedSelected = true;
+            }
+            grpProjects.appendChild(optRoot);
+
+            if (p.conversations && p.conversations.length) {
+              p.conversations.forEach(sc => {
+                const optSub = document.createElement('option');
+                optSub.value = 'conv:' + sc.id;
+                optSub.textContent = `  ↳ 💬 ${sc.title}`;
+                if (convId && sc.id === convId) {
+                  optSub.selected = true;
+                  matchedSelected = true;
+                }
+                grpProjects.appendChild(optSub);
+              });
+            }
+          });
+          select.appendChild(grpProjects);
+        }
+
+        // 3. Recent Conversations
+        if (data.hierarchy && data.hierarchy.conversations && data.hierarchy.conversations.length) {
+          const grpConvs = document.createElement('optgroup');
+          grpConvs.label = '💬 Conversations';
+          data.hierarchy.conversations.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = 'conv:' + c.id;
+            opt.textContent = `💬 ${c.title} (${c.project || 'General'})`;
+            if (!matchedSelected && convId && c.id === convId) {
+              opt.selected = true;
+              matchedSelected = true;
+            }
+            grpConvs.appendChild(opt);
+          });
+          select.appendChild(grpConvs);
+        }
+
+        // Fallback si nada coincidió explícitamente:
+        if (!matchedSelected && data.active) {
+          for (let i = 0; i < select.options.length; i++) {
+            const o = select.options[i];
+            if (data.active.convId && o.value === 'conv:' + data.active.convId) {
+              o.selected = true;
+              matchedSelected = true;
+              break;
+            }
+            if (!data.active.isGeneral && o.value === 'proj:' + data.active.name) {
+              o.selected = true;
+              matchedSelected = true;
+              break;
+            }
+          }
+        }
+
+        const currentVal = select.value;
+        const selectedOpt = select.selectedOptions[0];
+        const initialBadge = extractCleanBadge(selectedOpt, data.active);
+        document.getElementById('sync-status').textContent = initialBadge;
+
+        await loadProjectContext(currentVal);
+      } catch (e) {
+        console.error('Error cargando proyectos:', e);
+      }
+    }
+
+    function extractCleanBadge(opt, activeData) {
+      if (opt) {
+        const val = opt.value || '';
+        if (val.startsWith('proj:')) {
+          return val.slice(5).trim();
+        }
+        const text = opt.textContent || '';
+        const match = text.match(/\(([^)]+)\)$/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+        return text.replace(/^[📌📁💬\s↳]+/, '').trim();
+      }
+      if (activeData) {
+        return activeData.isGeneral ? 'General' : activeData.name;
+      }
+      return 'General';
+    }
+
+    async function loadProjectContext(selectedIdentifier) {
+      try {
+        const queryParams = new URLSearchParams(window.location.search);
+        if (selectedIdentifier) {
+          if (selectedIdentifier.startsWith('conv:')) {
+            queryParams.set('conversationId', selectedIdentifier.slice(5));
+            queryParams.delete('project');
+          } else if (selectedIdentifier.startsWith('proj:')) {
+            queryParams.set('project', selectedIdentifier.slice(5));
+            queryParams.delete('conversationId');
+          } else {
+            queryParams.set('project', selectedIdentifier);
+          }
+        }
+
+        const res = await fetch('/api/context?' + queryParams.toString());
+        projectContextData = await res.json();
+
+        if (projectContextData && projectContextData.project) {
+          currentProject = projectContextData.project.name;
+          document.getElementById('ctx-path').textContent = projectContextData.project.path;
+          document.getElementById('ctx-stack').textContent = projectContextData.packageInfo && projectContextData.packageInfo.dependencies.length ? projectContextData.packageInfo.dependencies.slice(0, 6).join(', ') : 'Nativo / Python';
+          document.getElementById('ctx-scripts').textContent = projectContextData.packageInfo && projectContextData.packageInfo.scripts.length ? projectContextData.packageInfo.scripts.join(', ') : 'Sin scripts npm';
+          
+          if (projectContextData.conversationTitle) {
+            document.getElementById('ctx-task').textContent = projectContextData.conversationTitle;
+          } else if (projectContextData.recentPrompts && projectContextData.recentPrompts.length) {
+            document.getElementById('ctx-task').textContent = projectContextData.recentPrompts[projectContextData.recentPrompts.length - 1].slice(0, 70) + '...';
+          } else {
+            document.getElementById('ctx-task').textContent = 'Continuidad activa';
+          }
+
+          if (projectContextData.files) {
+            document.getElementById('ctx-files').textContent = projectContextData.files.join('\n');
+          }
+
+          const select = document.getElementById('project-select');
+          const selectedOpt = select.selectedOptions[0];
+          const badgeText = extractCleanBadge(selectedOpt, projectContextData.project);
+          document.getElementById('sync-status').textContent = badgeText;
+        }
+      } catch (e) {
+        console.error('Error cargando contexto:', e);
+      }
+    }
+
+    async function onProjectChanged() {
+      const select = document.getElementById('project-select');
+      const selected = select.value;
+      if (!selected) return;
+
+      const selectedOpt = select.selectedOptions[0];
+      const badgeName = extractCleanBadge(selectedOpt, null);
+      document.getElementById('sync-status').textContent = badgeName;
+
+      try {
+        let payload = { selection: selected };
+        if (selected.startsWith('conv:')) {
+          payload.conversationId = selected.slice(5);
+        } else if (selected.startsWith('proj:')) {
+          payload.projectName = selected.slice(5);
+        } else {
+          payload.projectName = selected;
+        }
+
+        await fetch('/api/context/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        await loadProjectContext(selected);
+        showToast('📁 Contexto activo: ' + badgeName);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Escuchar cambios de workspace en tiempo real desde Antigravity
+    window.addEventListener('message', async (event) => {
+      if (event.data?.type === 'workspace-change') {
+        await loadProjects();
+      }
+    });
+
+    let allLocalModels = [];
+    let allDirectMlModels = [];
+    let allFreeAiModels = [];
+    let allSkills = [];
+    let allSkillsCategories = [];
+    let activeSkillId = '';
+    let currentSource = 'local';
+    let currentDirectMlStatus = 'offline';
+    let sessionModelfileOverrides = { customSystemPrompt: '', modelfileOptions: null };
+    let currentFolderData = { path: '', files: [], selectedFiles: [] };
+    const SOURCE_STORAGE_KEY = 'antigravity_selected_source';
+    const SKILL_STORAGE_KEY = 'antigravity_selected_skill';
+
+    function switchAiSource(source, persist = true) {
+      currentSource = source;
+      const btnLocal = document.getElementById('src-local-btn');
+      const btnDirectml = document.getElementById('src-directml-btn');
+      const btnFree = document.getElementById('src-freeai-btn');
+      const btnMf = document.getElementById('btn-modelfile');
+      const btnDml = document.getElementById('btn-dml-control');
+
+      if (btnLocal) btnLocal.classList.remove('active');
+      if (btnDirectml) btnDirectml.classList.remove('active');
+      if (btnFree) btnFree.classList.remove('active');
+
+      const input = document.getElementById('prompt-input');
+
+      if (source === 'directml') {
+        if (btnDirectml) btnDirectml.classList.add('active');
+        if (btnMf) btnMf.style.display = 'none';
+        if (btnDml) btnDml.style.display = 'inline-flex';
+        populateModelSelect('directml');
+        updateDirectMlStatus();
+        if (input) input.placeholder = "Pregunta a Agente DirectML (AMD GPU DirectX 12) sobre el proyecto...";
+        showToast('⚡ Agente DirectML Activado (Aceleración Nativa AMD Radeon | 25GB VRAM)');
+      } else if (source === 'freeai') {
+        if (btnFree) btnFree.classList.add('active');
+        if (btnMf) btnMf.style.display = 'none';
+        if (btnDml) btnDml.style.display = 'none';
+        populateModelSelect('freeai');
+        if (input) input.placeholder = "Pregunta a Agente Free.ai Cloud sobre el proyecto activo...";
+        showToast('🌐 Agente Free.ai Cloud Activado (467+ Modelos en la Nube)');
+      } else {
+        if (btnLocal) btnLocal.classList.add('active');
+        if (btnMf) btnMf.style.display = 'inline-flex';
+        if (btnDml) btnDml.style.display = 'none';
+        populateModelSelect('local');
+        if (input) input.placeholder = "Pregunta a Agente Ollama Local sobre el proyecto activo...";
+        showToast('🤖 Agente Ollama Local Activado (GGUF Local | Cero Cuota)');
+      }
+
+      if (persist) {
+        try {
+          localStorage.setItem(SOURCE_STORAGE_KEY, source);
+        } catch (e) {}
+      }
+    }
+
+    async function onModelChanged() {
+      const select = document.getElementById('model-select');
+      const modelVal = select.value;
+      if (!modelVal) return;
+
+      const savedModelKey = 'antigravity_selected_model_' + currentSource;
+      localStorage.setItem(savedModelKey, modelVal);
+      localStorage.setItem('antigravity_selected_model', modelVal);
+
+      if (currentSource === 'directml') {
+        await loadDirectMlModel(modelVal);
+      } else if (currentSource === 'local') {
+        showToast('🤖 Modelo Ollama activo: ' + modelVal);
+      } else if (currentSource === 'freeai') {
+        showToast('🌐 Modelo Free.ai Cloud activo: ' + modelVal);
+      }
+    }
+
+    async function updateDirectMlStatus() {
+      try {
+        const res = await fetch('/api/directml/status');
+        const data = await res.json();
+        const dmlLabel = document.getElementById('dml-label');
+        const dmlIcon = document.getElementById('dml-icon');
+
+        if (data.isAlive) {
+          currentDirectMlStatus = 'online';
+          if (dmlIcon) dmlIcon.textContent = '⚡';
+          if (dmlLabel) dmlLabel.textContent = data.model ? `DirectML: ${data.model}` : 'DirectML Activo';
+        } else {
+          currentDirectMlStatus = 'offline';
+          if (dmlIcon) dmlIcon.textContent = '🔌';
+          if (dmlLabel) dmlLabel.textContent = 'DirectML Offline (Clic Iniciar)';
+        }
+      } catch (e) {
+        currentDirectMlStatus = 'offline';
+      }
+    }
+
+    async function handleDirectMlControlClick() {
+      if (currentDirectMlStatus === 'offline') {
+        showToast('⚡ Iniciando servidor DirectML en puerto 8002...');
+        const dmlLabel = document.getElementById('dml-label');
+        if (dmlLabel) dmlLabel.textContent = 'Iniciando GPU...';
+        try {
+          const res = await fetch('/api/directml/start', { method: 'POST' });
+          const data = await res.json();
+          showToast(data.message || 'Servidor DirectML iniciado.');
+          await updateDirectMlStatus();
+          await loadModels();
+        } catch (e) {
+          showToast('Error iniciando DirectML: ' + e.message);
+        }
+      } else {
+        const select = document.getElementById('model-select');
+        await loadDirectMlModel(select.value);
+      }
+    }
+
+    async function loadDirectMlModel(modelName) {
+      if (!modelName) return;
+      const dmlLabel = document.getElementById('dml-label');
+      const dmlIcon = document.getElementById('dml-icon');
+      if (dmlLabel) dmlLabel.textContent = 'Cargando GPU...';
+      if (dmlIcon) dmlIcon.textContent = '⏳';
+      showToast('⏳ Inicializando ' + modelName + ' en DirectML GPU (AMD Radeon)...');
+
+      try {
+        const res = await fetch('/api/directml/load', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: modelName })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          currentDirectMlStatus = 'online';
+          if (dmlLabel) dmlLabel.textContent = `⚡ ${data.active_model || modelName}`;
+          if (dmlIcon) dmlIcon.textContent = '✅';
+          showToast('✅ ' + (data.displayName || data.active_model) + ' activo en GPU DirectML');
+        } else {
+          showToast('Aviso DirectML: ' + (data.error || 'Listo para inferencia'));
+        }
+      } catch (err) {
+        showToast('Error cargando DirectML: ' + err.message);
+      }
+    }
+
+    function populateModelSelect(source) {
+      const select = document.getElementById('model-select');
+      select.innerHTML = '';
+
+      if (source === 'directml') {
+        if (!allDirectMlModels.length) {
+          select.innerHTML = '<option value="">Cargando modelos DirectML...</option>';
+          setTimeout(loadModels, 2500);
+          return;
+        }
+
+        const grp = document.createElement('optgroup');
+        grp.label = `⚡ Modelos DirectML Nativo AMD GPU (${allDirectMlModels.length})`;
+        allDirectMlModels.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name || m.id;
+          opt.dataset.isDirectml = 'true';
+          const sizeText = m.size ? ` (${m.size})` : '';
+          const isPending = m.status === 'pending_export';
+          const statusText = isPending ? ' ⏳ [Pendiente]' : ' ✅ [Listo]';
+          opt.textContent = `⚡ ${m.displayName || m.name}${sizeText}${statusText}`;
+          if (isPending) opt.disabled = true;
+          grp.appendChild(opt);
+        });
+        select.appendChild(grp);
+
+        for (let i = 0; i < select.options.length; i++) {
+          if (!select.options[i].disabled) {
+            select.selectedIndex = i;
+            break;
+          }
+        }
+
+      } else if (source === 'freeai') {
+        if (!allFreeAiModels.length) {
+          select.innerHTML = '<option value="">No hay modelos de Free.ai cargados</option>';
+          return;
+        }
+
+        const featuredOrder = [
+          'freeai:qwen-coder',
+          'freeai:qwen7b',
+          'freeai:deepseek-r1',
+          'freeai:deepseek/deepseek-chat',
+          'freeai:openai/gpt-4o-mini',
+          'freeai:openai/gpt-4o',
+          'freeai:meta-llama/llama-3.3-70b-instruct',
+          'freeai:mistralai/mistral-large',
+          'freeai:google/gemini-4-argon'
+        ];
+
+        const grpFeatured = document.createElement('optgroup');
+        grpFeatured.label = '⭐ Modelos Principales Recomendados';
+        const added = new Set();
+
+        featuredOrder.forEach(id => {
+          const found = allFreeAiModels.find(m => m.id === id || m.name === id || m.rawId === id.replace('freeai:', ''));
+          if (found) {
+            const opt = document.createElement('option');
+            opt.value = found.id || found.name;
+            opt.dataset.isFreeai = 'true';
+            opt.textContent = `⭐ ${found.displayName || found.name}`;
+            grpFeatured.appendChild(opt);
+            added.add(found.id || found.name);
+          }
+        });
+        select.appendChild(grpFeatured);
+
+        const grpChat = document.createElement('optgroup');
+        grpChat.label = '💬 Modelos de Chat & Razonamiento';
+        const grpCode = document.createElement('optgroup');
+        grpCode.label = '💻 Modelos de Programación (Coder)';
+
+        allFreeAiModels
+          .filter(m => !added.has(m.id || m.name))
+          .forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id || m.name;
+            opt.dataset.isFreeai = 'true';
+            const icon = m.type === 'code' ? '💻' : '💬';
+            opt.textContent = `${icon} ${m.displayName || m.name}`;
+            if (m.type === 'code') grpCode.appendChild(opt);
+            else grpChat.appendChild(opt);
+          });
+
+        if (grpCode.children.length) select.appendChild(grpCode);
+        if (grpChat.children.length) select.appendChild(grpChat);
+
+      } else {
+        // Modo Local (Ollama)
+        if (!allLocalModels.length) {
+          select.innerHTML = '<option value="">No hay modelos locales de Ollama detectados (Reintentando...)</option>';
+          setTimeout(loadModels, 3000);
+          return;
+        }
+
+        const grp = document.createElement('optgroup');
+        grp.label = `🤖 Modelos Ollama Instalados (${allLocalModels.length})`;
+        allLocalModels.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          opt.dataset.isLocal = 'true';
+          const sizeGb = m.size ? (m.size / (1024 * 1024 * 1024)).toFixed(1) + 'GB' : 'Local';
+          opt.textContent = `💻 ${m.name} (${sizeGb})`;
+          grp.appendChild(opt);
+        });
+        select.appendChild(grp);
+      }
+
+      // Restaurar modelo previamente seleccionado para esta fuente
+      const savedModelKey = 'antigravity_selected_model_' + source;
+      const savedModel = localStorage.getItem(savedModelKey) || localStorage.getItem('antigravity_selected_model');
+      if (savedModel && Array.from(select.options).some(o => o.value === savedModel && !o.disabled)) {
+        select.value = savedModel;
+      } else {
+        for (let i = 0; i < select.options.length; i++) {
+          if (!select.options[i].disabled) {
+            select.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      select.onchange = onModelChanged;
+    }
+
+    // --- GESTIÓN DE MODELFILE DE OLLAMA ---
+    async function openModelfileModal() {
+      const select = document.getElementById('model-select');
+      const model = select.value;
+      if (!model) {
+        showToast('Selecciona un modelo de Ollama primero.');
+        return;
+      }
+
+      document.getElementById('mf-model-name').textContent = model;
+      document.getElementById('mf-editor').value = 'Cargando Modelfile desde Ollama...';
+      document.getElementById('mf-compile-status').style.display = 'none';
+      document.getElementById('modelfile-modal').classList.add('active');
+
+      try {
+        const res = await fetch(`/api/ollama/modelfile?model=${encodeURIComponent(model)}`);
+        const data = await res.json();
+        if (data.ok) {
+          let content = data.modelfile || '';
+          if (!content && data.system) {
+            content = `FROM ${model}\n\nSYSTEM """\n${data.system}\n"""\n`;
+          }
+          if (data.parameters) {
+            content += (content ? "\n" : "") + data.parameters;
+          }
+          document.getElementById('mf-editor').value = content;
+          document.getElementById('mf-model-details').textContent = data.details ? `${data.details.family || ''} ${data.details.parameter_size || ''}` : 'Ollama Local';
+        } else {
+          document.getElementById('mf-editor').value = `FROM ${model}\n\n# Modelfile personalizado para esta sesión\nSYSTEM """\nEres un asistente de programación experto en español.\n"""\nPARAMETER temperature 0.7\nPARAMETER num_ctx 8192\n`;
+        }
+      } catch (err) {
+        document.getElementById('mf-editor').value = `FROM ${model}\n\nSYSTEM """\nEres un asistente de programación experto en español.\n"""\nPARAMETER temperature 0.7\n`;
+      }
+    }
+
+    function closeModelfileModal() {
+      document.getElementById('modelfile-modal').classList.remove('active');
+    }
+
+    function copyModelfileText() {
+      const txt = document.getElementById('mf-editor').value;
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Modelfile copiado al portapapeles.'));
+    }
+
+    function downloadModelfile() {
+      const txt = document.getElementById('mf-editor').value;
+      const model = document.getElementById('mf-model-name').textContent;
+      const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Modelfile_${model.replace(/[:\/]/g, '_')}`;
+      a.click();
+      showToast('💾 Modelfile descargado.');
+    }
+
+    function applyModelfileToSession() {
+      const txt = document.getElementById('mf-editor').value;
+      const sysMatch = txt.match(/SYSTEM\s+"""([\s\S]*?)"""/) || txt.match(/SYSTEM\s+"([^"]*)"/) || txt.match(/SYSTEM\s+([^\n]+)/);
+      const customSys = sysMatch ? sysMatch[1].trim() : '';
+
+      const options = {};
+      const tempMatch = txt.match(/PARAMETER\s+temperature\s+([0-9\.]+)/i);
+      if (tempMatch) options.temperature = parseFloat(tempMatch[1]);
+      const ctxMatch = txt.match(/PARAMETER\s+num_ctx\s+([0-9]+)/i);
+      if (ctxMatch) options.num_ctx = parseInt(ctxMatch[1], 10);
+      const topPMatch = txt.match(/PARAMETER\s+top_p\s+([0-9\.]+)/i);
+      if (topPMatch) options.top_p = parseFloat(topPMatch[1]);
+
+      sessionModelfileOverrides = {
+        customSystemPrompt: customSys,
+        modelfileOptions: options
+      };
+
+      closeModelfileModal();
+      showToast('⚡ Modelfile aplicado a la sesión de chat actual.');
+    }
+
+    async function compileNewOllamaModel() {
+      const baseModel = document.getElementById('mf-model-name').textContent;
+      const cleanBase = baseModel.split(':')[0];
+      const newName = prompt('Indica el nombre para el nuevo modelo en Ollama:', cleanBase + '-custom:latest');
+      if (!newName || !newName.trim()) return;
+
+      const txt = document.getElementById('mf-editor').value;
+      const statusEl = document.getElementById('mf-compile-status');
+      statusEl.style.display = 'block';
+      statusEl.textContent = `Compilando modelo "${newName.trim()}" en Ollama... Por favor espera.`;
+
+      try {
+        const res = await fetch('/api/ollama/create-model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim(), modelfile: txt })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          statusEl.textContent = `Ollama: ${chunk.slice(-120)}`;
+        }
+
+        statusEl.textContent = `✅ ¡Modelo "${newName.trim()}" creado exitosamente!`;
+        showToast(`✅ Modelo "${newName.trim()}" creado en Ollama.`);
+        await loadModels();
+        setTimeout(closeModelfileModal, 1500);
+      } catch (err) {
+        statusEl.textContent = `⚠️ Error al crear modelo: ${err.message}`;
+      }
+    }
+
+    // --- GESTIÓN DE CARPETAS DE PROYECTO Y CÓDIGO REAL ---
+    async function openFolderModal() {
+      document.getElementById('folder-modal').classList.add('active');
+      const input = document.getElementById('folder-path-input');
+      if (projectContextData && projectContextData.project && projectContextData.project.path) {
+        input.value = projectContextData.project.path;
+      }
+      await loadFolderQuickChips();
+      if (input.value) {
+        await scanFolderFromInput();
+      }
+    }
+
+    function closeFolderModal() {
+      document.getElementById('folder-modal').classList.remove('active');
+    }
+
+    async function loadFolderQuickChips() {
+      const container = document.getElementById('folder-quick-chips');
+      try {
+        const res = await fetch('/api/project/folders');
+        const data = await res.json();
+        container.innerHTML = '';
+        if (data.folders && data.folders.length) {
+          data.folders.forEach(f => {
+            const btn = document.createElement('button');
+            btn.className = 'chip-btn';
+            btn.textContent = `📁 ${f.name}`;
+            btn.onclick = () => {
+              document.getElementById('folder-path-input').value = f.path;
+              scanFolderFromInput();
+            };
+            container.appendChild(btn);
+          });
+        }
+      } catch (e) {
+        container.innerHTML = '<span style="color:var(--text-muted);">No se pudieron listar carpetas</span>';
+      }
+    }
+
+    async function scanFolderFromInput() {
+      const input = document.getElementById('folder-path-input');
+      const folderPath = input.value.trim();
+      if (!folderPath) return;
+
+      const listContainer = document.getElementById('folder-file-list');
+      listContainer.innerHTML = '<div style="color:var(--accent-cyan); padding:10px; text-align:center;">🔍 Escaneando archivos de código en la carpeta...</div>';
+
+      try {
+        const res = await fetch('/api/project/load-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderPath: folderPath })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          listContainer.innerHTML = `<div style="color:var(--accent-red); padding:10px;">⚠️ ${data.error}</div>`;
+          return;
+        }
+
+        currentFolderData = {
+          path: data.folderPath,
+          files: data.files || [],
+          selectedFiles: data.selectedFiles || []
+        };
+
+        renderFolderFilesList();
+        updateSelectedSummary();
+        showToast(`📁 Carpeta cargada: ${data.name} (${data.files.length} archivos)`);
+      } catch (err) {
+        listContainer.innerHTML = `<div style="color:var(--accent-red); padding:10px;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function renderFolderFilesList(filterText = '') {
+      const listContainer = document.getElementById('folder-file-list');
+      listContainer.innerHTML = '';
+      const countEl = document.getElementById('folder-file-count');
+
+      const filterLower = (filterText || '').toLowerCase().trim();
+      const filtered = currentFolderData.files.filter(f => 
+        !filterLower || f.relPath.toLowerCase().includes(filterLower) || f.ext.toLowerCase().includes(filterLower)
+      );
+
+      if (countEl) countEl.textContent = currentFolderData.files.length;
+
+      if (!filtered.length) {
+        listContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px; text-align:center;">No coinciden archivos con el filtro.</div>';
+        return;
+      }
+
+      filtered.forEach(f => {
+        const row = document.createElement('label');
+        row.className = 'file-item-row';
+        const isChecked = currentFolderData.selectedFiles.includes(f.relPath) || currentFolderData.selectedFiles.includes(f.fullPath);
+        const sizeKb = (f.size / 1024).toFixed(1) + ' KB';
+
+        row.innerHTML = `
+          <input type="checkbox" value="${f.relPath}" ${isChecked ? 'checked' : ''} onchange="onFileCheckboxChange(this)">
+          <span class="file-item-name">${f.relPath}</span>
+          <span class="file-item-size">${sizeKb}</span>
+        `;
+        listContainer.appendChild(row);
+      });
+    }
+
+    function filterFolderFilesList() {
+      const q = document.getElementById('folder-file-filter').value;
+      renderFolderFilesList(q);
+    }
+
+    function onFileCheckboxChange(cb) {
+      const val = cb.value;
+      if (cb.checked) {
+        if (!currentFolderData.selectedFiles.includes(val)) {
+          currentFolderData.selectedFiles.push(val);
+        }
+      } else {
+        currentFolderData.selectedFiles = currentFolderData.selectedFiles.filter(f => f !== val);
+      }
+      updateSelectedSummary();
+    }
+
+    function updateSelectedSummary() {
+      const badge = document.getElementById('folder-selection-badge');
+      const count = currentFolderData.selectedFiles.length;
+      if (badge) {
+        badge.textContent = `${count} archivo${count === 1 ? '' : 's'} seleccionado${count === 1 ? '' : 's'}`;
+      }
+    }
+
+    function selectRecommendedFiles() {
+      const priority = [
+        'main.py', 'app.py', 'server.js', 'index.ts', 'index.js',
+        'package.json', 'requirements.txt', 'README.md', 'vite.config', 'tsconfig.json'
+      ];
+      currentFolderData.selectedFiles = [];
+
+      for (const kw of priority) {
+        const match = currentFolderData.files.find(f => f.relPath.toLowerCase().endsWith(kw.toLowerCase()));
+        if (match && !currentFolderData.selectedFiles.includes(match.relPath)) {
+          currentFolderData.selectedFiles.push(match.relPath);
+        }
+      }
+
+      for (const f of currentFolderData.files) {
+        if (currentFolderData.selectedFiles.length >= 6) break;
+        if (!currentFolderData.selectedFiles.includes(f.relPath) && f.size < 40000) {
+          currentFolderData.selectedFiles.push(f.relPath);
+        }
+      }
+
+      renderFolderFilesList(document.getElementById('folder-file-filter').value);
+      updateSelectedSummary();
+      showToast(`⭐ Seleccionados ${currentFolderData.selectedFiles.length} archivos clave recomendados.`);
+    }
+
+    function selectAllFolderFiles(check) {
+      if (check) {
+        currentFolderData.selectedFiles = currentFolderData.files.map(f => f.relPath);
+      } else {
+        currentFolderData.selectedFiles = [];
+      }
+      renderFolderFilesList(document.getElementById('folder-file-filter').value);
+      updateSelectedSummary();
+    }
+
+    async function applyFolderSelectionToContext() {
+      if (!currentFolderData.path) {
+        showToast('Escribe y escanea una carpeta de proyecto primero.');
+        return;
+      }
+
+      try {
+        await fetch('/api/project/select-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folderPath: currentFolderData.path,
+            selectedFiles: currentFolderData.selectedFiles
+          })
+        });
+
+        await loadProjects();
+        await loadProjectContext(currentFolderData.path);
+
+        const badge = document.getElementById('sync-status');
+        if (badge) {
+          const folderName = currentFolderData.path.split(/[\/\\]/).pop();
+          badge.textContent = `${folderName} (${currentFolderData.selectedFiles.length} arch. código)`;
+        }
+
+        closeFolderModal();
+        showToast(`✅ Contexto cargado con ${currentFolderData.selectedFiles.length} archivos de código.`);
+      } catch (err) {
+        showToast('Error aplicando selección: ' + err.message);
+      }
+    }
+
+    async function previewCurrentContext() {
+      const modal = document.getElementById('preview-modal');
+      const contentEl = document.getElementById('preview-content');
+      modal.classList.add('active');
+      contentEl.textContent = 'Generando previsualización de contexto...';
+
+      try {
+        const res = await fetch('/api/project/preview-context');
+        const data = await res.json();
+        if (data.systemPrompt) {
+          contentEl.textContent = data.systemPrompt;
+        } else {
+          contentEl.textContent = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        contentEl.textContent = 'Error cargando preview: ' + err.message;
+      }
+    }
+
+    function closePreviewModal() {
+      document.getElementById('preview-modal').classList.remove('active');
+    }
+
+    function copyPreviewContext() {
+      const txt = document.getElementById('preview-content').textContent;
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Contexto copiado al portapapeles.'));
+    }
+
+    async function loadModels() {
+      try {
+        const res = await fetch('/api/tags');
+        const data = await res.json();
+
+        allDirectMlModels = data.directmlModels || [];
+        allFreeAiModels = data.freeAiModels || (data.models ? data.models.filter(m => m.isFreeAi || (m.id && m.id.startsWith('freeai:'))) : []);
+        allLocalModels = data.localModels || (data.models ? data.models.filter(m => !m.isFreeAi && !m.isDirectML && (!m.id || !m.id.startsWith('freeai:'))) : []);
+
+        let savedSource = 'local';
+        try {
+          savedSource = localStorage.getItem(SOURCE_STORAGE_KEY) || 'local';
+        } catch (e) {}
+
+        switchAiSource(savedSource, false);
+      } catch (e) {
+        document.getElementById('model-select').innerHTML = '<option value="">Error cargando modelos</option>';
+      }
+    }
+
+    // Cargar y Gestionar Habilidades de C:\antigravityAS\antigravity-awesome-skills
+    async function loadSkills() {
+      try {
+        const res = await fetch('/api/skills');
+        const data = await res.json();
+        allSkills = data.skills || [];
+        allSkillsCategories = data.categories || [];
+
+        const catSelect = document.getElementById('skill-category-select');
+        if (catSelect) {
+          catSelect.innerHTML = '<option value="">Todas las Categorías (' + allSkillsCategories.length + ')</option>';
+          allSkillsCategories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.textContent = cat;
+            catSelect.appendChild(opt);
+          });
+        }
+
+        renderSkillsOptions();
+
+        // Restaurar skill guardada
+        try {
+          const savedSkill = localStorage.getItem(SKILL_STORAGE_KEY);
+          if (savedSkill) {
+            setSkillById(savedSkill, false);
+          }
+        } catch (e) {}
+      } catch (e) {
+        console.warn('Error cargando skills:', e.message);
+      }
+    }
+
+    function renderSkillsOptions(filteredSkills = null) {
+      const select = document.getElementById('skill-select');
+      if (!select) return;
+      select.innerHTML = '<option value="">(Ninguna habilidad activa - Modo Base)</option>';
+
+      const list = filteredSkills || allSkills;
+      list.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `🎯 ${s.name} [${s.category}] - ${s.description.slice(0, 45)}...`;
+        if (s.id === activeSkillId) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function onSkillCategoryChanged() {
+      const cat = document.getElementById('skill-category-select').value;
+      if (!cat) {
+        renderSkillsOptions();
+      } else {
+        const filtered = allSkills.filter(s => s.category === cat);
+        renderSkillsOptions(filtered);
+      }
+    }
+
+    function onSkillSelected() {
+      const select = document.getElementById('skill-select');
+      const val = select.value;
+      setSkillById(val, true);
+    }
+
+    function setSkillById(skillId, showNotification = true) {
+      activeSkillId = skillId || '';
+      const badgeContainer = document.getElementById('active-skill-container');
+      const badgeName = document.getElementById('active-skill-name');
+      const select = document.getElementById('skill-select');
+
+      if (activeSkillId) {
+        if (badgeContainer) badgeContainer.style.display = 'inline-flex';
+        if (badgeName) badgeName.textContent = `🎯 Skill: ${activeSkillId}`;
+        if (select) select.value = activeSkillId;
+        try { localStorage.setItem(SKILL_STORAGE_KEY, activeSkillId); } catch (e) {}
+        if (showNotification) showToast(`🎯 Habilidad Activada: ${activeSkillId}`);
+      } else {
+        if (badgeContainer) badgeContainer.style.display = 'none';
+        if (select) select.value = '';
+        try { localStorage.removeItem(SKILL_STORAGE_KEY); } catch (e) {}
+        if (showNotification) showToast('🎯 Habilidad desactivada (Modo Base)');
+      }
+    }
+
+    function clearActiveSkill() {
+      setSkillById('', true);
+    }
+
+    function newChat() {
+      saveCurrentSessionToStorage();
+      chatHistory = [];
+      currentSessionId = 'local_ai_' + Date.now();
+      document.getElementById('chat-container').innerHTML = `
+        <div class="message info">
+          ✨ Nuevo chat iniciado para <strong>${currentProject || 'el proyecto'}</strong>. El contexto está activo y vinculado.
+        </div>
+      `;
+      showToast('Nuevo chat iniciado.');
+    }
+
+    function clearChat() {
+      document.getElementById('chat-container').innerHTML = `
+        <div class="message info">
+          🧹 Chat limpiado. El contexto de <strong>${currentProject || 'el proyecto'}</strong> sigue activo.
+        </div>
+      `;
+      chatHistory = [];
+      showToast('🧹 Pantalla de chat limpiada.');
+    }
+
+    function openDesktopApp() {
+      window.open('http://127.0.0.1:8080/', '_blank');
+      showToast('🖥️ Abriendo Open WebUI en el navegador...');
+    }
+
+    function saveCurrentSessionToStorage() {
+      if (!chatHistory.length) return;
+      try {
+        const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const existingIdx = sessions.findIndex(s => s.id === currentSessionId);
+        const firstUserMsg = chatHistory.find(m => m.role === 'user');
+        const title = firstUserMsg ? firstUserMsg.content.slice(0, 45) : 'Conversación';
+
+        const item = {
+          id: currentSessionId,
+          project: currentProject || 'General',
+          title: title,
+          time: new Date().toISOString(),
+          messages: chatHistory
+        };
+
+        if (existingIdx >= 0) {
+          sessions[existingIdx] = item;
+        } else {
+          sessions.unshift(item);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(0, 25)));
+      } catch (e) {}
+    }
+
+    function renderHistoryList() {
+      const listEl = document.getElementById('history-list');
+      listEl.innerHTML = '';
+      try {
+        const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if (!sessions.length) {
+          listEl.innerHTML = '<div style="color:var(--text-muted); font-size:11.5px; text-align:center; padding:20px;">Sin historial guardado aún.</div>';
+          return;
+        }
+
+        sessions.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          const dt = new Date(s.time);
+          item.innerHTML = `
+            <div class="history-item-top">
+              <span>📁 ${s.project} • ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+              <button class="btn-del-session" onclick="deleteSession(event, '${s.id}')">🗑️</button>
+            </div>
+            <div class="history-item-title">${s.title}</div>
+            <div style="font-size:10px; color:var(--accent-cyan); margin-top:3px;">${s.messages ? s.messages.length : 0} mensajes</div>
+          `;
+          item.onclick = () => loadSession(s);
+          listEl.appendChild(item);
+        });
+      } catch (e) {}
+    }
+
+    function loadSession(s) {
+      currentSessionId = s.id;
+      chatHistory = s.messages || [];
+      const container = document.getElementById('chat-container');
+      container.innerHTML = '';
+
+      chatHistory.forEach(m => {
+        appendMessage(m.role, m.content, false);
+      });
+      toggleHistory();
+      showToast('Chat restaurado.');
+    }
+
+    function deleteSession(e, id) {
+      e.stopPropagation();
+      try {
+        let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        sessions = sessions.filter(s => s.id !== id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+        renderHistoryList();
+        showToast('Conversación eliminada.');
+      } catch (err) {}
+    }
+
+    function quickPrompt(text) {
+      document.getElementById('prompt-input').value = text;
+      sendMessage();
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function escapeForAttr(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
+    }
+
+    function appendMessage(role, text, animate = true) {
+      const container = document.getElementById('chat-container');
+      const msg = document.createElement('div');
+      msg.className = `message ${role}`;
+      if (!animate) msg.style.animation = 'none';
+
+      msg.innerHTML = `
+        <div class="message-content">${formatMarkdown(text)}</div>
+        <div class="msg-actions">
+          <button class="btn-msg-action" onclick="copyMessageText(this)">📋 Copiar</button>
+          <button class="btn-msg-action" onclick="resendMessage('${escapeForAttr(text)}')">🔁 Reenviar</button>
+          <button class="btn-msg-action" onclick="ttsSpeakMessage(this)">🔊 TTS</button>
+        </div>
+      `;
+      container.appendChild(msg);
+      container.scrollTop = container.scrollHeight;
+      return msg;
+    }
+
+    // Guardar archivo directamente en el proyecto
+    async function saveCodeToProject(btn) {
+      const codeWrapper = btn.closest('.code-wrapper');
+      const code = codeWrapper.querySelector('code').innerText;
+      
+      // Intentar detectar nombre de archivo desde comentarios de cabecera
+      let detectedPath = '';
+      const lines = code.split('\n');
+      if (lines.length > 0) {
+        const firstLine = lines[0].trim();
+        const m = firstLine.match(/^(?:\/\/|#|\/\*)\s*([a-zA-Z0-9_\-\.\/]+\.[a-zA-Z0-9]+)/);
+        if (m) detectedPath = m[1];
+      }
+
+      const filePath = prompt('Guardar en el proyecto:\nIndica la ruta relativa del archivo:', detectedPath || 'src/nuevo_archivo.js');
+      if (!filePath || !filePath.trim()) return;
+
+      try {
+        const res = await fetch('/api/project/save-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            filePath: filePath.trim(),
+            content: code
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`✅ Guardado: ${filePath} (${data.size} bytes)`);
+          btn.textContent = '✅ Guardado';
+          setTimeout(() => { btn.textContent = '💾 Guardar en Proyecto'; }, 3000);
+        } else {
+          alert('Error guardando archivo: ' + data.error);
+        }
+      } catch (err) {
+        alert('Error conectando con el servidor: ' + err.message);
+      }
+    }
+
+    const AUTO_APPLY_STORAGE_KEY = 'local_ai_auto_apply';
+    let autoApplyEnabled = false;
+
+    function updateAutoApplyButtonUI() {
+      const btn = document.getElementById('btn-auto-apply');
+      const icon = document.getElementById('auto-apply-icon');
+      const label = document.getElementById('auto-apply-label');
+      if (!btn || !icon || !label) return;
+
+      if (autoApplyEnabled) {
+        btn.classList.add('active');
+        icon.textContent = '⚡';
+        label.textContent = 'Autoguardado: ON';
+      } else {
+        btn.classList.remove('active');
+        icon.textContent = '💾';
+        label.textContent = 'Autoguardado: OFF';
+      }
+    }
+
+    function initAutoApply() {
+      try {
+        const saved = localStorage.getItem(AUTO_APPLY_STORAGE_KEY);
+        autoApplyEnabled = (saved === 'true');
+        updateAutoApplyButtonUI();
+      } catch (e) {}
+    }
+
+    function toggleAutoApply() {
+      autoApplyEnabled = !autoApplyEnabled;
+      updateAutoApplyButtonUI();
+      try {
+        localStorage.setItem(AUTO_APPLY_STORAGE_KEY, autoApplyEnabled ? 'true' : 'false');
+      } catch (e) {}
+      if (autoApplyEnabled) {
+        showToast('⚡ Autoguardado ACTIVADO: Los archivos se escribirán al disco automáticamente.');
+      } else {
+        showToast('💾 Autoguardado desactivado. Podrás aplicar cambios con 1 clic.');
+      }
+    }
+
+    function renderFileWriteCard(filePath, code) {
+      const safePath = filePath.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const linesCount = code.split('\n').length;
+      const sizeKb = (new Blob([code]).size / 1024).toFixed(1);
+
+      return `<div class="file-action-card card-create" data-type="write" data-filepath="${safePath}">
+        <div class="fac-header">
+          <div class="fac-title-group">
+            <span class="fac-badge badge-create">📁 CREAR / ACTUALIZAR</span>
+            <span class="fac-path">${safePath}</span>
+            <span style="color:var(--text-muted); font-size:11px;">(${linesCount} líneas • ${sizeKb} KB)</span>
+          </div>
+          <div class="fac-actions">
+            <button class="btn-apply-action btn-apply-file" onclick="applyDirectFileWrite(this, '${safePath}')">
+              <span>⚡</span>
+              <span>Aplicar al Proyecto</span>
+            </button>
+            <button class="btn-code-action" onclick="copyCodeBlock(this)">📋 Copiar</button>
+          </div>
+        </div>
+        <pre><code>${code}</code></pre>
+      </div>`;
+    }
+
+    function renderFilePatchCard(filePath, code) {
+      const safePath = filePath.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const unescapedCode = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      const patchMatch = unescapedCode.match(/<{3,7}\s*SEARCH\s*\n([\s\S]*?)\n={3,7}\s*\n([\s\S]*?)\n>{3,7}/);
+
+      if (patchMatch) {
+        const searchPart = patchMatch[1];
+        const replacePart = patchMatch[2];
+        const safeSearchAttr = encodeURIComponent(searchPart);
+        const safeReplaceAttr = encodeURIComponent(replacePart);
+        const escapedSearch = searchPart.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escapedReplace = replacePart.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        return `<div class="file-action-card card-patch" data-type="patch" data-filepath="${safePath}" data-search="${safeSearchAttr}" data-replace="${safeReplaceAttr}">
+          <div class="fac-header">
+            <div class="fac-title-group">
+              <span class="fac-badge badge-patch">⚡ EDICIÓN QUIRÚRGICA (PATCH)</span>
+              <span class="fac-path">${safePath}</span>
+            </div>
+            <div class="fac-actions">
+              <button class="btn-apply-action patch-btn btn-apply-patch" onclick="applyDirectFilePatch(this, '${safePath}')">
+                <span>⚡</span>
+                <span>Aplicar Parche</span>
+              </button>
+              <button class="btn-code-action" onclick="copyCodeBlock(this)">📋 Copiar</button>
+            </div>
+          </div>
+          <div class="diff-section">
+            <div class="diff-box-search">
+              <div class="diff-label">🔻 Bloque a Reemplazar (SEARCH)</div>
+              <code>${escapedSearch}</code>
+            </div>
+            <div class="diff-box-replace">
+              <div class="diff-label">🟢 Nuevo Código Modificado (REPLACE)</div>
+              <code>${escapedReplace}</code>
+            </div>
+          </div>
+          <pre style="display:none;"><code>${code}</code></pre>
+        </div>`;
+      }
+
+      return renderFileWriteCard(filePath, code);
+    }
+
+    async function applyDirectFileWrite(btn, filePath) {
+      const card = btn.closest('.file-action-card');
+      const codeEl = card ? card.querySelector('code') : null;
+      if (!codeEl) return;
+      const content = codeEl.innerText;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span><span>Guardando...</span>';
+
+      try {
+        const res = await fetch('/api/project/save-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            filePath: filePath,
+            content: content
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          btn.className = 'btn-apply-action applied';
+          btn.innerHTML = '<span>✅</span><span>Aplicado en Disco</span>';
+          showToast(`✅ Archivo creado/actualizado: ${filePath} (${data.size} bytes)`);
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = '<span>⚠️</span><span>Reintentar</span>';
+          alert('Error guardando archivo: ' + data.error);
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚠️</span><span>Error</span>';
+        alert('Error conectando con el servidor: ' + err.message);
+      }
+    }
+
+    async function applyDirectFilePatch(btn, filePath) {
+      const card = btn.closest('.file-action-card');
+      const searchPart = decodeURIComponent(card.dataset.search || '');
+      const replacePart = decodeURIComponent(card.dataset.replace || '');
+
+      if (!searchPart) {
+        alert('Bloque SEARCH no encontrado.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span><span>Aplicando parche...</span>';
+
+      try {
+        const res = await fetch('/api/project/apply-patch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: currentProject,
+            filePath: filePath,
+            search: searchPart,
+            replace: replacePart
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          btn.className = 'btn-apply-action applied';
+          btn.innerHTML = '<span>✅</span><span>Parche Aplicado</span>';
+          showToast(`✅ Parche aplicado con éxito en: ${filePath}`);
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = '<span>⚠️</span><span>Reintentar Parche</span>';
+          alert('Error aplicando parche: ' + data.error);
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚠️</span><span>Error</span>';
+        alert('Error de red: ' + err.message);
+      }
+    }
+
+    async function autoApplyActionsInContainer(containerEl) {
+      if (!autoApplyEnabled) return;
+      const cards = containerEl.querySelectorAll('.file-action-card');
+      let count = 0;
+      for (const card of cards) {
+        const type = card.dataset.type;
+        const filePath = card.dataset.filepath;
+        if (type === 'patch') {
+          const btn = card.querySelector('.btn-apply-patch:not(.applied)');
+          if (btn) {
+            await applyDirectFilePatch(btn, filePath);
+            count++;
+          }
+        } else {
+          const btn = card.querySelector('.btn-apply-file:not(.applied)');
+          if (btn) {
+            await applyDirectFileWrite(btn, filePath);
+            count++;
+          }
+        }
+      }
+      if (count > 0) {
+        showToast(`⚡ ${count} cambio(s) guardados automáticamente en el disco.`);
+      }
+    }
+
+    function copyCodeBlock(btn) {
+      const codeWrapper = btn.closest('.code-wrapper') || btn.closest('.file-action-card');
+      const code = codeWrapper ? codeWrapper.querySelector('code').innerText : '';
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('📋 Código copiado');
+      });
+    }
+
+    function copyMessageText(btn) {
+      const msg = btn.closest('.message');
+      const text = msg.querySelector('.message-content').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Mensaje copiado al portapapeles');
+      });
+    }
+
+    function resendMessage(rawText) {
+      const input = document.getElementById('prompt-input');
+      input.value = rawText;
+      input.focus();
+      showToast('🔁 Mensaje cargado en el cuadro de texto.');
+    }
+
+    function ttsSpeakMessage(btn) {
+      if ('speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 TTS';
+          return;
+        }
+
+        const msg = btn.closest('.message');
+        const text = msg.querySelector('.message-content').innerText;
+        const cleanText = text.replace(/```[\s\S]*?```/g, 'Fragmento de código omitido.').trim();
+
+        const utter = new SpeechSynthesisUtterance(cleanText);
+        utter.lang = 'es-ES';
+        utter.rate = 1.05;
+
+        const voices = window.speechSynthesis.getVoices();
+        const esVoice = voices.find(v => v.lang.startsWith('es'));
+        if (esVoice) utter.voice = esVoice;
+
+        btn.classList.add('speaking');
+        btn.textContent = '⏹️ Detener';
+
+        utter.onend = () => {
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 TTS';
+        };
+
+        utter.onerror = () => {
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 TTS';
+        };
+
+        window.speechSynthesis.speak(utter);
+      } else {
+        showToast('TTS no disponible en este entorno.');
+      }
+    }
+
+    function formatMarkdown(text) {
+      let t = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      t = t.replace(/```([a-zA-Z0-9_\-\.\/:]*)\n([\s\S]*?)```/g, (match, header, rawCode) => {
+        const cleanHeader = (header || '').trim();
+        const code = rawCode.trimEnd();
+
+        if (cleanHeader.startsWith('write:') || cleanHeader.startsWith('create:') || cleanHeader.startsWith('file:')) {
+          const filePath = cleanHeader.replace(/^(write|create|file):/, '').trim();
+          return renderFileWriteCard(filePath, code);
+        }
+
+        if (cleanHeader.startsWith('patch:') || cleanHeader.startsWith('edit:')) {
+          const filePath = cleanHeader.replace(/^(patch|edit):/, '').trim();
+          return renderFilePatchCard(filePath, code);
+        }
+
+        let detectedPath = '';
+        const lines = code.split('\n');
+        if (lines.length > 0) {
+          const firstLine = lines[0].trim();
+          const m = firstLine.match(/^(?:\/\/|#|\/\*)\s*([a-zA-Z0-9_\-\.\/]+\.[a-zA-Z0-9]+)/);
+          if (m && m[1].includes('.')) {
+            detectedPath = m[1];
+          }
+        }
+
+        if (detectedPath) {
+          return renderFileWriteCard(detectedPath, code);
+        }
+
+        const language = cleanHeader || 'código';
+        return `<div class="code-wrapper">
+          <div class="code-header">
+            <span>📄 ${language}</span>
+            <div class="code-actions">
+              <button class="btn-code-action btn-code-save" onclick="saveCodeToProject(this)">💾 Guardar en Proyecto</button>
+              <button class="btn-code-action" onclick="copyCodeBlock(this)">📋 Copiar</button>
+            </div>
+          </div>
+          <pre><code>${code}</code></pre>
+        </div>`;
+      });
+      t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+      t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      t = t.replace(/\n/g, '<br>');
+      return t;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('prompt-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const modelSelect = document.getElementById('model-select');
+      const model = modelSelect.value;
+      if (!model) {
+        showToast('Selecciona un modelo disponible.');
+        return;
+      }
+
+      input.value = '';
+      appendMessage('user', text);
+      chatHistory.push({ role: 'user', content: text });
+
+      const isDirectml = currentSource === 'directml' || model.toLowerCase().includes('directml') || model.toLowerCase().includes('onnx');
+      const isFreeAi = !isDirectml && (model.startsWith('freeai:') || modelSelect.selectedOptions[0]?.dataset.isFreeai === 'true' || currentSource === 'freeai');
+
+      let providerLabel = '🤖 Agente Ollama Local';
+      if (isDirectml) providerLabel = '⚡ Agente DirectML (AMD GPU)';
+      else if (isFreeAi) providerLabel = '🌐 Agente Free.ai Cloud';
+
+      const skillBadgeText = activeSkillId ? ` [🎯 Skill: ${activeSkillId}]` : '';
+      const aiMsg = appendMessage('ai', `Pensando con ${providerLabel}${skillBadgeText} y contexto de ${currentProject || 'proyecto'}...`);
+      const aiContent = aiMsg.querySelector('.message-content');
+      document.getElementById('send-btn').disabled = true;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: model,
+            isDirectML: isDirectml,
+            isFreeAi: isFreeAi,
+            isLocal: !isFreeAi && !isDirectml,
+            source: currentSource,
+            skillId: activeSkillId || null,
+            messages: chatHistory,
+            project: currentProject,
+            conversationId: convId,
+            customSystemPrompt: sessionModelfileOverrides.customSystemPrompt || null,
+            modelfileOptions: sessionModelfileOverrides.modelfileOptions || null,
+            stream: true
+          })
+        });
+
+        if (!res.ok) {
+          let errMsg = `Error ${res.status}`;
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch (e) {
+            const textErr = await res.text().catch(() => '');
+            if (textErr) errMsg = textErr;
+          }
+          aiContent.innerHTML = `<span style="color: #f7768e; font-weight: 500;">⚠️ ${errMsg}</span>`;
+          document.getElementById('send-btn').disabled = false;
+          return;
+        }
+
+        aiContent.innerHTML = '';
+        let fullResponse = '';
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              let parsed;
+              if (trimmed.startsWith('data: ')) {
+                if (trimmed === 'data: [DONE]') continue;
+                parsed = JSON.parse(trimmed.slice(6));
+              } else {
+                parsed = JSON.parse(trimmed);
+              }
+
+              if (parsed.error) {
+                fullResponse += `\n⚠️ Error: ${parsed.error}`;
+                aiContent.innerHTML = formatMarkdown(fullResponse);
+                continue;
+              }
+
+              const content = (parsed.message && parsed.message.content) ||
+                (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content || parsed.choices[0].text)) ||
+                (parsed.response) || '';
+
+              if (content) {
+                fullResponse += content;
+                aiContent.innerHTML = formatMarkdown(fullResponse);
+                const container = document.getElementById('chat-container');
+                if (container) container.scrollTop = container.scrollHeight;
+              }
+            } catch (err) {}
+          }
+        }
+
+        if (!fullResponse.trim()) {
+          aiContent.innerHTML = `<span style="color: #f7768e;">⚠️ El modelo no devolvió texto. Comprueba que Ollama o Free.ai esté respondiendo.</span>`;
+        } else {
+          chatHistory.push({ role: 'assistant', content: fullResponse });
+          saveCurrentSessionToStorage();
+
+          // Auto-aplicar cambios en disco si la casilla está activa
+          await autoApplyActionsInContainer(aiMsg);
+
+          fetch('/api/project/log-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project: currentProject,
+              model: model,
+              task: text,
+              summary: fullResponse.slice(0, 250)
+            })
+          }).catch(() => {});
+        }
+
+      } catch (err) {
+        aiContent.innerHTML = `<span style="color: #f7768e;">⚠️ Error de conexión: ${err.message}</span>`;
+      } finally {
+        document.getElementById('send-btn').disabled = false;
+      }
+    }
+
+    window.addEventListener('load', () => {
+      initFontSize();
+      initAutoApply();
+      loadProjects();
+      loadModels();
+      loadSkills();
+
+      // Sincronización en vivo con el servidor
+      let currentBuildVersion = null;
+      setInterval(async () => {
+        try {
+          const res = await fetch('/api/version');
+          const data = await res.json();
+          if (currentBuildVersion === null) {
+            currentBuildVersion = data.build;
+          } else if (data.build && data.build !== currentBuildVersion) {
+            location.reload();
+          }
+        } catch (e) {}
+      }, 3500);
+    });
+  </script>
+</body>
+</html>

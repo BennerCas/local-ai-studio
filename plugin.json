@@ -1,0 +1,17 @@
+{
+  "name": "local-ai-studio",
+  "displayName": "Local AI Studio",
+  "version": "1.0.0",
+  "description": "Panel de Asistente IA Local (Ollama / LiteRT) integrado en Antigravity para trabajar sin consumo de cuota de nube.",
+  "author": {
+    "name": "Benner Castillo"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "local-ai",
+    "ollama",
+    "litert",
+    "offline",
+    "sidecar"
+  ]
+}

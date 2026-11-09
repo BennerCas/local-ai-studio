@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cline Agent - Antigravity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #12141d;
+      --bg-card: rgba(26, 29, 45, 0.85);
+      --bg-terminal: #0e1017;
+      --border-color: rgba(122, 162, 247, 0.2);
+      --accent-blue: #7aa2f7;
+      --accent-cyan: #7dcfff;
+      --accent-purple: #bb9af7;
+      --accent-green: #9ece6a;
+      --accent-yellow: #e0af68;
+      --accent-red: #f7768e;
+      --accent-orange: #ff9e3b;
+      --text-main: #c0caf5;
+      --text-muted: #7982a9;
+      --chat-font-size: 16px;
+      --font-title: calc(var(--chat-font-size) * 1.05);
+      --font-ui: calc(var(--chat-font-size) * 0.88);
+      --font-ui-small: calc(var(--chat-font-size) * 0.78);
+      --font-pill: calc(var(--chat-font-size) * 0.82);
+      --code-font-size: calc(var(--chat-font-size) * 0.9);
+      --input-font-size: var(--chat-font-size);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    header {
+      padding: 9px 14px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #ff7a00, #ff0055);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(255, 122, 0, 0.4);
+    }
+
+    .brand-title {
+      font-size: var(--font-title);
+      font-weight: 600;
+    }
+
+    .top-action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    /* Barra de Motor AI (Selector de Fuente + Selector de Modelo) */
+    .model-control-bar {
+      padding: 7px 14px;
+      background: rgba(18, 20, 31, 0.95);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .model-control-bar .ai-source-toggle {
+      flex-shrink: 0;
+    }
+
+    .model-control-bar .model-selector {
+      flex: 1;
+      min-width: 180px;
+      background: #181b2a;
+      color: var(--accent-orange);
+      border: 1px solid rgba(255, 158, 59, 0.35);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font-size: var(--font-ui);
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* Selector de Fuente: Modelos Locales vs Free.ai Cloud */
+    .ai-source-toggle {
+      display: inline-flex;
+      background: #141724;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .source-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .source-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .source-btn.active.source-local {
+      background: rgba(122, 162, 247, 0.2);
+      color: #7dcfff;
+      border: 1px solid rgba(122, 162, 247, 0.5);
+      box-shadow: 0 0 10px rgba(122, 162, 247, 0.25);
+    }
+
+    .source-btn.active.source-freeai {
+      background: rgba(187, 154, 247, 0.2);
+      color: #bb9af7;
+      border: 1px solid rgba(187, 154, 247, 0.5);
+      box-shadow: 0 0 10px rgba(187, 154, 247, 0.25);
+    }
+
+    .header-btn {
+      background: #181b2a;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .header-btn:hover {
+      background: rgba(122, 162, 247, 0.15);
+      border-color: var(--accent-cyan);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .header-btn.btn-primary {
+      background: linear-gradient(135deg, #ff7a00, #ff0055);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(255, 122, 0, 0.35);
+    }
+
+    .header-btn.btn-primary:hover {
+      box-shadow: 0 0 16px rgba(255, 122, 0, 0.55);
+    }
+
+    /* Selector Dinámico de Tamaño de Letra */
+    .font-size-control {
+      display: inline-flex;
+      align-items: center;
+      background: #181b2a;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      overflow: hidden;
+      padding: 1px;
+    }
+
+    .font-size-btn {
+      background: transparent;
+      border: none;
+      color: var(--accent-orange);
+      padding: 3px 8px;
+      font-size: var(--font-ui);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .font-size-btn:hover {
+      background: rgba(255, 122, 0, 0.25);
+      color: #fff;
+    }
+
+    .font-size-select {
+      background: transparent;
+      border: none;
+      border-left: 1px solid rgba(122, 162, 247, 0.2);
+      border-right: 1px solid rgba(122, 162, 247, 0.2);
+      color: var(--text-main);
+      padding: 3px 6px;
+      font-family: inherit;
+      font-size: var(--font-ui);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .font-size-select option {
+      background: #1a1e32;
+      color: #fff;
+    }
+
+    /* Barra de Proyecto */
+    .project-bar {
+      padding: 7px 14px;
+      background: rgba(18, 20, 29, 0.95);
+      border-bottom: 1px solid rgba(122, 162, 247, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: var(--font-ui);
+      gap: 8px;
+    }
+
+    .project-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .project-select {
+      background: #181b2a;
+      color: var(--accent-orange);
+      border: 1px solid rgba(255, 158, 59, 0.3);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: var(--font-ui);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .context-tag {
+      background: rgba(255, 122, 0, 0.12);
+      color: var(--accent-orange);
+      border: 1px solid rgba(255, 122, 0, 0.3);
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-size: var(--font-ui-small);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Cajón de Contexto */
+    #context-drawer {
+      display: none;
+      background: #151824;
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 14px;
+      font-size: var(--font-ui);
+      line-height: 1.5;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    #context-drawer.active { display: block; }
+
+    .ctx-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 6px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .ctx-files-box {
+      background: #0e1017;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      max-height: 60px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .controls-bar {
+      padding: 7px 14px;
+      background: #141724;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: var(--font-ui);
+    }
+
+    .mode-toggle {
+      display: flex;
+      background: #0e1017;
+      border-radius: 6px;
+      padding: 2px;
+      border: 1px solid var(--border-color);
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 3px 10px;
+      border-radius: 5px;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent-blue);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Terminal y Contenedor de Mensajes */
+    #chat-container {
+      flex: 1;
+      background: var(--bg-terminal);
+      padding: 12px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .task-bubble {
+      background: rgba(26, 29, 45, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: var(--chat-font-size);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: calc(var(--chat-font-size) - 2px);
+      color: var(--accent-orange);
+      font-weight: 600;
+    }
+
+    .task-body {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--chat-font-size);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      color: var(--text-main);
+      max-height: 380px;
+      overflow-y: auto;
+      background: #090a0f;
+      padding: 10px 12px;
+      border-radius: 6px;
+    }
+
+    /* Acciones en cada burbuja (Copiar, Reenviar, TTS) */
+    .bubble-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-action-small {
+      background: rgba(122, 162, 247, 0.08);
+      border: 1px solid rgba(122, 162, 247, 0.2);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+
+    .btn-action-small:hover {
+      background: rgba(122, 162, 247, 0.2);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-action-small.speaking {
+      background: rgba(158, 206, 106, 0.2);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.04); }
+    }
+
+    /* Barra Lateral de Historial */
+    #history-drawer {
+      position: absolute;
+      top: 0;
+      right: -320px;
+      width: 320px;
+      height: 100%;
+      background: #141724;
+      border-left: 1px solid var(--border-color);
+      box-shadow: -8px 0 24px rgba(0,0,0,0.6);
+      transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #history-drawer.active {
+      right: 0;
+    }
+
+    .history-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(26, 29, 45, 0.9);
+    }
+
+    .history-title {
+      font-size: var(--font-title);
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-item {
+      background: #1a1e32;
+      border: 1px solid rgba(122, 162, 247, 0.15);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .history-item:hover {
+      border-color: var(--accent-orange);
+      background: #20263f;
+    }
+
+    .history-item-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .history-item-title {
+      font-size: var(--font-ui);
+      color: #fff;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-del-session {
+      background: none;
+      border: none;
+      color: var(--accent-red);
+      font-size: var(--font-ui-small);
+      cursor: pointer;
+      opacity: 0.7;
+    }
+    .btn-del-session:hover { opacity: 1; }
+
+    footer {
+      padding: 9px 14px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .quick-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .pill {
+      background: rgba(255, 122, 0, 0.1);
+      border: 1px solid rgba(255, 122, 0, 0.25);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: var(--font-pill);
+      color: var(--accent-orange);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .pill:hover {
+      background: rgba(255, 122, 0, 0.25);
+      color: #fff;
+    }
+
+    .input-box {
+      display: flex;
+      gap: 8px;
+    }
+
+    textarea {
+      flex: 1;
+      background: #151824;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 9px 12px;
+      color: #fff;
+      font-family: inherit;
+      font-size: var(--input-font-size);
+      resize: none;
+      min-height: 48px;
+      height: 48px;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 10px rgba(255, 158, 59, 0.2);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    button.run-btn {
+      background: linear-gradient(135deg, #ff7a00, #ff0055);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 18px;
+      font-weight: 600;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button.run-btn:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 12px rgba(255, 122, 0, 0.35);
+    }
+
+    button.stop-btn {
+      background: rgba(247, 118, 142, 0.15);
+      border: 1px solid var(--accent-red);
+      color: var(--accent-red);
+      border-radius: 10px;
+      padding: 0 14px;
+      font-weight: 600;
+      font-size: var(--font-ui);
+      cursor: pointer;
+      display: none;
+    }
+
+    .legal-signature {
+      text-align: center;
+      font-size: var(--font-ui-small);
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1e32;
+      border: 1px solid var(--accent-blue);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      display: none;
+      z-index: 2000;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Cline Autonomous Agent</div>
+      </div>
+    </div>
+    <div class="top-action-buttons">
+      <button class="header-btn btn-primary" onclick="newChat()" title="Iniciar nueva sesión limpia">
+        <span>+ Nuevo Chat</span>
+      </button>
+      <button class="header-btn" onclick="toggleHistory()" title="Ver historial de sesiones guardadas">
+        <span>📜</span>
+        <span>Historial</span>
+      </button>
+      <button class="header-btn" onclick="openDesktopApp()" title="Abrir en aplicación de escritorio">
+        <span>🖥️</span>
+        <span>Desktop</span>
+      </button>
+      <button class="header-btn" onclick="clearLogs()" title="Limpiar salida de la consola">
+        <span>🧹</span>
+        <span>Limpiar</span>
+      </button>
+      <div class="font-size-control" title="Ajustar tamaño de letra de toda la interfaz">
+        <button class="font-size-btn" onclick="adjustFontSize(-1)" title="Reducir letra (A-)">A-</button>
+        <select id="font-size-select" class="font-size-select" onchange="setFontSize(this.value)" title="Tamaño de letra de toda la interfaz">
+          <option value="13">Aa 13px (Compacto)</option>
+          <option value="14">Aa 14px (Estándar)</option>
+          <option value="16" selected>Aa 16px (Recomendado)</option>
+          <option value="18">Aa 18px (Grande)</option>
+          <option value="20">Aa 20px (Muy Grande)</option>
+          <option value="22">Aa 22px (Extra Grande)</option>
+          <option value="24">Aa 24px (Máximo)</option>
+        </select>
+        <button class="font-size-btn" onclick="adjustFontSize(1)" title="Aumentar letra (A+)">A+</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Barra Superior de Configuración de Motor AI (Local vs Free.ai + Modelo) -->
+  <div class="model-control-bar">
+    <div class="ai-source-toggle" title="Elegir entre ejecutar Modelos Locales en tu PC o usar Free.ai Cloud">
+      <button id="src-local-btn" class="source-btn active source-local" onclick="switchAiSource('local')">
+        <span>💻</span>
+        <span>Modelos Locales</span>
+      </button>
+      <button id="src-freeai-btn" class="source-btn source-freeai" onclick="switchAiSource('freeai')">
+        <span>🌐</span>
+        <span>Free.ai Cloud</span>
+      </button>
+    </div>
+
+    <!-- Selector Dinámico de Modelo para Cline -->
+    <select id="model-select" class="model-selector" title="Seleccionar Modelo AI para Cline">
+      <option value="">Cargando modelos...</option>
+    </select>
+  </div>
+
+  <!-- Barra de Proyecto Sincronizado -->
+  <div class="project-bar">
+    <div class="project-left">
+      <span>📁 Proyecto:</span>
+      <select id="project-select" class="project-select" onchange="onProjectChanged()">
+        <option value="">Detectando proyectos...</option>
+      </select>
+      <div class="context-tag">
+        <span>⚡ CWD:</span>
+        <span id="sync-status">Sincronizado</span>
+      </div>
+    </div>
+    <button class="header-btn" onclick="toggleContextDrawer()">👁️ Ver Contexto</button>
+  </div>
+
+  <!-- Cajón Desplegable de Contexto -->
+  <div id="context-drawer">
+    <div class="ctx-meta">
+      <div>📁 <strong>Ruta CWD:</strong> <span id="ctx-path">-</span></div>
+      <div>📦 <strong>Dependencias:</strong> <span id="ctx-stack">-</span></div>
+      <div>🔄 <strong>Continuidad Antigravity:</strong> <span id="ctx-task">-</span></div>
+    </div>
+    <div style="margin-bottom: 4px; font-weight: 500; color: var(--accent-orange);">Archivos en el Espacio de Trabajo:</div>
+    <div class="ctx-files-box" id="ctx-files">Cargando árbol de archivos...</div>
+  </div>
+
+  <div class="controls-bar">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span>Modo:</span>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-act" onclick="setMode('act')">Act (Ejecutar)</button>
+        <button class="mode-btn" id="btn-plan" onclick="setMode('plan')">Plan (Diseño)</button>
+      </div>
+    </div>
+    <span id="agent-status" style="color: var(--accent-cyan); font-size: 11px;">Listo</span>
+  </div>
+
+  <!-- Contenedor Principal de Tareas y Mensajes -->
+  <div id="chat-container">
+    <div class="task-bubble">
+      <div class="task-header">🤖 Cline Agent - Sesión de Trabajo Activa</div>
+      <div class="task-body">Listo para ejecutar órdenes de forma autónoma en la carpeta de tu proyecto. Elige entre tus modelos locales de Ollama o modelos Cloud arriba a la derecha.</div>
+      <div class="bubble-actions">
+        <button class="btn-action-small" onclick="copyBubbleText(this)">📋 Copiar</button>
+        <button class="btn-action-small" onclick="ttsSpeakBubble(this)">🔊 Escuchar (TTS)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra Lateral de Historial -->
+  <div id="history-drawer">
+    <div class="history-header">
+      <div class="history-title">📜 Historial de Sesiones Cline</div>
+      <button class="header-btn" onclick="toggleHistory()">✕ Cerrar</button>
+    </div>
+    <div class="history-list" id="history-list">
+      <!-- Se puebla dinámicamente -->
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <footer>
+    <div class="quick-pills">
+      <div class="pill" onclick="quickTask('Audita los archivos del proyecto y verifica dependencias faltantes.')">⚡ Auditar Dependencias</div>
+      <div class="pill" onclick="quickTask('Revisa la última tarea de Antigravity y continúa la implementación.')">🚀 Continuar Tarea Activa</div>
+      <div class="pill" onclick="quickTask('Ejecuta la suite de pruebas del proyecto y reporta resultados.')">🧪 Ejecutar Tests</div>
+      <div class="pill" onclick="quickTask('Revisa el estado de git y genera un resumen de cambios.')">📝 Estado Git</div>
+    </div>
+    <div class="input-box">
+      <textarea id="prompt-input" placeholder="Instrucción para Cline (ej. 'Analiza el proyecto y refactoriza componentes')..." onkeydown="handleKey(event)"></textarea>
+      <div class="btn-group">
+        <button class="run-btn" id="run-btn" onclick="runTask()">Ejecutar</button>
+        <button class="stop-btn" id="stop-btn" onclick="stopTask()">Detener</button>
+      </div>
+    </div>
+    <div class="legal-signature">
+      HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®
+    </div>
+  </footer>
+
+  <script>
+    let currentMode = 'act';
+    let running = false;
+    let currentProject = null;
+    let projectContextData = null;
+    let currentSessionId = 'cline_' + Date.now();
+    let currentSessionMessages = [];
+    const STORAGE_KEY = 'cline_agent_history_v1';
+    const FONT_STORAGE_KEY = 'antigravity_cline_font_size';
+    const convId = new URLSearchParams(window.location.search).get('conversationId') || '';
+
+    // Manejo Dinámico del Tamaño de Letra de Toda la Interfaz
+    function setFontSize(size, showNotification = true) {
+      const numSize = parseInt(size, 10) || 16;
+      document.documentElement.style.setProperty('--chat-font-size', numSize + 'px');
+      document.documentElement.style.setProperty('--font-title', Math.round(numSize * 1.05) + 'px');
+      document.documentElement.style.setProperty('--font-ui', Math.max(12, Math.round(numSize * 0.88)) + 'px');
+      document.documentElement.style.setProperty('--font-ui-small', Math.max(11, Math.round(numSize * 0.78)) + 'px');
+      document.documentElement.style.setProperty('--font-pill', Math.max(11, Math.round(numSize * 0.82)) + 'px');
+      document.documentElement.style.setProperty('--code-font-size', Math.max(12, Math.round(numSize * 0.9)) + 'px');
+      document.documentElement.style.setProperty('--input-font-size', numSize + 'px');
+      if (document.body) {
+        document.body.style.fontSize = Math.max(12, Math.round(numSize * 0.88)) + 'px';
+      }
+
+      const select = document.getElementById('font-size-select');
+      if (select) {
+        let found = false;
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].value === String(numSize)) {
+            select.selectedIndex = i;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = String(numSize);
+          opt.textContent = 'Aa ' + numSize + 'px';
+          opt.selected = true;
+          select.appendChild(opt);
+        }
+      }
+
+      try {
+        localStorage.setItem(FONT_STORAGE_KEY, String(numSize));
+      } catch (e) {}
+
+      if (showNotification) {
+        showToast('🔤 Tamaño general: ' + numSize + 'px');
+      }
+    }
+
+    function adjustFontSize(delta) {
+      let current = 16;
+      try {
+        current = parseInt(localStorage.getItem(FONT_STORAGE_KEY) || '16', 10);
+      } catch (e) {}
+      let next = current + delta;
+      if (next < 13) next = 13;
+      if (next > 26) next = 26;
+      setFontSize(next, true);
+    }
+
+    function initFontSize() {
+      let saved = '16';
+      try {
+        saved = localStorage.getItem(FONT_STORAGE_KEY) || '16';
+      } catch (e) {}
+      setFontSize(saved, false);
+    }
+    initFontSize();
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 2400);
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('btn-act').classList.toggle('active', mode === 'act');
+      document.getElementById('btn-plan').classList.toggle('active', mode === 'plan');
+    }
+
+    function toggleContextDrawer() {
+      document.getElementById('context-drawer').classList.toggle('active');
+    }
+
+    function toggleHistory() {
+      const d = document.getElementById('history-drawer');
+      d.classList.toggle('active');
+      if (d.classList.contains('active')) {
+        renderHistoryList();
+      }
+    }
+
+    let allLocalModels = [];
+    let allFreeAiModels = [];
+    let currentSource = 'local';
+    const SOURCE_STORAGE_KEY = 'antigravity_cline_source';
+
+    function switchAiSource(source, persist = true) {
+      currentSource = source;
+      const btnLocal = document.getElementById('src-local-btn');
+      const btnFree = document.getElementById('src-freeai-btn');
+
+      if (source === 'freeai') {
+        if (btnFree) btnFree.classList.add('active');
+        if (btnLocal) btnLocal.classList.remove('active');
+        populateModelSelect('freeai');
+        const input = document.getElementById('prompt-input');
+        if (input) input.placeholder = "Indica la tarea para Cline usando Free.ai Cloud...";
+        showToast('🌐 Modo Free.ai Cloud activado para Cline');
+      } else {
+        if (btnLocal) btnLocal.classList.add('active');
+        if (btnFree) btnFree.classList.remove('active');
+        populateModelSelect('local');
+        const input = document.getElementById('prompt-input');
+        if (input) input.placeholder = "Indica la tarea para Cline usando tu Modelo Local (Ollama)...";
+        showToast('💻 Modo Modelo Local activado para Cline (Ollama)');
+      }
+
+      if (persist) {
+        try {
+          localStorage.setItem(SOURCE_STORAGE_KEY, source);
+        } catch (e) {}
+      }
+    }
+
+    function populateModelSelect(source) {
+      const select = document.getElementById('model-select');
+      select.innerHTML = '';
+
+      if (source === 'freeai') {
+        if (!allFreeAiModels.length) {
+          select.innerHTML = '<option value="">No hay modelos Free.ai disponibles</option>';
+          return;
+        }
+
+        const featuredOrder = [
+          'freeai:qwen-coder',
+          'freeai:qwen7b',
+          'freeai:deepseek-r1',
+          'freeai:deepseek/deepseek-chat',
+          'freeai:openai/gpt-4o-mini',
+          'freeai:openai/gpt-4o',
+          'freeai:meta-llama/llama-3.3-70b-instruct'
+        ];
+
+        const grpFeatured = document.createElement('optgroup');
+        grpFeatured.label = '⭐ Modelos Recomendados (Coder & Chat)';
+        const added = new Set();
+
+        featuredOrder.forEach(id => {
+          const found = allFreeAiModels.find(m => m.id === id || m.name === id || m.rawId === id.replace('freeai:', ''));
+          if (found) {
+            const opt = document.createElement('option');
+            opt.value = found.id || found.name;
+            opt.dataset.freeai = 'true';
+            opt.textContent = `⭐ ${found.displayName || found.name}`;
+            grpFeatured.appendChild(opt);
+            added.add(found.id || found.name);
+          }
+        });
+        select.appendChild(grpFeatured);
+
+        const grpCode = document.createElement('optgroup');
+        grpCode.label = '💻 Modelos Coder Especializados';
+        const grpChat = document.createElement('optgroup');
+        grpChat.label = '💬 Modelos de Chat & Razonamiento';
+
+        allFreeAiModels
+          .filter(m => !added.has(m.id || m.name))
+          .forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id || m.name;
+            opt.dataset.freeai = 'true';
+            const icon = m.type === 'code' ? '💻' : '💬';
+            opt.textContent = `${icon} ${m.displayName || m.name}`;
+            if (m.type === 'code') grpCode.appendChild(opt);
+            else grpChat.appendChild(opt);
+          });
+
+        if (grpCode.children.length) select.appendChild(grpCode);
+        if (grpChat.children.length) select.appendChild(grpChat);
+
+      } else {
+        // Modo Local (Ollama)
+        if (!allLocalModels.length) {
+          select.innerHTML = '<option value="">No hay modelos Ollama locales detectados</option>';
+          return;
+        }
+
+        const grp = document.createElement('optgroup');
+        grp.label = `💻 Modelos Locales (${allLocalModels.length})`;
+        allLocalModels.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          opt.setAttribute('data-local', 'true');
+          const sizeGb = m.size ? (m.size / (1024 * 1024 * 1024)).toFixed(1) + 'GB' : 'Local';
+          opt.textContent = `⚡ ${m.name} (${sizeGb})`;
+          grp.appendChild(opt);
+        });
+        select.appendChild(grp);
+      }
+
+      // Restaurar modelo previamente seleccionado para esta fuente
+      const savedModelKey = 'antigravity_cline_model_' + source;
+      const savedModel = localStorage.getItem(savedModelKey) || localStorage.getItem('antigravity_cline_model');
+      if (savedModel && Array.from(select.options).some(o => o.value === savedModel)) {
+        select.value = savedModel;
+      } else if (select.options.length > 0) {
+        select.selectedIndex = 0;
+      }
+
+      select.onchange = () => {
+        localStorage.setItem(savedModelKey, select.value);
+        localStorage.setItem('antigravity_cline_model', select.value);
+      };
+    }
+
+    // Cargar modelos de Free.ai y Ollama en el selector de Cline
+    async function loadModels() {
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+
+        allFreeAiModels = data.freeAiModels || (data.models ? data.models.filter(m => m.isFreeAi) : []);
+        allLocalModels = data.localModels || (data.models ? data.models.filter(m => m.isLocal) : []);
+
+        let savedSource = 'local';
+        try {
+          savedSource = localStorage.getItem(SOURCE_STORAGE_KEY) || 'local';
+        } catch (e) {}
+
+        switchAiSource(savedSource, false);
+      } catch (e) {
+        console.error('Error cargando modelos:', e);
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const queryParams = new URLSearchParams(window.location.search);
+        const url = `/api/projects?${queryParams.toString()}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const select = document.getElementById('project-select');
+        select.innerHTML = '';
+
+        let matchedSelected = false;
+
+        // 1. Pinned Conversations
+        if (data.hierarchy && data.hierarchy.pinned && data.hierarchy.pinned.length) {
+          const grpPinned = document.createElement('optgroup');
+          grpPinned.label = '📌 Pinned Conversations';
+          data.hierarchy.pinned.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = 'conv:' + c.id;
+            opt.textContent = `📌 ${c.title} (${c.project || 'General'})`;
+            if (convId && c.id === convId) {
+              opt.selected = true;
+              matchedSelected = true;
+            }
+            grpPinned.appendChild(opt);
+          });
+          select.appendChild(grpPinned);
+        }
+
+        // 2. Projects (con conversaciones anidadas)
+        if (data.hierarchy && data.hierarchy.projects && data.hierarchy.projects.length) {
+          const grpProjects = document.createElement('optgroup');
+          grpProjects.label = '📁 Projects';
+          data.hierarchy.projects.forEach(p => {
+            const optRoot = document.createElement('option');
+            optRoot.value = 'proj:' + p.name;
+            optRoot.textContent = `📁 ${p.name}`;
+            if (!matchedSelected && data.active && !data.active.isGeneral && p.name.toLowerCase() === data.active.name.toLowerCase()) {
+              optRoot.selected = true;
+              matchedSelected = true;
+            }
+            grpProjects.appendChild(optRoot);
+
+            if (p.conversations && p.conversations.length) {
+              p.conversations.forEach(sc => {
+                const optSub = document.createElement('option');
+                optSub.value = 'conv:' + sc.id;
+                optSub.textContent = `  ↳ 💬 ${sc.title}`;
+                if (convId && sc.id === convId) {
+                  optSub.selected = true;
+                  matchedSelected = true;
+                }
+                grpProjects.appendChild(optSub);
+              });
+            }
+          });
+          select.appendChild(grpProjects);
+        }
+
+        // 3. Recent Conversations
+        if (data.hierarchy && data.hierarchy.conversations && data.hierarchy.conversations.length) {
+          const grpConvs = document.createElement('optgroup');
+          grpConvs.label = '💬 Conversations';
+          data.hierarchy.conversations.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = 'conv:' + c.id;
+            opt.textContent = `💬 ${c.title} (${c.project || 'General'})`;
+            if (!matchedSelected && convId && c.id === convId) {
+              opt.selected = true;
+              matchedSelected = true;
+            }
+            grpConvs.appendChild(opt);
+          });
+          select.appendChild(grpConvs);
+        }
+
+        // Fallback si nada coincidió explícitamente:
+        if (!matchedSelected && data.active) {
+          for (let i = 0; i < select.options.length; i++) {
+            const o = select.options[i];
+            if (data.active.convId && o.value === 'conv:' + data.active.convId) {
+              o.selected = true;
+              matchedSelected = true;
+              break;
+            }
+            if (!data.active.isGeneral && o.value === 'proj:' + data.active.name) {
+              o.selected = true;
+              matchedSelected = true;
+              break;
+            }
+          }
+        }
+
+        const currentVal = select.value;
+        const selectedOpt = select.selectedOptions[0];
+        const initialBadge = extractCleanBadge(selectedOpt, data.active);
+        document.getElementById('sync-status').textContent = initialBadge;
+
+        await loadProjectContext(currentVal);
+      } catch (e) {
+        console.error('Error cargando proyectos:', e);
+      }
+    }
+
+    function extractCleanBadge(opt, activeData) {
+      if (opt) {
+        const val = opt.value || '';
+        if (val.startsWith('proj:')) {
+          return val.slice(5).trim();
+        }
+        const text = opt.textContent || '';
+        const match = text.match(/\(([^)]+)\)$/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+        return text.replace(/^[📌📁💬\s↳]+/, '').trim();
+      }
+      if (activeData) {
+        return activeData.isGeneral ? 'General' : activeData.name;
+      }
+      return 'General';
+    }
+
+    async function loadProjectContext(selectedIdentifier) {
+      try {
+        const queryParams = new URLSearchParams(window.location.search);
+        if (selectedIdentifier) {
+          if (selectedIdentifier.startsWith('conv:')) {
+            queryParams.set('conversationId', selectedIdentifier.slice(5));
+            queryParams.delete('project');
+          } else if (selectedIdentifier.startsWith('proj:')) {
+            queryParams.set('project', selectedIdentifier.slice(5));
+            queryParams.delete('conversationId');
+          } else {
+            queryParams.set('project', selectedIdentifier);
+          }
+        }
+
+        const res = await fetch('/api/context?' + queryParams.toString());
+        projectContextData = await res.json();
+
+        if (projectContextData && projectContextData.project) {
+          currentProject = projectContextData.project.name;
+          document.getElementById('ctx-path').textContent = projectContextData.project.path;
+          document.getElementById('ctx-stack').textContent = projectContextData.packageInfo && projectContextData.packageInfo.dependencies.length ? projectContextData.packageInfo.dependencies.slice(0, 5).join(', ') : 'Nativo';
+          
+          if (projectContextData.conversationTitle) {
+            document.getElementById('ctx-task').textContent = projectContextData.conversationTitle;
+          } else if (projectContextData.recentPrompts && projectContextData.recentPrompts.length) {
+            document.getElementById('ctx-task').textContent = projectContextData.recentPrompts[projectContextData.recentPrompts.length - 1].slice(0, 70) + '...';
+          } else {
+            document.getElementById('ctx-task').textContent = 'Continuidad de sesión';
+          }
+
+          if (projectContextData.files) {
+            document.getElementById('ctx-files').textContent = projectContextData.files.join('\n');
+          }
+
+          const select = document.getElementById('project-select');
+          const selectedOpt = select.selectedOptions[0];
+          const badgeText = extractCleanBadge(selectedOpt, projectContextData.project);
+          document.getElementById('sync-status').textContent = badgeText;
+        }
+      } catch (e) {
+        console.error('Error cargando contexto:', e);
+      }
+    }
+
+    async function onProjectChanged() {
+      const select = document.getElementById('project-select');
+      const selected = select.value;
+      if (!selected) return;
+
+      const selectedOpt = select.selectedOptions[0];
+      const badgeName = extractCleanBadge(selectedOpt, null);
+      document.getElementById('sync-status').textContent = badgeName;
+
+      try {
+        let payload = { selection: selected };
+        if (selected.startsWith('conv:')) {
+          payload.conversationId = selected.slice(5);
+        } else if (selected.startsWith('proj:')) {
+          payload.projectName = selected.slice(5);
+        } else {
+          payload.projectName = selected;
+        }
+
+        await fetch('/api/context/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        await loadProjectContext(selected);
+        showToast('📁 Contexto activo: ' + badgeName);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Escuchar cambios de workspace en tiempo real desde Antigravity
+    window.addEventListener('message', async (event) => {
+      if (event.data?.type === 'workspace-change') {
+        await loadProjects();
+      }
+    });
+
+    function clearLogs() {
+      document.getElementById('chat-container').innerHTML = '';
+      currentSessionMessages = [];
+      showToast('Consola limpiada.');
+    }
+
+    function newChat() {
+      saveCurrentSessionToStorage();
+      currentSessionId = 'cline_' + Date.now();
+      currentSessionMessages = [];
+      document.getElementById('chat-container').innerHTML = `
+        <div class="task-bubble">
+          <div class="task-header">✨ Nueva Sesión iniciada (${new Date().toLocaleTimeString()})</div>
+          <div class="task-body">Directorio de trabajo configurado en: ${projectContextData ? projectContextData.project.path : 'Proyecto'}. Escribe tu siguiente orden para Cline.</div>
+          <div class="bubble-actions">
+            <button class="btn-action-small" onclick="copyBubbleText(this)">📋 Copiar</button>
+            <button class="btn-action-small" onclick="ttsSpeakBubble(this)">🔊 Escuchar (TTS)</button>
+          </div>
+        </div>
+      `;
+      showToast('Nueva sesión de Cline iniciada.');
+    }
+
+    function createBubble(promptText, mode, modelName) {
+      const container = document.getElementById('chat-container');
+      const bubble = document.createElement('div');
+      bubble.className = 'task-bubble';
+      bubble.innerHTML = `
+        <div class="task-header">
+          <span>> [${mode.toUpperCase()}] ${promptText.slice(0, 40)}... (${modelName})</span>
+          <span style="font-size: 10px; color: var(--text-muted);">${new Date().toLocaleTimeString()}</span>
+        </div>
+        <div class="task-body">Iniciando ejecución...</div>
+        <div class="bubble-actions">
+          <button class="btn-action-small" onclick="copyBubbleText(this)">📋 Copiar</button>
+          <button class="btn-action-small" onclick="resendPrompt('${escapeForAttr(promptText)}')">🔁 Reenviar</button>
+          <button class="btn-action-small" onclick="ttsSpeakBubble(this)">🔊 Escuchar (TTS)</button>
+        </div>
+      `;
+      container.appendChild(bubble);
+      container.scrollTop = container.scrollHeight;
+      return bubble.querySelector('.task-body');
+    }
+
+    function escapeForAttr(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
+    }
+
+    // Funciones de Acción en Mensajes (Copiar, Reenviar, TTS)
+    function copyBubbleText(btn) {
+      const bubble = btn.closest('.task-bubble');
+      const text = bubble.querySelector('.task-body').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Texto copiado al portapapeles');
+      });
+    }
+
+    function resendPrompt(promptText) {
+      const input = document.getElementById('prompt-input');
+      input.value = promptText;
+      input.focus();
+      showToast('🔁 Instrucción cargada en el cuadro de texto.');
+    }
+
+    function ttsSpeakBubble(btn) {
+      if ('speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 Escuchar (TTS)';
+          return;
+        }
+
+        const bubble = btn.closest('.task-bubble');
+        const text = bubble.querySelector('.task-body').textContent;
+        const cleanText = text.replace(/\[Proyecto:.*?\]/g, '').replace(/─+/g, '').trim();
+
+        const utter = new SpeechSynthesisUtterance(cleanText);
+        utter.lang = 'es-ES';
+        utter.rate = 1.05;
+
+        const voices = window.speechSynthesis.getVoices();
+        const esVoice = voices.find(v => v.lang.startsWith('es'));
+        if (esVoice) utter.voice = esVoice;
+
+        btn.classList.add('speaking');
+        btn.textContent = '⏹️ Detener Voz';
+
+        utter.onend = () => {
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 Escuchar (TTS)';
+        };
+
+        utter.onerror = () => {
+          btn.classList.remove('speaking');
+          btn.textContent = '🔊 Escuchar (TTS)';
+        };
+
+        window.speechSynthesis.speak(utter);
+      } else {
+        showToast('TTS no soportado en este navegador');
+      }
+    }
+
+    // Almacenamiento e Historial de Sesiones
+    function saveCurrentSessionToStorage() {
+      if (!currentSessionMessages.length) return;
+      try {
+        const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const existingIdx = sessions.findIndex(s => s.id === currentSessionId);
+        const item = {
+          id: currentSessionId,
+          project: currentProject || 'General',
+          title: currentSessionMessages[0].prompt.slice(0, 50),
+          time: new Date().toISOString(),
+          messages: currentSessionMessages
+        };
+
+        if (existingIdx >= 0) {
+          sessions[existingIdx] = item;
+        } else {
+          sessions.unshift(item);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(0, 25)));
+      } catch (e) {}
+    }
+
+    function renderHistoryList() {
+      const listEl = document.getElementById('history-list');
+      listEl.innerHTML = '';
+      try {
+        const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if (!sessions.length) {
+          listEl.innerHTML = '<div style="color:var(--text-muted); font-size:11.5px; text-align:center; padding:20px;">Sin sesiones guardadas aún.</div>';
+          return;
+        }
+
+        sessions.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          const dt = new Date(s.time);
+          item.innerHTML = `
+            <div class="history-item-top">
+              <span>📁 ${s.project} • ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+              <button class="btn-del-session" onclick="deleteSession(event, '${s.id}')">🗑️</button>
+            </div>
+            <div class="history-item-title">${s.title}</div>
+            <div style="font-size:10px; color:var(--accent-orange); margin-top:3px;">${s.messages ? s.messages.length : 1} tareas</div>
+          `;
+          item.onclick = () => loadSession(s);
+          listEl.appendChild(item);
+        });
+      } catch (e) {}
+    }
+
+    function loadSession(s) {
+      currentSessionId = s.id;
+      currentSessionMessages = s.messages || [];
+      const container = document.getElementById('chat-container');
+      container.innerHTML = '';
+
+      currentSessionMessages.forEach(m => {
+        const bubble = document.createElement('div');
+        bubble.className = 'task-bubble';
+        bubble.innerHTML = `
+          <div class="task-header">
+            <span>> [${m.mode.toUpperCase()}] ${m.prompt.slice(0, 40)}... (${m.model || 'AI'})</span>
+          </div>
+          <div class="task-body">${m.output}</div>
+          <div class="bubble-actions">
+            <button class="btn-action-small" onclick="copyBubbleText(this)">📋 Copiar</button>
+            <button class="btn-action-small" onclick="resendPrompt('${escapeForAttr(m.prompt)}')">🔁 Reenviar</button>
+            <button class="btn-action-small" onclick="ttsSpeakBubble(this)">🔊 Escuchar (TTS)</button>
+          </div>
+        `;
+        container.appendChild(bubble);
+      });
+      toggleHistory();
+      showToast('Sesión restaurada.');
+    }
+
+    function deleteSession(e, id) {
+      e.stopPropagation();
+      try {
+        let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        sessions = sessions.filter(s => s.id !== id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+        renderHistoryList();
+        showToast('Sesión eliminada.');
+      } catch (err) {}
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        runTask();
+      }
+    }
+
+    function quickTask(text) {
+      document.getElementById('prompt-input').value = text;
+      runTask();
+    }
+
+    async function openDesktopApp() {
+      try {
+        const res = await fetch('/api/open-desktop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: currentProject })
+        });
+        const data = await res.json();
+        showToast('🖥️ Abriendo Cline Desktop en el proyecto.');
+      } catch (e) {
+        showToast('Error abriendo Desktop: ' + e.message);
+      }
+    }
+
+    async function runTask() {
+      if (running) return;
+      const input = document.getElementById('prompt-input');
+      const prompt = input.value.trim();
+      if (!prompt) return;
+
+      const modelSelect = document.getElementById('model-select');
+      const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+      const modelVal = modelSelect.value;
+      const isLocal = selectedOption ? selectedOption.getAttribute('data-local') === 'true' : false;
+      const isFreeAi = modelVal.startsWith('freeai:') || (selectedOption && selectedOption.dataset.freeai === 'true');
+
+      running = true;
+      input.value = '';
+      document.getElementById('run-btn').style.display = 'none';
+      document.getElementById('stop-btn').style.display = 'block';
+      const providerTag = isFreeAi ? '🌐 Free.ai' : (isLocal ? '💻 Ollama Local' : '☁️ Cline Cloud');
+      document.getElementById('agent-status').textContent = `Ejecutando con ${providerTag} (${modelVal || 'Default'})...`;
+
+      const taskBody = createBubble(prompt, currentMode, modelVal || 'Cloud');
+      taskBody.textContent = '';
+      let accumulatedOutput = '';
+
+      try {
+        const res = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            mode: currentMode,
+            project: currentProject,
+            conversationId: convId,
+            model: modelVal,
+            isLocal: isLocal,
+            isFreeAi: isFreeAi
+          })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedOutput += chunk;
+          taskBody.textContent = accumulatedOutput;
+          document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+        }
+
+        currentSessionMessages.push({
+          prompt: prompt,
+          output: accumulatedOutput,
+          mode: currentMode,
+          model: modelVal
+        });
+        saveCurrentSessionToStorage();
+
+      } catch (err) {
+        taskBody.textContent += `\nError ejecutando Cline: ${err.message}`;
+      } finally {
+        running = false;
+        document.getElementById('run-btn').style.display = 'block';
+        document.getElementById('stop-btn').style.display = 'none';
+        document.getElementById('agent-status').textContent = 'Listo';
+      }
+    }
+
+    async function stopTask() {
+      try {
+        await fetch('/api/stop', { method: 'POST' });
+        showToast('Tarea detenida por el usuario.');
+      } catch (e) {}
+    }
+
+    window.addEventListener('load', () => {
+      initFontSize();
+      loadProjects();
+      loadModels();
+    });
+  </script>
+</body>
+</html>

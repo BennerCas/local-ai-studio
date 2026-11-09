@@ -1,0 +1,9 @@
+.env
+.env.*
+*.log
+*.tmp
+*.bak
+.webui_secret_key
+memory/
+__pycache__/
+node_modules/

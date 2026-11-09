@@ -1,0 +1,23 @@
+{
+  "activeProject": "SynthIA",
+  "updatedAt": "2026-11-07T18:40:28.974Z",
+  "explicitFolder": "C:\\antigravityAS\\SynthIA",
+  "selectedFilesMap": {
+    "c:\\antigravityas\\synthia": [
+      "server/index.ts",
+      "package.json",
+      "biblioteca/README.md",
+      "AVANCES_LOCAL_AI.md",
+      "biblioteca/20261104_152139_imagen_portada_ses-bcb85deb.json",
+      "biblioteca/20261104_152208_imagen_portada_ses-e7a5f501.json"
+    ]
+  },
+  "selectedFiles": [
+    "server/index.ts",
+    "package.json",
+    "biblioteca/README.md",
+    "AVANCES_LOCAL_AI.md",
+    "biblioteca/20261104_152139_imagen_portada_ses-bcb85deb.json",
+    "biblioteca/20261104_152208_imagen_portada_ses-e7a5f501.json"
+  ]
+}
