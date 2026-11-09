@@ -87,9 +87,9 @@ async function startOpenWebUIProcess(port) {
     ...process.env,
     DATA_DIR: DATA_DIR,
     OLLAMA_BASE_URL: "http://127.0.0.1:11434",
-    OPENAI_API_BASE_URL: "https://api.free.ai/v1",
+    OPENAI_API_BASE_URL: freeai.getBaseUrl(),
     OPENAI_API_KEY: freeai.getKey(),
-    OPENAI_API_BASE_URLS: "https://api.free.ai/v1",
+    OPENAI_API_BASE_URLS: freeai.getBaseUrl(),
     OPENAI_API_KEYS: freeai.getKey(),
     PORT: String(port),
     WEBUI_AUTH: "False"

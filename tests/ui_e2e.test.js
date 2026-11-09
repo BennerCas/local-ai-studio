@@ -1,4 +1,4 @@
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it, beforeEach, afterEach, after } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const fs = require("node:fs");
@@ -6,8 +6,10 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { chromium } = require("C:/Users/Benner/node_modules/playwright");
+const envLoader = require("../env-loader.js");
 const memoryStore = require("../memory-store.js");
 const hardwareAdvisor = require("../hardware-advisor.js");
+const ttsBridge = require("../tts-bridge.js");
 const { createStudioServer } = require("../sidecars/local_ai_chat/server.js");
 
 let tempRoot = "";
@@ -28,12 +30,36 @@ const ENV_BACKUP_KEYS = [
   "LOCAL_AI_MEMORY_DIR",
   "LOCAL_AI_CONFIG_FILE",
   "LOCAL_AI_BRAIN_DIR",
+  "LOCAL_AI_DISABLE_EXTERNAL_ENV",
+  "LOCAL_AI_EXTERNAL_ENV_PATH",
   "FREEAI_BASE_URL",
   "FREEAI_API_KEY_1",
   "FREE_AI_API_KEY",
   ...hardwareAdvisor.SAFE_AI_ENV_KEYS
 ];
 let savedEnvValues = {};
+let savedSerpEnvValues = {};
+const activeSlowTimers = new Set();
+
+function buildSilentWavBuffer(durationSec = 2, sampleRate = 24000) {
+  const numSamples = Math.max(1, Math.round(durationSec * sampleRate));
+  const dataSize = numSamples * 2;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write("RIFF", 0, 4, "ascii");
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write("WAVE", 8, 4, "ascii");
+  buf.write("fmt ", 12, 4, "ascii");
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20);
+  buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28);
+  buf.writeUInt16LE(2, 32);
+  buf.writeUInt16LE(16, 34);
+  buf.write("data", 36, 4, "ascii");
+  buf.writeUInt32LE(dataSize, 40);
+  return buf;
+}
 
 function listenServer(srv) {
   return new Promise((resolve, reject) => {
@@ -107,6 +133,30 @@ function createMockAiEngineServer() {
             name: "Qwen 2.5 Coder (Free.ai Mock)",
             license: "Apache-2.0",
             type: "chat"
+          },
+          {
+            id: "flux-schnell",
+            name: "Flux Schnell Image",
+            license: "Apache-2.0",
+            type: "image"
+          },
+          {
+            id: "whisper-large-v3",
+            name: "Whisper Large v3",
+            license: "MIT",
+            type: "audio"
+          },
+          {
+            id: "bge-m3-embed",
+            name: "BGE-M3 Embedding",
+            license: "MIT",
+            type: "embedding"
+          },
+          {
+            id: "kokoro-tts",
+            name: "Kokoro TTS Audio",
+            license: "Apache-2.0",
+            type: "tts"
           }
         ]
       }));
@@ -141,6 +191,36 @@ function createMockAiEngineServer() {
         const fullPromptText = messages.map((m) => String(m.content || "")).join("\n");
 
         res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8" });
+
+        if (lastUser.includes("SLOW_STREAM_TEST")) {
+          res.write(JSON.stringify({
+            model: parsed?.model || "qwen2.5-coder:latest",
+            message: { role: "assistant", content: "Fragmento parcial antes de detener. " },
+            done: false
+          }) + "\n");
+          const slowTimer = setTimeout(() => {
+            activeSlowTimers.delete(slowTimer);
+            if (!res.writableEnded) {
+              res.write(JSON.stringify({
+                model: parsed?.model || "qwen2.5-coder:latest",
+                message: { role: "assistant", content: " texto tardio que debe abortarse." },
+                done: false
+              }) + "\n");
+              res.write(JSON.stringify({
+                model: parsed?.model || "qwen2.5-coder:latest",
+                message: { role: "assistant", content: "" },
+                done: true
+              }) + "\n");
+              res.end();
+            }
+          }, 2500);
+          activeSlowTimers.add(slowTimer);
+          req.on("close", () => {
+            clearTimeout(slowTimer);
+            activeSlowTimers.delete(slowTimer);
+          });
+          return;
+        }
 
         if (fullPromptText.includes("DUAL_WRITE_TEST")) {
           const isStage2 = lastUser.includes("<salida_agente_a>");
@@ -279,7 +359,17 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
   beforeEach(async () => {
     savedEnvValues = {};
     for (const k of ENV_BACKUP_KEYS) savedEnvValues[k] = process.env[k];
+    savedSerpEnvValues = {};
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) {
+        savedSerpEnvValues[k] = process.env[k];
+        delete process.env[k];
+      }
+    }
     for (const k of hardwareAdvisor.SAFE_AI_ENV_KEYS) delete process.env[k];
+    process.env.LOCAL_AI_DISABLE_EXTERNAL_ENV = "1";
+    delete process.env.LOCAL_AI_EXTERNAL_ENV_PATH;
+    envLoader.getSerpApiKeyPools();
 
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "local-ai-e2e-"));
     tempProjectsDir = path.join(tempRoot, "projects");
@@ -357,23 +447,41 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
   });
 
   afterEach(async () => {
+    for (const t of activeSlowTimers) {
+      clearTimeout(t);
+    }
+    activeSlowTimers.clear();
+
     if (browser) {
       await browser.close();
       browser = null;
     }
+    await ttsBridge.shutdownTtsWorker();
     await closeServer(studioServer);
     await closeServer(mockEngineServer);
     studioServer = null;
     mockEngineServer = null;
 
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) delete process.env[k];
+    }
     for (const k of ENV_BACKUP_KEYS) {
       if (savedEnvValues[k] === undefined) delete process.env[k];
       else process.env[k] = savedEnvValues[k];
     }
+    for (const [k, v] of Object.entries(savedSerpEnvValues)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    envLoader.getSerpApiKeyPools();
 
     if (tempRoot && fs.existsSync(tempRoot)) {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  after(async () => {
+    await ttsBridge.shutdownTtsWorker();
   });
 
   it("valida layout, SEO, Autoguardado ON, toggles cloud/HF Zero-Silent-Download, Entrar en Contexto, Prompt Maestro, Preview sin escritura y Memoria Persistente", async () => {
@@ -977,6 +1085,409 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     await page.waitForSelector("#history-drawer.active .history-mode-badge");
     const histBadge = await page.textContent("#history-drawer .history-mode-badge");
     assert.match(histBadge, /DUAL \(freeai\+ollama\)/);
+
+    assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
+    assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);
+
+    await context.close();
+  });
+
+  it("valida Búsqueda Web SerpApi UI, citas Single/Dual, Kokoro/Piper 13 voces + speaking, #btn-stop-stream, #btn-dml-restart, runtime warnings HW y filtro isChatCapableModel", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+
+    const consoleErrors = [];
+    const pageErrors = [];
+    const speakRequests = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") consoleErrors.push(msg.text());
+    });
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+
+    await page.route("**/api/integrations/github/repos**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: true, user: { login: "benner-e2e" }, repos: [], detectedRemote: { isGitRepo: false } })
+      });
+    });
+    await page.route("**/api/integrations/netlify/sites**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, configured: true, user: { full_name: "Benner E2E" }, sites: [] })
+      });
+    });
+    await page.route("**/api/integrations/status", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: {
+            githubConfigured: true,
+            netlifyConfigured: true,
+            hfConfigured: true,
+            freeaiConfigured: true,
+            serpApiConfigured: true,
+            serpApiWebKeysCount: 1,
+            serpApiJobsKeysCount: 1
+          },
+          defaultModelsDir: "C:\\antigravityAS\\Modelos -ai-brains"
+        })
+      });
+    });
+    let mockSerpWebUses = 12;
+    await page.route("**/api/integrations/serpapi/usage", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          configured: true,
+          webKeysCount: 1,
+          jobsKeysCount: 1,
+          totalKeysCount: 2,
+          usage: {
+            month: "2026-11",
+            webUses: mockSerpWebUses,
+            webLimit: 250,
+            jobsUses: 3,
+            jobsLimit: 250
+          }
+        })
+      });
+    });
+
+    const silentWav = buildSilentWavBuffer(2.5, 24000);
+    await page.route("**/api/tts/speak", async (route) => {
+      const postRaw = route.request().postData() || "{}";
+      try {
+        speakRequests.push(JSON.parse(postRaw));
+      } catch (_e) {
+        speakRequests.push({ raw: postRaw });
+      }
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "audio/wav",
+          "X-TTS-Engine": "kokoro",
+          "X-TTS-Voice": "es_blend_editorial",
+          "X-TTS-Sample-Rate": "24000"
+        },
+        body: silentWav
+      });
+    });
+
+    await page.goto(studioBaseUrl, { waitUntil: "networkidle" });
+    await page.waitForFunction(() => {
+      const sSel = document.getElementById("skill-select");
+      const mSel = document.getElementById("model-select");
+      const tSel = document.getElementById("tts-voice-select");
+      return sSel && sSel.options.length > 100 && mSel && mSel.value !== "" && tSel && tSel.options.length === 13;
+    });
+
+    // 1. Verificar controles Web Search (#toggle-web-search, #web-search-pill-state, #web-search-mode, #serpapi-usage-badge, #dot-serp)
+    const serpInitial = await page.evaluate(() => ({
+      pillText: document.getElementById("web-search-pill-state")?.textContent?.trim(),
+      pressed: document.getElementById("toggle-web-search")?.getAttribute("aria-pressed"),
+      badgeText: document.getElementById("serpapi-usage-badge")?.textContent?.trim(),
+      dotReady: document.getElementById("dot-serp")?.classList.contains("ready"),
+      modes: Array.from(document.getElementById("web-search-mode")?.options || []).map((o) => o.value)
+    }));
+    assert.equal(serpInitial.pillText, "Web: OFF");
+    assert.equal(serpInitial.pressed, "false");
+    assert.equal(serpInitial.badgeText, "W:12/250 J:3/250");
+    assert.equal(serpInitial.dotReady, true);
+    assert.deepEqual(serpInitial.modes, ["web", "news", "jobs"]);
+
+    await page.click("#toggle-web-search");
+    assert.equal(await page.textContent("#web-search-pill-state"), "Web: ON");
+    assert.equal(await page.getAttribute("#toggle-web-search", "aria-pressed"), "true");
+
+    await page.selectOption("#web-search-mode", "news");
+    assert.equal(await page.inputValue("#web-search-mode"), "news");
+    await page.selectOption("#web-search-mode", "jobs");
+    assert.equal(await page.inputValue("#web-search-mode"), "jobs");
+    await page.selectOption("#web-search-mode", "web");
+
+    // 2. Verificar TTS (#tts-status-badge, #tts-voice-select 13 opciones y persistencia tras recarga)
+    const ttsInfo = await page.evaluate(() => {
+      const badgeText = document.getElementById("tts-status-badge")?.textContent?.trim();
+      const opts = Array.from(document.getElementById("tts-voice-select")?.options || []).map((o) => o.value);
+      return { badgeText, opts };
+    });
+    assert.match(ttsInfo.badgeText, /Kokoro|Piper/);
+    assert.equal(ttsInfo.opts.length, 13, `Esperadas 13 voces TTS, encontradas ${ttsInfo.opts.length}`);
+    for (const expectedVoice of [
+      "ef_dora",
+      "es_blend_editorial",
+      "es_blend_documental",
+      "vits-piper-es_ES-miro-high",
+      "vits-piper-es_ES-carlfm-x_low",
+      "vits-piper-es_ES-sharvard-m",
+      "vits-piper-es_ES-sharvard-f"
+    ]) {
+      assert.ok(ttsInfo.opts.includes(expectedVoice), `Falta voz TTS ${expectedVoice}`);
+    }
+
+    await page.selectOption("#tts-voice-select", "es_blend_editorial");
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem("local_ai_tts_voice_v1")),
+      "es_blend_editorial"
+    );
+
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForFunction(() => document.getElementById("tts-voice-select")?.options.length === 13);
+    assert.equal(await page.inputValue("#tts-voice-select"), "es_blend_editorial");
+
+    // 3. Filtrado isChatCapableModel excluyendo flux / whisper / embedding / tts en Free.ai
+    await page.click("#src-freeai-btn");
+    await page.waitForTimeout(80);
+    const freeAiModelOptions = await page.evaluate(() =>
+      Array.from(document.getElementById("model-select")?.options || []).map((o) => `${o.value} ${o.textContent}`.toLowerCase())
+    );
+    assert.ok(freeAiModelOptions.some((x) => x.includes("qwen-2.5-coder")), "Debe mantener modelo chat qwen-2.5-coder");
+    assert.equal(
+      freeAiModelOptions.some((x) => /\b(flux|whisper|embed|kokoro-tts)\b/.test(x)),
+      false,
+      `No debe mostrar modelos no-chat de Free.ai: ${freeAiModelOptions.join(" | ")}`
+    );
+
+    // 4. Botón #btn-dml-restart visible al seleccionar DirectML online (#src-directml-btn)
+    await page.click("#src-directml-btn");
+    await page.waitForSelector("#btn-dml-restart", { state: "visible" });
+    assert.equal(await page.isVisible("#btn-dml-restart"), true);
+
+    // Volver a Ollama local para flujo single chat
+    await page.click("#src-local-btn");
+    await page.waitForTimeout(80);
+
+    // 5. Chat single con Búsqueda Web ON -> X-Web-Search-Meta -> details.web-citations-box + click [data-msg-act="tts"] .speaking
+    await page.click("#toggle-web-search");
+    assert.equal(await page.textContent("#web-search-pill-state"), "Web: ON");
+
+    let capturedSingleChatPayload = null;
+    await page.route("**/api/chat", async (route) => {
+      capturedSingleChatPayload = JSON.parse(route.request().postData() || "{}");
+      mockSerpWebUses = 13;
+      const metaObj = {
+        ok: true,
+        configured: true,
+        query: "Radeon 860M ROCm",
+        mode: "web",
+        engine: "google",
+        poolUsed: "web",
+        totalResults: 1,
+        results: [
+          {
+            title: "Guía AMD Radeon 860M ROCm",
+            link: "https://rocm.example.com/ryzen-860m",
+            snippet: "Variables OLLAMA_IGPU_ENABLE=1 y HSA_OVERRIDE_GFX_VERSION=11.0.0.",
+            source: "AMD Docs",
+            date: "2026-11-09"
+          }
+        ],
+        usage: { month: "2026-11", webUses: 13, webLimit: 250, jobsUses: 3, jobsLimit: 250 }
+      };
+      const metaB64 = Buffer.from(JSON.stringify(metaObj), "utf8").toString("base64");
+      const ndjsonBody = [
+        JSON.stringify({ model: "qwen2.5-coder:latest", message: { role: "assistant", content: "La Radeon 860M usa RDNA 3.5 con ROCm y DirectML." }, done: false }),
+        JSON.stringify({ model: "qwen2.5-coder:latest", message: { role: "assistant", content: "" }, done: true })
+      ].join("\n") + "\n";
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "application/x-ndjson; charset=utf-8",
+          "X-Web-Search-Meta": metaB64
+        },
+        body: ndjsonBody
+      });
+    });
+
+    await page.fill("#prompt-input", "Explica Radeon 860M ROCm");
+    await page.click("#send-btn");
+    await page.waitForSelector(".message.ai details.web-citations-box");
+    await page.waitForSelector('.message.ai [data-msg-act="tts"]');
+    await page.unroute("**/api/chat");
+
+    assert.equal(capturedSingleChatPayload.webSearchEnabled, true);
+    assert.equal(capturedSingleChatPayload.webSearchMode, "web");
+    const singleCitationText = await page.textContent(".message.ai details.web-citations-box");
+    assert.match(singleCitationText, /1 fuente\(s\)/);
+    assert.match(singleCitationText, /Guía AMD Radeon 860M ROCm/);
+    assert.equal(await page.textContent("#serpapi-usage-badge"), "W:13/250 J:3/250");
+
+    // Click TTS en respuesta AI -> adquiere .speaking -> click para detener -> remueve .speaking
+    await page.click('.message.ai [data-msg-act="tts"]');
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('.message.ai [data-msg-act="tts"]');
+      return btn && btn.classList.contains("speaking") && btn.textContent.includes("Detener");
+    });
+    assert.equal(speakRequests.at(-1)?.voice, "es_blend_editorial");
+    await page.click('.message.ai [data-msg-act="tts"]');
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('.message.ai [data-msg-act="tts"]');
+      return btn && !btn.classList.contains("speaking") && btn.textContent.includes("Leer");
+    });
+
+    const shotDir = process.env.LOCAL_AI_E2E_SCREENSHOT_DIR || tempRoot;
+    await page.screenshot({ path: path.join(shotDir, "desktop_web_tts.png") });
+
+    // 6. Botón #btn-stop-stream durante stream lento (SLOW_STREAM_TEST) conserva respuesta parcial
+    await page.click("#toggle-web-search");
+    assert.equal(await page.textContent("#web-search-pill-state"), "Web: OFF");
+
+    await page.fill("#prompt-input", "SLOW_STREAM_TEST abortar flujo largo");
+    await page.click("#send-btn");
+    await page.waitForSelector("#btn-stop-stream", { state: "visible" });
+    await page.waitForFunction(() => {
+      const msgs = document.querySelectorAll("#chat-container .message.ai");
+      const last = msgs[msgs.length - 1];
+      return last && last.textContent.includes("Fragmento parcial antes de detener.");
+    });
+
+    await page.click("#btn-stop-stream");
+    await page.waitForFunction(() => {
+      const msgs = document.querySelectorAll("#chat-container .message.ai");
+      const last = msgs[msgs.length - 1];
+      const stopBtn = document.getElementById("btn-stop-stream");
+      const sendEl = document.getElementById("send-btn");
+      return last
+        && last.textContent.includes("⏹️ Respuesta detenida por el usuario")
+        && stopBtn
+        && getComputedStyle(stopBtn).display === "none"
+        && sendEl
+        && !sendEl.disabled;
+    });
+    const abortedText = await page.evaluate(() => {
+      const msgs = document.querySelectorAll("#chat-container .message.ai");
+      return msgs[msgs.length - 1]?.textContent || "";
+    });
+    assert.match(abortedText, /Fragmento parcial antes de detener\./);
+    assert.equal(abortedText.includes("texto tardio"), false);
+
+    // 7. Hardware Advisor runtime note + auto-checks + Dual web_search citations + [data-dual-pane-act="tts"] .speaking
+    await page.route("**/api/system/hardware-evaluate", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          telemetry: {
+            cpu: { name: "AMD Ryzen AI 7 350", cores: 8, logicalThreads: 16 },
+            gpu: { name: "AMD Radeon(TM) 860M Graphics" },
+            ram: { totalGb: 29.66, freeGb: 8.5 },
+            env: {
+              effective: {
+                OLLAMA_IGPU_ENABLE: "1",
+                OLIVE_GPU_MEMORY_LIMIT: "12"
+              }
+            }
+          },
+          evaluation: {
+            riskLevel: "caution",
+            freeRamGb: 8.5,
+            estimatedPeakLocalGb: 6.2,
+            psGpuRatio: 0,
+            ollamaRunningOnCpu: true,
+            requiresOllamaRestart: true,
+            requiresDirectmlRestart: true,
+            warnings: ["Ollama corriendo en CPU"],
+            recommendations: ["Reinicia Ollama y DirectML tras aplicar tuning."],
+            agentA: { isCloud: true, totalGb: 0, weightGb: 0 },
+            agentB: { isCloud: false, totalGb: 4.5, weightGb: 4.0 }
+          }
+        })
+      });
+    });
+
+    await page.click("#btn-dual-mode");
+    await page.waitForSelector("#dual-config-panel.active");
+    await page.waitForSelector("#dual-hw-runtime-note", { state: "visible" });
+    const runtimeNoteText = await page.textContent("#dual-hw-runtime-note");
+    assert.match(runtimeNoteText, /Ollama detectado corriendo en CPU \(0% en GPU\)/);
+    assert.match(runtimeNoteText, /Límite\/hilos DirectML actualizados/);
+    assert.match(await page.textContent("#dual-hw-summary"), /GPUps=0%/);
+    assert.equal(await page.isChecked("#dual-restart-ollama-check"), true);
+    assert.equal(await page.isChecked("#dual-restart-directml-check"), true);
+
+    await page.click("#btn-dual-close-panel");
+    await page.waitForFunction(() => !document.getElementById("dual-config-panel").classList.contains("active"));
+
+    // Reactivar Web: ON y enviar Dual turn mockeando /api/chat/dual con evento web_search
+    await page.click("#toggle-web-search");
+    assert.equal(await page.textContent("#web-search-pill-state"), "Web: ON");
+
+    await page.route("**/api/chat/dual", async (route) => {
+      mockSerpWebUses = 14;
+      const dualEvents = [
+        {
+          type: "dual_preflight",
+          pair: "freeai+ollama",
+          workflow: "pipeline",
+          requestedWorkflow: "pipeline",
+          downgradedFromParallel: false
+        },
+        {
+          type: "web_search",
+          ok: true,
+          configured: true,
+          query: "DirectML vs ROCm",
+          mode: "web",
+          engine: "google",
+          poolUsed: "web",
+          totalResults: 1,
+          results: [
+            {
+              title: "Comparativa DirectML vs ROCm",
+              link: "https://bench.example.com/dml-rocm",
+              snippet: "Resultados verificados en Radeon 860M.",
+              source: "BenchHub"
+            }
+          ],
+          usage: { month: "2026-11", webUses: 14, webLimit: 250, jobsUses: 3, jobsLimit: 250 }
+        },
+        { type: "agent_start", agent: "A", stage: 1, stageLabel: "Propuesta Inicial", source: "freeai", model: "qwen-2.5-coder", roleLabel: "Arquitecto" },
+        { type: "agent_chunk", agent: "A", stage: 1, delta: "Propuesta inicial de Agente A basada en búsqueda web." },
+        { type: "agent_done", agent: "A", stage: 1, source: "freeai", model: "qwen-2.5-coder", elapsedMs: 120, text: "Propuesta inicial de Agente A basada en búsqueda web." },
+        { type: "agent_start", agent: "B", stage: 2, stageLabel: "Auditoría", source: "ollama", model: "qwen2.5-coder:latest", roleLabel: "Auditor" },
+        { type: "agent_chunk", agent: "B", stage: 2, delta: "Auditoría verificada de Agente B." },
+        { type: "agent_done", agent: "B", stage: 2, source: "ollama", model: "qwen2.5-coder:latest", elapsedMs: 140, text: "Auditoría verificada de Agente B." },
+        { type: "dual_done", pair: "freeai+ollama", workflow: "pipeline", requestedWorkflow: "pipeline", elapsedMs: 260, partialFailure: false }
+      ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+
+      await route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+        body: dualEvents
+      });
+    });
+
+    await page.fill("#prompt-input", "Analiza Dual con búsqueda web");
+    await page.click("#send-btn");
+    await page.waitForSelector(".dual-turn-wrap .dual-turn-notices details.web-citations-box");
+    await page.waitForSelector('.dual-agent-pane[data-agent-slot="A"] [data-dual-pane-act="tts"]');
+    await page.waitForFunction(() => document.getElementById("serpapi-usage-badge")?.textContent?.trim() === "W:14/250 J:3/250");
+    await page.unroute("**/api/chat/dual");
+
+    const dualCitationText = await page.textContent(".dual-turn-wrap .dual-turn-notices details.web-citations-box");
+    assert.match(dualCitationText, /Comparativa DirectML vs ROCm/);
+    assert.equal(await page.textContent("#serpapi-usage-badge"), "W:14/250 J:3/250");
+
+    await page.click('.dual-agent-pane[data-agent-slot="A"] [data-dual-pane-act="tts"]');
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('.dual-agent-pane[data-agent-slot="A"] [data-dual-pane-act="tts"]');
+      return btn && btn.classList.contains("speaking") && btn.textContent.includes("Detener");
+    });
+    await page.click('.dual-agent-pane[data-agent-slot="A"] [data-dual-pane-act="tts"]');
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('.dual-agent-pane[data-agent-slot="A"] [data-dual-pane-act="tts"]');
+      return btn && !btn.classList.contains("speaking");
+    });
+
+    const finalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(finalOverflow <= 1, `Desborde horizontal en desktop Web+TTS: ${finalOverflow}`);
 
     assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
     assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);

@@ -38,8 +38,40 @@ function getBaseUrl() {
   return normalized || DEFAULT_FREEAI_BASE_URL;
 }
 
+function sanitizeFreeAiError(input, extraSecrets = []) {
+  let text = "";
+  if (input instanceof Error) {
+    text = input.message || String(input);
+  } else if (typeof input === "string") {
+    text = input;
+  } else if (input !== undefined && input !== null) {
+    try {
+      text = JSON.stringify(input);
+    } catch (_e) {
+      text = String(input);
+    }
+  }
+  const secrets = [...getApiKeys(), ...(Array.isArray(extraSecrets) ? extraSecrets : [])]
+    .filter((s) => typeof s === "string" && s.trim().length >= 4);
+  for (const secret of secrets) {
+    const clean = secret.trim();
+    if (text.includes(clean)) {
+      text = text.split(clean).join("[REDACTED]");
+    }
+  }
+  text = text
+    .replace(/(Bearer\s+)[^\s"',;]+/gi, "$1[REDACTED]")
+    .replace(/([?&](?:api_key|key|token)=)[^&\s"'#]+/gi, "$1[REDACTED]")
+    .replace(/\bfreeai[_-][A-Za-z0-9_-]{6,}\b/gi, "[REDACTED]")
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]");
+  return text || "Error interno de Free.ai";
+}
+
 function getHttpClient(targetUrl) {
   const parsed = new URL(targetUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Protocolo no permitido para Free.ai: ${parsed.protocol}`);
+  }
   return {
     client: parsed.protocol === "http:" ? http : https,
     url: parsed
@@ -75,22 +107,31 @@ function fetchModels() {
 
     const key = getKey();
     const targetUrl = `${baseUrl}/models`;
-    const { client } = getHttpClient(targetUrl);
+    let client;
+    try {
+      ({ client } = getHttpClient(targetUrl));
+    } catch (urlErr) {
+      return reject(new Error(sanitizeFreeAiError(urlErr)));
+    }
 
     const req = client.get(targetUrl, {
       headers: {
-        "Authorization": `Bearer ${key}`,
+        ...(key ? { "Authorization": `Bearer ${key}` } : {}),
         "User-Agent": "Antigravity/1.0"
       },
       timeout: 8000
     }, (res) => {
       let data = "";
       res.on("data", (c) => { data += c; });
+      res.on("error", (err) => {
+        rotateKey();
+        reject(new Error(sanitizeFreeAiError(err)));
+      });
       res.on("end", () => {
         try {
           if (res.statusCode !== 200) {
             rotateKey();
-            return reject(new Error(`Free.ai API returned status ${res.statusCode}: ${data}`));
+            return reject(new Error(sanitizeFreeAiError(`Free.ai API returned status ${res.statusCode}: ${data}`)));
           }
           const parsed = JSON.parse(data);
           const rawModels = parsed.models || parsed.data || [];
@@ -116,14 +157,14 @@ function fetchModels() {
           lastFetchTime = now;
           resolve(formatted);
         } catch (e) {
-          reject(e);
+          reject(new Error(sanitizeFreeAiError(e)));
         }
       });
     });
 
     req.on("error", (err) => {
       rotateKey();
-      reject(err);
+      reject(new Error(sanitizeFreeAiError(err)));
     });
 
     req.on("timeout", () => {
@@ -134,12 +175,22 @@ function fetchModels() {
   });
 }
 
-function streamChat(payload, res, systemPrompt = null) {
+function streamChat(payload, res, systemPrompt = null, options = {}) {
   return new Promise((resolve, reject) => {
     const key = getKey();
     const baseUrl = getBaseUrl();
     const targetUrl = `${baseUrl}/chat/completions`;
-    const { client } = getHttpClient(targetUrl);
+    let client;
+    try {
+      ({ client } = getHttpClient(targetUrl));
+    } catch (urlErr) {
+      const safeMsg = sanitizeFreeAiError(urlErr);
+      if (!res.headersSent && !res.writableEnded) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: safeMsg }));
+      }
+      return reject(new Error(safeMsg));
+    }
 
     let model = payload.model || "qwen7b";
     if (model.startsWith("freeai:")) {
@@ -166,94 +217,205 @@ function streamChat(payload, res, systemPrompt = null) {
       max_tokens: payload.max_tokens || 4096
     });
 
-    const req = client.request(targetUrl, {
+    const signal = options && options.signal ? options.signal : null;
+    let settled = false;
+    let aborted = false;
+    let req = null;
+    let upstreamRes = null;
+
+    function cleanup() {
+      if (typeof res.off === "function") {
+        res.off("close", onClientClose);
+      } else if (typeof res.removeListener === "function") {
+        res.removeListener("close", onClientClose);
+      }
+      if (signal && typeof signal.removeEventListener === "function") {
+        signal.removeEventListener("abort", onSignalAbort);
+      }
+    }
+
+    function abortStream(reason = "Conexión cerrada por el cliente") {
+      if (settled) return;
+      aborted = true;
+      settled = true;
+      cleanup();
+      try { if (upstreamRes) upstreamRes.destroy(); } catch (_e) {}
+      try { if (req) req.destroy(); } catch (_e) {}
+      const err = new Error(sanitizeFreeAiError(reason));
+      err.aborted = true;
+      reject(err);
+    }
+
+    function onClientClose() {
+      if (!res.writableEnded) {
+        abortStream("Conexión cerrada por el cliente");
+      }
+    }
+
+    function onSignalAbort() {
+      abortStream("Petición abortada por señal");
+    }
+
+    if (signal && signal.aborted) {
+      return abortStream("Petición abortada por señal");
+    }
+
+    res.on("close", onClientClose);
+    if (signal && typeof signal.addEventListener === "function") {
+      signal.addEventListener("abort", onSignalAbort, { once: true });
+    }
+
+    req = client.request(targetUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${key}`,
+        ...(key ? { "Authorization": `Bearer ${key}` } : {}),
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(bodyData, "utf8"),
         "User-Agent": "Antigravity/1.0"
       },
       timeout: 45000
     }, (proxyRes) => {
+      upstreamRes = proxyRes;
+      if (aborted) {
+        try { proxyRes.destroy(); } catch (_e) {}
+        return;
+      }
+
       if (proxyRes.statusCode !== 200) {
         let errData = "";
         proxyRes.on("data", (c) => { errData += c; });
-        proxyRes.on("end", () => {
-          rotateKey();
-          if (!res.headersSent) {
-            res.writeHead(proxyRes.statusCode, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "Free.ai error: " + errData }));
+        proxyRes.on("error", (err) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          const safeErr = sanitizeFreeAiError(err);
+          if (!res.headersSent && !res.writableEnded) {
+            res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: `Free.ai error: ${safeErr}` }));
           }
-          reject(new Error(errData));
+          reject(new Error(safeErr));
+        });
+        proxyRes.on("end", () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          rotateKey();
+          const safeErrData = sanitizeFreeAiError(errData);
+          if (!res.headersSent && !res.writableEnded) {
+            res.writeHead(proxyRes.statusCode, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: "Free.ai error: " + safeErrData }));
+          }
+          reject(new Error(safeErrData));
         });
         return;
       }
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*"
-      });
+      const extraHeaders = (options && options.extraHeaders && typeof options.extraHeaders === "object")
+        ? options.extraHeaders
+        : {};
+      if (!res.headersSent && !res.writableEnded) {
+        res.writeHead(200, {
+          ...extraHeaders,
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "Access-Control-Allow-Origin": "*"
+        });
+      }
 
       let buffer = "";
 
+      function emitSseLine(rawLine) {
+        if (aborted || res.writableEnded) return;
+        const trimmed = String(rawLine || "").trim();
+        if (!trimmed || trimmed.startsWith(":")) return;
+
+        if (trimmed === "data: [DONE]") {
+          res.write(JSON.stringify({
+            model,
+            message: { role: "assistant", content: "" },
+            done: true
+          }) + "\n");
+          return;
+        }
+
+        if (trimmed.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            const delta = data.choices && data.choices[0] && data.choices[0].delta;
+            if (delta && delta.content) {
+              res.write(JSON.stringify({
+                model,
+                message: { role: "assistant", content: delta.content },
+                done: false
+              }) + "\n");
+            }
+          } catch (_e) {}
+        }
+      }
+
       proxyRes.on("data", (chunk) => {
+        if (aborted || res.writableEnded) return;
         buffer += chunk.toString("utf-8");
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith(":")) continue;
-
-          if (trimmed === "data: [DONE]") {
-            res.write(JSON.stringify({
-              model,
-              message: { role: "assistant", content: "" },
-              done: true
-            }) + "\n");
-            continue;
-          }
-
-          if (trimmed.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(trimmed.slice(6));
-              const delta = data.choices && data.choices[0] && data.choices[0].delta;
-              if (delta && delta.content) {
-                res.write(JSON.stringify({
-                  model,
-                  message: { role: "assistant", content: delta.content },
-                  done: false
-                }) + "\n");
-              }
-            } catch (e) {}
-          }
+          emitSseLine(line);
         }
       });
 
       proxyRes.on("end", () => {
-        res.end();
+        if (settled) return;
+        if (buffer.trim()) {
+          emitSseLine(buffer);
+          buffer = "";
+        }
+        settled = true;
+        cleanup();
+        if (!aborted && !res.writableEnded) {
+          res.end();
+        }
         resolve();
+      });
+
+      proxyRes.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        const safeErr = sanitizeFreeAiError(err);
+        if (!res.writableEnded) {
+          res.end();
+        }
+        reject(new Error(safeErr));
       });
     });
 
     req.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       rotateKey();
-      if (!res.headersSent) {
-        res.writeHead(502, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Error conectando con Free.ai: " + err.message }));
+      const safeErr = sanitizeFreeAiError(err);
+      if (!aborted && !res.headersSent && !res.writableEnded) {
+        res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "Error conectando con Free.ai: " + safeErr }));
+      } else if (!aborted && !res.writableEnded) {
+        res.end();
       }
-      reject(err);
+      reject(new Error(safeErr));
     });
 
     req.on("timeout", () => {
-      req.destroy();
+      if (settled) return;
+      try { req.destroy(); } catch (_e) {}
+      settled = true;
+      cleanup();
       rotateKey();
-      if (!res.headersSent) {
-        res.writeHead(504, { "Content-Type": "application/json" });
+      if (!aborted && !res.headersSent && !res.writableEnded) {
+        res.writeHead(504, { "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({ error: "Timeout en petición a Free.ai" }));
+      } else if (!aborted && !res.writableEnded) {
+        res.end();
       }
       reject(new Error("Timeout en petición a Free.ai"));
     });
@@ -270,5 +432,6 @@ module.exports = {
   rotateKey,
   getBaseUrl,
   getApiKeys,
+  sanitizeFreeAiError,
   API_KEYS
 };

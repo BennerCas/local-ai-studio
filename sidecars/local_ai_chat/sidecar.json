@@ -3,12 +3,12 @@
     "server.js"
   ],
   "command": "node",
-  "description": "Chat de Asistente IA Local (Ollama / LiteRT) en modo estable para trabajo sin límite de cuota.",
-  "display_name": "Local AI Chat (Ollama / LiteRT)",
+  "description": "Chat de Asistente IA Local (Ollama / DirectML / Free.ai) en modo estable para trabajo sin límite de cuota.",
+  "display_name": "Local AI Chat (Ollama / DirectML / Free.ai)",
   "has_web_ui": true,
   "restart_policy": "always",
   "ui_config": {
-    "display_name": "Local AI Chat (Ollama / LiteRT)",
+    "display_name": "Local AI Chat (Ollama / DirectML / Free.ai)",
     "views": [
       {
         "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",

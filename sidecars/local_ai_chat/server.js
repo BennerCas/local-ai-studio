@@ -14,6 +14,7 @@ const skillsBridge = require("../../skills-bridge.js");
 const freeai = require("../../freeai-bridge.js");
 const integrations = require("../../integrations-bridge.js");
 const hardwareAdvisor = require("../../hardware-advisor.js");
+const ttsBridge = require("../../tts-bridge.js");
 
 const DEFAULT_PORT = 63719;
 const DEFAULT_OLLAMA_HOST = "127.0.0.1";
@@ -383,13 +384,19 @@ function pickDefaultModelForSource(catalog, source) {
   return (firstLocal && (firstLocal.name || firstLocal.model)) || "";
 }
 
-function flattenHistoryMessagesForDual(rawMessages) {
+function flattenHistoryMessagesForDual(rawMessages, options = {}) {
+  const preserveSystem = Boolean(options && options.preserveSystem);
   const list = Array.isArray(rawMessages) ? rawMessages : [];
   const out = [];
   for (const raw of list) {
     if (!raw || typeof raw !== "object") continue;
     const role = String(raw.role || "user").trim();
-    if (role === "system") continue;
+    if (role === "system") {
+      if (preserveSystem) {
+        out.push({ role: "system", content: String(raw.content ?? "") });
+      }
+      continue;
+    }
     if (role === "assistant_dual") {
       const parts = [];
       const aData = raw.dual && raw.dual.agentA;
@@ -412,6 +419,113 @@ function flattenHistoryMessagesForDual(rawMessages) {
     out.push({ role: cleanRole, content: String(raw.content ?? "") });
   }
   return out;
+}
+
+function extractLastUserQuery(rawMessages) {
+  const list = Array.isArray(rawMessages) ? rawMessages : [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const msg = list[i];
+    if (!msg || msg.role !== "user") continue;
+    const text = String(msg.content ?? "").replace(/\s+/g, " ").trim();
+    if (text) return text.slice(0, 220);
+  }
+  return "";
+}
+
+function buildCompactWebSearchMeta(searchRes = {}) {
+  const rawResults = Array.isArray(searchRes.results) ? searchRes.results : [];
+  return {
+    ok: Boolean(searchRes.ok),
+    configured: Boolean(searchRes.configured),
+    query: String(searchRes.query || "").slice(0, 160),
+    mode: String(searchRes.mode || "web"),
+    engine: String(searchRes.engine || "google"),
+    poolUsed: searchRes.poolUsed || null,
+    totalResults: Number(searchRes.totalResults || rawResults.length || 0),
+    results: rawResults.slice(0, 5).map((r) => ({
+      title: String((r && r.title) || "").slice(0, 140),
+      link: String((r && r.link) || ""),
+      snippet: String((r && r.snippet) || "").slice(0, 180),
+      source: String((r && r.source) || "").slice(0, 60),
+      date: String((r && r.date) || "").slice(0, 40)
+    })),
+    usage: searchRes.usage || null,
+    ...(searchRes.error ? { error: safeErrMsg(searchRes.error).slice(0, 200) } : {})
+  };
+}
+
+function encodeWebSearchMetaHeader(meta) {
+  const clone = {
+    ...meta,
+    results: Array.isArray(meta.results) ? meta.results.map((r) => ({ ...r })) : []
+  };
+  let encoded = Buffer.from(JSON.stringify(clone), "utf8").toString("base64");
+  if (encoded.length <= 7168) return encoded;
+  clone.results = clone.results.map((r) => ({ ...r, snippet: String(r.snippet || "").slice(0, 60) }));
+  encoded = Buffer.from(JSON.stringify(clone), "utf8").toString("base64");
+  while (encoded.length > 7168 && clone.results.length > 0) {
+    clone.results.pop();
+    encoded = Buffer.from(JSON.stringify(clone), "utf8").toString("base64");
+  }
+  return encoded;
+}
+
+async function runWebSearchForChat(payload, messagesList) {
+  if (!payload || payload.webSearchEnabled !== true) {
+    return null;
+  }
+  const explicitQuery = typeof payload.webSearchQuery === "string" ? payload.webSearchQuery.trim() : "";
+  const queryText = (explicitQuery || extractLastUserQuery(messagesList)).slice(0, 220);
+  const mode = String(payload.webSearchMode || "web").trim().toLowerCase() || "web";
+  if (!queryText) {
+    const meta = buildCompactWebSearchMeta({
+      ok: false,
+      configured: Boolean(envLoader.getEnvStatus().serpApiConfigured),
+      query: "",
+      mode,
+      totalResults: 0,
+      results: [],
+      error: "No se detectó consulta de usuario para búsqueda web."
+    });
+    return {
+      meta,
+      headerValue: encodeWebSearchMetaHeader(meta),
+      contextSuffix: ""
+    };
+  }
+
+  try {
+    const searchRes = await integrations.searchWebSerpApi({
+      query: queryText,
+      mode,
+      pool: payload.webSearchPool || "auto",
+      num: payload.webSearchNum || 5
+    });
+    const meta = buildCompactWebSearchMeta(searchRes);
+    const contextSuffix = (searchRes.ok && searchRes.contextBlock)
+      ? `\n\n${searchRes.contextBlock}\n[Instrucción: Utiliza la información anterior si es relevante y cita explícitamente las fuentes con su título y URL exacta.]`
+      : "";
+    return {
+      meta,
+      headerValue: encodeWebSearchMetaHeader(meta),
+      contextSuffix
+    };
+  } catch (err) {
+    const meta = buildCompactWebSearchMeta({
+      ok: false,
+      configured: Boolean(envLoader.getEnvStatus().serpApiConfigured),
+      query: queryText,
+      mode,
+      totalResults: 0,
+      results: [],
+      error: safeErrMsg(err)
+    });
+    return {
+      meta,
+      headerValue: encodeWebSearchMetaHeader(meta),
+      contextSuffix: ""
+    };
+  }
 }
 
 function createStudioServer(options = {}) {
@@ -777,6 +891,13 @@ function createStudioServer(options = {}) {
           status: "ready"
         },
         {
+          id: "Llama-3.2-3B-ONNX-DirectML",
+          displayName: "Llama-3.2-3B-Instruct (INT4 DirectML)",
+          size: "2.3 GB",
+          active: false,
+          status: "ready"
+        },
+        {
           id: "Hermes-3-8B-UNLOCKED-ONNX-DirectML",
           displayName: "Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)",
           size: "8.5 GB",
@@ -826,8 +947,11 @@ function createStudioServer(options = {}) {
     }
   }
 
-  function proxyToDirectML(reqPath, method, postData, res) {
+  function proxyToDirectML(reqPath, method, postData, res, options = {}) {
     const postBuffer = Buffer.from(postData || "", "utf8");
+    const extraHeaders = (options && options.extraHeaders && typeof options.extraHeaders === "object")
+      ? options.extraHeaders
+      : {};
     const reqOptions = {
       hostname: config.directmlHost,
       port: config.directmlPort,
@@ -837,12 +961,14 @@ function createStudioServer(options = {}) {
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
         "Content-Length": postBuffer.length
-      }
+      },
+      timeout: 180000
     };
 
     const proxyReq = http.request(reqOptions, (proxyRes) => {
       if (!res.headersSent) {
         res.writeHead(proxyRes.statusCode, {
+          ...extraHeaders,
           "Content-Type": proxyRes.headers["content-type"] || "text/event-stream; charset=utf-8",
           "Access-Control-Allow-Origin": "*",
           "Cache-Control": "no-cache",
@@ -869,6 +995,18 @@ function createStudioServer(options = {}) {
       }
     });
 
+    proxyReq.on("timeout", () => {
+      try { proxyReq.destroy(); } catch (_e) {}
+      if (!res.headersSent) {
+        sendJson(res, 504, {
+          ok: false,
+          error: `Timeout conectando con DirectML en http://${config.directmlHost}:${config.directmlPort}.`
+        });
+      } else if (!res.writableEnded) {
+        res.end();
+      }
+    });
+
     proxyReq.on("error", (err) => {
       if (!res.headersSent) {
         sendJson(res, 502, {
@@ -887,8 +1025,11 @@ function createStudioServer(options = {}) {
     proxyReq.end();
   }
 
-  function proxyToOllama(reqPath, method, postData, res) {
+  function proxyToOllama(reqPath, method, postData, res, options = {}) {
     const postBuffer = Buffer.from(postData || "", "utf8");
+    const extraHeaders = (options && options.extraHeaders && typeof options.extraHeaders === "object")
+      ? options.extraHeaders
+      : {};
     const reqOptions = {
       hostname: config.ollamaHost,
       port: config.ollamaPort,
@@ -897,22 +1038,39 @@ function createStudioServer(options = {}) {
       headers: {
         "Content-Type": "application/json",
         "Content-Length": postBuffer.length
-      }
+      },
+      timeout: 180000
     };
 
     const proxyReq = http.request(reqOptions, (proxyRes) => {
       if (!res.headersSent) {
         res.writeHead(proxyRes.statusCode, {
+          ...extraHeaders,
           "Content-Type": proxyRes.headers["content-type"] || "application/json; charset=utf-8",
           "Access-Control-Allow-Origin": "*"
         });
       }
+      proxyRes.on("error", () => {
+        if (!res.writableEnded) res.end();
+      });
       proxyRes.pipe(res);
     });
 
     res.on("close", () => {
       if (!res.writableEnded) {
         try { proxyReq.destroy(); } catch (_e) {}
+      }
+    });
+
+    proxyReq.on("timeout", () => {
+      try { proxyReq.destroy(); } catch (_e) {}
+      if (!res.headersSent) {
+        sendJson(res, 504, {
+          ok: false,
+          error: `Timeout conectando con Ollama en http://${config.ollamaHost}:${config.ollamaPort}.`
+        });
+      } else if (!res.writableEnded) {
+        res.end();
       }
     });
 
@@ -934,11 +1092,22 @@ function createStudioServer(options = {}) {
     proxyReq.end();
   }
 
-  async function streamEngineCompletion({ engine, model, messages: providedMessages, systemPrompt, userPrompt, payload = {} }, onToken) {
+  async function streamEngineCompletion({ engine, model, messages: providedMessages, systemPrompt, userPrompt, payload = {}, signal = null }, onToken) {
+    if (signal && signal.aborted) {
+      const abortErr = new Error("Conexión cerrada por el cliente");
+      abortErr.aborted = true;
+      throw abortErr;
+    }
+
     if (engine === "directml") {
       const alive = await checkDirectMLAlive();
       if (!alive && config.autoStartDirectML) {
         await startDirectMLServer();
+      }
+      if (signal && signal.aborted) {
+        const abortErr = new Error("Conexión cerrada por el cliente");
+        abortErr.aborted = true;
+        throw abortErr;
       }
     }
 
@@ -956,22 +1125,51 @@ function createStudioServer(options = {}) {
       let settled = false;
       let accumulated = "";
       let buffer = "";
+      let activeReq = null;
+      let activeUpstreamRes = null;
+
+      function onAbort() {
+        try { if (activeUpstreamRes) activeUpstreamRes.destroy(); } catch (_e) {}
+        try { if (activeReq) activeReq.destroy(); } catch (_e) {}
+        doneReject("Conexión cerrada por el cliente", true);
+      }
+
+      function cleanup() {
+        if (signal && typeof signal.removeEventListener === "function") {
+          signal.removeEventListener("abort", onAbort);
+        }
+      }
+
+      if (signal && typeof signal.addEventListener === "function") {
+        if (signal.aborted) {
+          const abortErr = new Error("Conexión cerrada por el cliente");
+          abortErr.aborted = true;
+          abortErr.partialText = accumulated;
+          reject(abortErr);
+          return;
+        }
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
 
       function doneResolve() {
         if (settled) return;
         settled = true;
+        cleanup();
         resolve({ text: accumulated, model });
       }
 
-      function doneReject(reason) {
+      function doneReject(reason, isAborted = false) {
         if (settled) return;
         settled = true;
+        cleanup();
         const err = new Error(safeErrMsg(reason));
         err.partialText = accumulated;
+        if (isAborted) err.aborted = true;
         reject(err);
       }
 
       function processSseLine(line) {
+        if (settled) return;
         const trimmed = String(line || "").trim();
         if (!trimmed || trimmed.startsWith(":") || trimmed === "data: [DONE]") return;
         const rawJson = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
@@ -1027,9 +1225,15 @@ function createStudioServer(options = {}) {
           },
           timeout: 90000
         }, (upstreamRes) => {
+          activeUpstreamRes = upstreamRes;
+          if (settled) {
+            try { upstreamRes.destroy(); } catch (_e) {}
+            return;
+          }
           if (upstreamRes.statusCode !== 200) {
             let errBody = "";
             upstreamRes.on("data", (c) => { errBody += c; });
+            upstreamRes.on("error", (err) => doneReject(err.message));
             upstreamRes.on("end", () => {
               if (typeof freeai.rotateKey === "function") freeai.rotateKey();
               doneReject(`Free.ai HTTP ${upstreamRes.statusCode}${errBody ? `: ${errBody.slice(0, 200)}` : ""}`);
@@ -1039,6 +1243,7 @@ function createStudioServer(options = {}) {
 
           upstreamRes.setEncoding("utf8");
           upstreamRes.on("data", (chunk) => {
+            if (settled) return;
             buffer += chunk;
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || "";
@@ -1055,13 +1260,15 @@ function createStudioServer(options = {}) {
           });
           upstreamRes.on("error", (err) => doneReject(err.message));
         });
+        activeReq = req;
 
         req.on("error", (err) => {
+          if (settled) return;
           if (typeof freeai.rotateKey === "function") freeai.rotateKey();
           doneReject(`Free.ai offline (${err.message})`);
         });
         req.on("timeout", () => {
-          req.destroy();
+          try { req.destroy(); } catch (_e) {}
           doneReject("Timeout conectando con Free.ai");
         });
         req.write(bodyData);
@@ -1089,11 +1296,17 @@ function createStudioServer(options = {}) {
             "Accept": "text/event-stream",
             "Content-Length": Buffer.byteLength(bodyData, "utf8")
           },
-          timeout: 90000
+          timeout: 180000
         }, (upstreamRes) => {
+          activeUpstreamRes = upstreamRes;
+          if (settled) {
+            try { upstreamRes.destroy(); } catch (_e) {}
+            return;
+          }
           if (upstreamRes.statusCode !== 200) {
             let errBody = "";
             upstreamRes.on("data", (c) => { errBody += c; });
+            upstreamRes.on("error", (err) => doneReject(err.message));
             upstreamRes.on("end", () => {
               doneReject(`DirectML HTTP ${upstreamRes.statusCode}${errBody ? `: ${errBody.slice(0, 200)}` : ""}`);
             });
@@ -1102,6 +1315,7 @@ function createStudioServer(options = {}) {
 
           upstreamRes.setEncoding("utf8");
           upstreamRes.on("data", (chunk) => {
+            if (settled) return;
             buffer += chunk;
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || "";
@@ -1118,10 +1332,13 @@ function createStudioServer(options = {}) {
           });
           upstreamRes.on("error", (err) => doneReject(err.message));
         });
+        activeReq = req;
 
-        req.on("error", (err) => doneReject(`DirectML offline (${err.message})`));
+        req.on("error", (err) => {
+          if (!settled) doneReject(`DirectML offline (${err.message})`);
+        });
         req.on("timeout", () => {
-          req.destroy();
+          try { req.destroy(); } catch (_e) {}
           doneReject("Timeout conectando con DirectML");
         });
         req.write(bodyData);
@@ -1172,9 +1389,15 @@ function createStudioServer(options = {}) {
         },
         timeout: 90000
       }, (upstreamRes) => {
+        activeUpstreamRes = upstreamRes;
+        if (settled) {
+          try { upstreamRes.destroy(); } catch (_e) {}
+          return;
+        }
         if (upstreamRes.statusCode !== 200) {
           let errBody = "";
           upstreamRes.on("data", (c) => { errBody += c; });
+          upstreamRes.on("error", (err) => doneReject(err.message));
           upstreamRes.on("end", () => {
             doneReject(`Ollama HTTP ${upstreamRes.statusCode}${errBody ? `: ${errBody.slice(0, 200)}` : ""}`);
           });
@@ -1182,6 +1405,7 @@ function createStudioServer(options = {}) {
         }
 
         const processOllamaLine = (line) => {
+          if (settled) return;
           const trimmed = String(line || "").trim();
           if (!trimmed) return;
           try {
@@ -1200,6 +1424,7 @@ function createStudioServer(options = {}) {
 
         upstreamRes.setEncoding("utf8");
         upstreamRes.on("data", (chunk) => {
+          if (settled) return;
           buffer += chunk;
           const lines = buffer.split(/\r?\n/);
           buffer = lines.pop() || "";
@@ -1216,10 +1441,13 @@ function createStudioServer(options = {}) {
         });
         upstreamRes.on("error", (err) => doneReject(err.message));
       });
+      activeReq = req;
 
-      req.on("error", (err) => doneReject(`Ollama offline (${err.message})`));
+      req.on("error", (err) => {
+        if (!settled) doneReject(`Ollama offline (${err.message})`);
+      });
       req.on("timeout", () => {
-        req.destroy();
+        try { req.destroy(); } catch (_e) {}
         doneReject("Timeout conectando con Ollama");
       });
       req.write(bodyData);
@@ -1231,6 +1459,7 @@ function createStudioServer(options = {}) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Expose-Headers", "X-Web-Search-Meta, X-TTS-Engine, X-TTS-Voice, X-TTS-Sample-Rate");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -1973,6 +2202,15 @@ function createStudioServer(options = {}) {
         return;
       }
 
+      const enterAbort = new AbortController();
+      let clientClosed = false;
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          clientClosed = true;
+          enterAbort.abort();
+        }
+      });
+
       let streamedText = "";
       try {
         await streamEngineCompletion(
@@ -1981,11 +2219,12 @@ function createStudioServer(options = {}) {
             model: target.model,
             systemPrompt: enterPayload.promptPackage.systemPrompt,
             userPrompt: enterPayload.promptPackage.userPrompt,
-            payload
+            payload,
+            signal: enterAbort.signal
           },
           (tokenChunk) => {
             streamedText += tokenChunk;
-            if (!res.writableEnded) {
+            if (!clientClosed && !res.writableEnded) {
               res.write(JSON.stringify({
                 model: target.model,
                 message: { role: "assistant", content: tokenChunk },
@@ -1994,6 +2233,11 @@ function createStudioServer(options = {}) {
             }
           }
         );
+
+        if (clientClosed) {
+          if (!res.writableEnded) res.end();
+          return;
+        }
 
         if (!streamedText.trim()) {
           throw new Error("El motor de IA devolvió una respuesta vacía");
@@ -2010,6 +2254,10 @@ function createStudioServer(options = {}) {
           res.end();
         }
       } catch (engineErr) {
+        if (clientClosed || (engineErr && engineErr.aborted) || enterAbort.signal.aborted) {
+          if (!res.writableEnded) res.end();
+          return;
+        }
         const reason = safeErrMsg(engineErr.message || "Motor de IA offline");
         const offlineReport = buildFallbackEnterContextReport(enterPayload, reason);
         const contentToEmit = streamedText.trim()
@@ -2151,6 +2399,16 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/directml/stop" && req.method === "POST") {
       const result = await stopDirectMLServer();
+      sendJson(res, result.ok ? 200 : 500, result);
+      return;
+    }
+
+    if (pathname === "/api/directml/restart" && req.method === "POST") {
+      const payload = await readJsonBody(req);
+      const envOverrides = (payload && payload.envOverrides && typeof payload.envOverrides === "object")
+        ? hardwareAdvisor.validateSafeEnvOverrides(payload.envOverrides)
+        : null;
+      const result = await restartDirectMLServer(envOverrides);
       sendJson(res, result.ok ? 200 : 500, result);
       return;
     }
@@ -2348,6 +2606,43 @@ function createStudioServer(options = {}) {
     }
 
     // ---------------------------------------------------------
+    // Voz Local Kokoro TTS / Piper ES (/api/tts/*)
+    // ---------------------------------------------------------
+    if (pathname === "/api/tts/status" && req.method === "GET") {
+      const forceRefresh = query.refresh === "1" || query.refresh === "true";
+      const status = await ttsBridge.getTtsStatus({ forceRefresh });
+      sendJson(res, 200, status);
+      return;
+    }
+
+    if (pathname === "/api/tts/speak" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      try {
+        const result = await ttsBridge.synthesizeSpeech({
+          text: payload.text,
+          voice: payload.voice,
+          speed: payload.speed,
+          maxChars: payload.maxChars
+        });
+        if (!res.writableEnded) {
+          res.writeHead(200, {
+            "Content-Type": "audio/wav",
+            "Content-Length": result.audioBuffer.length,
+            "Cache-Control": "no-store",
+            "X-TTS-Engine": String(result.engine || "kokoro"),
+            "X-TTS-Voice": String(result.voice || "ef_dora"),
+            "X-TTS-Sample-Rate": String(result.sampleRate || 24000)
+          });
+          res.end(result.audioBuffer);
+        }
+      } catch (ttsErr) {
+        const statusCode = (ttsErr && Number.isInteger(ttsErr.statusCode)) ? ttsErr.statusCode : 500;
+        sendJsonError(res, statusCode, ttsErr);
+      }
+      return;
+    }
+
+    // ---------------------------------------------------------
     // Chat Unificado (DirectML / Free.ai / Ollama)
     // ---------------------------------------------------------
     if (pathname === "/api/chat" && req.method === "POST") {
@@ -2356,6 +2651,10 @@ function createStudioServer(options = {}) {
         sendJsonError(res, 400, "El campo 'messages' debe ser un arreglo.");
         return;
       }
+
+      const flattenedMessages = payload.messages !== undefined
+        ? flattenHistoryMessagesForDual(payload.messages, { preserveSystem: true })
+        : undefined;
 
       const rawProjIdentifier = payload.project || payload.projectPath || null;
       const convId = payload.conversationId || null;
@@ -2367,8 +2666,19 @@ function createStudioServer(options = {}) {
         modelOverridesPrompt: payload.modelSystemPrompt || null
       });
 
-      const combinedSysPrompt = ctx && ctx.systemPrompt ? ctx.systemPrompt : "";
-      const unifiedMessages = injectSystemMessage(payload.messages, combinedSysPrompt);
+      const webSearch = await runWebSearchForChat(payload, flattenedMessages || payload.messages || []);
+      let combinedSysPrompt = ctx && ctx.systemPrompt ? ctx.systemPrompt : "";
+      if (webSearch && webSearch.contextSuffix) {
+        combinedSysPrompt = combinedSysPrompt
+          ? `${combinedSysPrompt}${webSearch.contextSuffix}`
+          : webSearch.contextSuffix.trim();
+      }
+      const extraHeaders = webSearch ? { "X-Web-Search-Meta": webSearch.headerValue } : {};
+      if (webSearch && !res.headersSent) {
+        res.setHeader("X-Web-Search-Meta", webSearch.headerValue);
+      }
+
+      const unifiedMessages = injectSystemMessage(flattenedMessages, combinedSysPrompt);
       const target = detectEngineTarget(payload);
 
       if (target.engine === "directml") {
@@ -2385,7 +2695,7 @@ function createStudioServer(options = {}) {
             max_tokens: payload.max_tokens || 2048,
             temperature: payload.temperature !== undefined ? payload.temperature : 0.7
           });
-          proxyToDirectML("/v1/chat/completions", "POST", dmlPayload, res);
+          proxyToDirectML("/v1/chat/completions", "POST", dmlPayload, res, { extraHeaders });
         } catch (dmlErr) {
           sendJsonError(res, 502, `Error en DirectML: ${safeErrMsg(dmlErr)}`);
         }
@@ -2400,7 +2710,8 @@ function createStudioServer(options = {}) {
               messages: unifiedMessages
             },
             res,
-            combinedSysPrompt
+            combinedSysPrompt,
+            { extraHeaders }
           );
         } catch (freeErr) {
           if (!res.headersSent) {
@@ -2420,7 +2731,7 @@ function createStudioServer(options = {}) {
         ollamaPayload.options = { ...(payload.options || {}), ...payload.modelfileOptions };
       }
 
-      proxyToOllama("/api/chat", "POST", JSON.stringify(ollamaPayload), res);
+      proxyToOllama("/api/chat", "POST", JSON.stringify(ollamaPayload), res, { extraHeaders });
       return;
     }
 
@@ -2594,6 +2905,9 @@ function createStudioServer(options = {}) {
       const convId = payload.conversationId || null;
       const globalDirective = typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "";
 
+      const webSearch = await runWebSearchForChat(payload, baseHistory);
+      const dualWebSearchSuffix = (webSearch && webSearch.contextSuffix) ? webSearch.contextSuffix.trim() : "";
+
       function composeAgentDirective(slot, roleLabel, ownPrompt) {
         let stageRule = "";
         if (effectiveWorkflow === "pipeline") {
@@ -2615,6 +2929,9 @@ function createStudioServer(options = {}) {
         if (globalDirective) sections.push(`Directiva compartida de sesión:\n${globalDirective}`);
         if (ownPrompt && String(ownPrompt).trim()) {
           sections.push(`Directiva específica del Agente ${slot}:\n${String(ownPrompt).trim()}`);
+        }
+        if (dualWebSearchSuffix) {
+          sections.push(dualWebSearchSuffix);
         }
         return sections.join("\n\n");
       }
@@ -2648,10 +2965,12 @@ function createStudioServer(options = {}) {
         res.flushHeaders();
       }
 
+      const dualAbort = new AbortController();
       let clientClosed = false;
       res.on("close", () => {
         if (!res.writableEnded) {
           clientClosed = true;
+          dualAbort.abort();
         }
       });
 
@@ -2662,6 +2981,7 @@ function createStudioServer(options = {}) {
           return true;
         } catch (_e) {
           clientClosed = true;
+          dualAbort.abort();
           return false;
         }
       };
@@ -2696,7 +3016,7 @@ function createStudioServer(options = {}) {
       };
 
       async function executeAgentStage(slot, stageNum, stageLabel, engine, model, roleLabel, rawAgent, messagesForStage) {
-        if (clientClosed) {
+        if (clientClosed || dualAbort.signal.aborted) {
           return { ok: false, error: "Conexión cerrada por el cliente", partialText: "", elapsedMs: 0 };
         }
         const stageStart = Date.now();
@@ -2716,7 +3036,8 @@ function createStudioServer(options = {}) {
               engine,
               model,
               messages: messagesForStage,
-              payload: buildEngineOptions(rawAgent, engine)
+              payload: buildEngineOptions(rawAgent, engine),
+              signal: dualAbort.signal
             },
             (delta) => {
               if (!clientClosed && delta) {
@@ -2747,17 +3068,19 @@ function createStudioServer(options = {}) {
           const elapsedMs = Date.now() - stageStart;
           const partialText = stageErr && typeof stageErr.partialText === "string" ? stageErr.partialText : "";
           const errMessage = safeErrMsg(stageErr);
-          writeEvent({
-            type: "agent_error",
-            agent: slot,
-            stage: stageNum,
-            source: engine,
-            model,
-            roleLabel,
-            elapsedMs,
-            error: errMessage,
-            partialText
-          });
+          if (!clientClosed) {
+            writeEvent({
+              type: "agent_error",
+              agent: slot,
+              stage: stageNum,
+              source: engine,
+              model,
+              roleLabel,
+              elapsedMs,
+              error: errMessage,
+              partialText
+            });
+          }
           return { ok: false, error: errMessage, partialText, elapsedMs };
         }
       }
@@ -2786,6 +3109,13 @@ function createStudioServer(options = {}) {
           },
           evaluation
         });
+
+        if (webSearch && webSearch.meta) {
+          writeEvent({
+            type: "web_search",
+            ...webSearch.meta
+          });
+        }
 
         if (downgradedFromParallel) {
           writeEvent({
@@ -3072,6 +3402,41 @@ function createStudioServer(options = {}) {
     }
 
     // ---------------------------------------------------------
+    // Búsqueda Web Real & Uso SerpApi (/api/integrations/serpapi/*, /api/search/web)
+    // ---------------------------------------------------------
+    if (pathname === "/api/integrations/serpapi/usage" && req.method === "GET") {
+      sendJson(res, 200, integrations.getSerpApiStatus());
+      return;
+    }
+
+    if (pathname === "/api/integrations/serpapi/reset" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const result = integrations.resetSerpApiUsage(payload.pool || "all");
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (pathname === "/api/search/web" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const q = typeof payload.query === "string" ? payload.query.trim() : "";
+      if (!q) {
+        sendJsonError(res, 400, "El campo 'query' es obligatorio.");
+        return;
+      }
+      const result = await integrations.searchWebSerpApi({
+        query: q,
+        mode: payload.mode || "web",
+        pool: payload.pool || "auto",
+        num: payload.num,
+        gl: payload.gl,
+        hl: payload.hl
+      });
+      const status = result.ok ? 200 : (result.configured ? 502 : 400);
+      sendJson(res, status, result);
+      return;
+    }
+
+    // ---------------------------------------------------------
     // Fallback UI HTML (solo rutas GET no-API, sin caché WebView)
     // ---------------------------------------------------------
     if (req.method === "GET" && !pathname.startsWith("/api/")) {
@@ -3100,7 +3465,7 @@ function createStudioServer(options = {}) {
     res.end("Not Found");
   }
 
-  return http.createServer((req, res) => {
+  const serverInstance = http.createServer((req, res) => {
     handleRequest(req, res).catch((err) => {
       const status = (err && Number.isInteger(err.statusCode)) ? err.statusCode : 500;
       if (!res.headersSent) {
@@ -3110,6 +3475,12 @@ function createStudioServer(options = {}) {
       }
     });
   });
+
+  serverInstance.on("close", () => {
+    ttsBridge.shutdownTtsWorker().catch(() => {});
+  });
+
+  return serverInstance;
 }
 
 if (require.main === module) {
@@ -3125,6 +3496,19 @@ if (require.main === module) {
     : DEFAULT_PORT;
 
   const server = createStudioServer();
+
+  const gracefulShutdown = () => {
+    ttsBridge.shutdownTtsWorker().catch(() => {}).finally(() => {
+      try {
+        server.close(() => process.exit(0));
+      } catch (_e) {
+        process.exit(0);
+      }
+      setTimeout(() => process.exit(0), 2000).unref();
+    });
+  };
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {

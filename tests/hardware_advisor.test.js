@@ -1,5 +1,8 @@
 const { describe, it, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const hardwareAdvisor = require("../hardware-advisor.js");
 
@@ -233,5 +236,205 @@ describe("hardware-advisor.js", () => {
     assert.equal(process.env.OLIVE_CPU_THREADS, "6");
     assert.equal(process.env.OLLAMA_IGPU_ENABLE, "1");
     assert.equal(process.env.HSA_OVERRIDE_GFX_VERSION, "11.0.0");
+  });
+
+  it("parseOllamaServerLog y readOllamaServerLogBounded leen logs pequeños y acotan archivos >2MB conservando inicio y cola", () => {
+    const droppingLog = [
+      'time=2026-11-09T10:00:00.000Z level=INFO source=routes.go:1100 msg="server config" env="map[OLLAMA_IGPU_ENABLE:0 OLLAMA_FLASH_ATTENTION:true OLLAMA_KV_CACHE_TYPE:q8_0]"',
+      'time=2026-11-09T10:00:01.000Z level=WARN source=gpu.go:450 msg="dropping integrated GPU; to enable, set OLLAMA_IGPU_ENABLE=1"',
+      'time=2026-11-09T10:00:02.000Z level=INFO source=gpu.go:500 msg="inference compute" id=cpu library=cpu compute=""'
+    ].join("\n");
+
+    const parsedDrop = hardwareAdvisor.parseOllamaServerLog(droppingLog);
+    assert.equal(parsedDrop.envKnown, true);
+    assert.equal(parsedDrop.env.OLLAMA_IGPU_ENABLE, "0");
+    assert.equal(parsedDrop.env.OLLAMA_FLASH_ATTENTION, "1");
+    assert.equal(parsedDrop.env.OLLAMA_KV_CACHE_TYPE, "q8_0");
+    assert.equal(parsedDrop.droppingIgpuInLog, true);
+    assert.equal(parsedDrop.cpuOnlyInLog, true);
+    assert.equal(parsedDrop.gpuDetectedInLog, false);
+    assert.equal(parsedDrop.computeBackend, "cpu");
+
+    const rocmRebootLog = [
+      droppingLog,
+      'time=2026-11-09T11:00:00.000Z level=INFO source=routes.go:1100 msg="server config" env="map[OLLAMA_IGPU_ENABLE:1 HSA_OVERRIDE_GFX_VERSION:11.0.0 OLLAMA_FLASH_ATTENTION:1 OLLAMA_KV_CACHE_TYPE:q8_0]"',
+      'time=2026-11-09T11:00:01.000Z level=INFO source=gpu.go:510 msg="inference compute" id=GPU-0 library=rocm compute=gfx1100',
+      'time=2026-11-09T11:00:02.000Z level=INFO source=sched.go:220 msg="vram-based default context" total_vram="2.0 GiB"'
+    ].join("\n");
+
+    const parsedRocm = hardwareAdvisor.parseOllamaServerLog(rocmRebootLog);
+    assert.equal(parsedRocm.droppingIgpuInLog, false);
+    assert.equal(parsedRocm.gpuDetectedInLog, true);
+    assert.equal(parsedRocm.cpuOnlyInLog, false);
+    assert.equal(parsedRocm.computeBackend, "rocm");
+    assert.equal(parsedRocm.totalVramText, "2.0 GiB");
+    assert.equal(parsedRocm.env.OLLAMA_IGPU_ENABLE, "1");
+
+    const missing = hardwareAdvisor.readOllamaServerLogBounded(path.join(os.tmpdir(), `nonexistent-${Date.now()}.log`));
+    assert.deepEqual(missing, { found: false, text: "", mtimeMs: 0 });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hw-log-bounded-"));
+    try {
+      const smallPath = path.join(tmpDir, "small.log");
+      fs.writeFileSync(smallPath, droppingLog, "utf8");
+      const smallRes = hardwareAdvisor.readOllamaServerLogBounded(smallPath);
+      assert.equal(smallRes.found, true);
+      assert.equal(smallRes.text, droppingLog);
+
+      const largePath = path.join(tmpDir, "huge.log");
+      const headMarker = "HEAD_MARKER_OLLAMA_START\n";
+      const tailMarker = "\nTAIL_MARKER_OLLAMA_END";
+      const middleChunk = "M".repeat(hardwareAdvisor.OLLAMA_LOG_MAX_READ_BYTES + 262144);
+      fs.writeFileSync(largePath, `${headMarker}${middleChunk}${tailMarker}`, "utf8");
+
+      const largeRes = hardwareAdvisor.readOllamaServerLogBounded(largePath);
+      assert.equal(largeRes.found, true);
+      assert.equal(largeRes.text.includes("HEAD_MARKER_OLLAMA_START"), true);
+      assert.equal(largeRes.text.includes("TAIL_MARKER_OLLAMA_END"), true);
+      assert.ok(largeRes.text.length < fs.statSync(largePath).size, "Lectura acotada debe omitir la parte intermedia");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("detectLiveOllamaAcceleration detecta droppingIgpu, rocm, cpuOnly, logMatchesLiveProcess y dmlStaleEnvForSession", async () => {
+    const nowMs = Date.now();
+    const procStartedIso = new Date(nowMs).toISOString();
+    const freshLogIso = new Date(nowMs + 500).toISOString();
+    const staleLogIso = new Date(nowMs - 120000).toISOString();
+
+    const dropLive = await hardwareAdvisor.detectLiveOllamaAcceleration({
+      processes: [{ name: "ollama.exe", pid: 4100, ppid: 99, startedAt: procStartedIso }],
+      logContent: [
+        `time=${freshLogIso} level=INFO msg="server config" env="map[OLLAMA_IGPU_ENABLE:0]"`,
+        `time=${freshLogIso} level=WARN msg="dropping integrated GPU; to enable, set OLLAMA_IGPU_ENABLE=1"`,
+        `time=${freshLogIso} level=INFO msg="inference compute" library=cpu`
+      ].join("\n"),
+      logMtimeMs: nowMs + 500
+    });
+    assert.equal(dropLive.ollamaRuntime.alive, true);
+    assert.equal(dropLive.ollamaRuntime.logMatchesLiveProcess, true);
+    assert.equal(dropLive.ollamaRuntime.droppingIgpu, true);
+    assert.equal(dropLive.ollamaRuntime.cpuOnly, true);
+    assert.equal(dropLive.ollamaRuntime.gpuDetected, false);
+    assert.equal(dropLive.ollamaRuntime.computeBackend, "cpu");
+
+    const rocmLive = await hardwareAdvisor.detectLiveOllamaAcceleration({
+      processes: [{ name: "ollama.exe", pid: 4101, ppid: 99, startedAt: procStartedIso }],
+      logContent: [
+        `time=${freshLogIso} level=INFO msg="server config" env="map[OLLAMA_IGPU_ENABLE:1 HSA_OVERRIDE_GFX_VERSION:11.0.0]"`,
+        `time=${freshLogIso} level=INFO msg="inference compute" library=rocm`,
+        `time=${freshLogIso} level=INFO msg="vram-based default context" total_vram="2.0 GiB"`
+      ].join("\n"),
+      logMtimeMs: nowMs + 500
+    });
+    assert.equal(rocmLive.ollamaRuntime.alive, true);
+    assert.equal(rocmLive.ollamaRuntime.logMatchesLiveProcess, true);
+    assert.equal(rocmLive.ollamaRuntime.droppingIgpu, false);
+    assert.equal(rocmLive.ollamaRuntime.cpuOnly, false);
+    assert.equal(rocmLive.ollamaRuntime.gpuDetected, true);
+    assert.equal(rocmLive.ollamaRuntime.computeBackend, "rocm");
+
+    const staleAndDml = await hardwareAdvisor.detectLiveOllamaAcceleration({
+      processes: [
+        { name: "ollama.exe", pid: 4102, ppid: 99, startedAt: procStartedIso },
+        {
+          name: "python.exe",
+          kind: "directml",
+          pid: 4200,
+          ppid: process.pid,
+          startedAt: new Date(nowMs - 5000).toISOString()
+        }
+      ],
+      logContent: `time=${staleLogIso} level=INFO msg="inference compute" library=cpu`,
+      logMtimeMs: nowMs - 120000,
+      sessionAppliedAtMs: nowMs,
+      sessionAppliedEnv: { OLIVE_GPU_MEMORY_LIMIT: "12", OLIVE_CPU_THREADS: "6" }
+    });
+    assert.equal(staleAndDml.ollamaRuntime.alive, true);
+    assert.equal(staleAndDml.ollamaRuntime.logMatchesLiveProcess, false);
+    assert.equal(staleAndDml.directmlRuntime.alive, true);
+    assert.equal(staleAndDml.directmlRuntime.staleEnvForSession, true);
+  });
+
+  it("evaluateDualConfiguration expone ollamaRunningOnCpu, requiresOllamaRestart, requiresDirectmlRestart y psGpuRatio", () => {
+    const baseTel = makeMockTelemetry({
+      freeGb: 9.0,
+      envEffective: {
+        OLLAMA_IGPU_ENABLE: "1",
+        HSA_OVERRIDE_GFX_VERSION: "11.0.0",
+        OLLAMA_FLASH_ATTENTION: "1",
+        OLLAMA_KV_CACHE_TYPE: "q8_0",
+        OLIVE_GPU_MEMORY_LIMIT: "12",
+        OLIVE_CPU_THREADS: "6"
+      }
+    });
+
+    const evalCpuPs = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "ollama+directml",
+      agentA: { source: "ollama", model: "qwen2.5-coder:latest" },
+      agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+      workflow: "pipeline",
+      ollamaPs: [{ name: "qwen2.5-coder:latest", size: 4000000000, size_vram: 0 }],
+      directmlStatus: { isAlive: true, oliveGpuMemoryLimit: 20, oliveCpuThreads: 12 },
+      telemetry: {
+        ...baseTel,
+        ollamaRuntime: { alive: true, droppingIgpu: true, gpuDetected: false, cpuOnly: true, envKnown: true, env: { OLLAMA_IGPU_ENABLE: "0" } }
+      }
+    });
+    assert.equal(evalCpuPs.psGpuRatio, 0);
+    assert.equal(evalCpuPs.ollamaRunningOnCpu, true);
+    assert.equal(evalCpuPs.requiresOllamaRestart, true);
+    assert.equal(evalCpuPs.requiresDirectmlRestart, true);
+
+    const evalSplitLowPs = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "freeai+ollama",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "ollama", model: "qwen2.5-coder:latest" },
+      ollamaPs: [{ name: "qwen2.5-coder:latest", size: 4000000000, size_vram: 1000000000 }],
+      telemetry: baseTel
+    });
+    assert.equal(evalSplitLowPs.psGpuRatio, 0.25);
+    assert.equal(evalSplitLowPs.ollamaRunningOnCpu, true);
+
+    const evalHybridHalfPs = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "freeai+ollama",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "ollama", model: "qwen2.5-coder:latest" },
+      ollamaPs: [{ name: "qwen2.5-coder:latest", size: 4000000000, size_vram: 2000000000 }],
+      telemetry: baseTel
+    });
+    assert.equal(evalHybridHalfPs.psGpuRatio, 0.5);
+    assert.equal(evalHybridHalfPs.ollamaRunningOnCpu, false);
+
+    const evalOptimalGpu = hardwareAdvisor.evaluateDualConfiguration({
+      pair: "ollama+directml",
+      agentA: { source: "ollama", model: "qwen2.5-coder:latest" },
+      agentB: { source: "directml", model: "Phi-3.5-mini-instruct-ONNX" },
+      workflow: "pipeline",
+      ollamaPs: [{ name: "qwen2.5-coder:latest", size: 4000000000, size_vram: 4000000000 }],
+      directmlStatus: { isAlive: true, oliveGpuMemoryLimit: 12, oliveCpuThreads: 6 },
+      telemetry: {
+        ...baseTel,
+        ollamaRuntime: {
+          alive: true,
+          droppingIgpu: false,
+          gpuDetected: true,
+          cpuOnly: false,
+          envKnown: true,
+          env: {
+            OLLAMA_IGPU_ENABLE: "1",
+            HSA_OVERRIDE_GFX_VERSION: "11.0.0",
+            OLLAMA_FLASH_ATTENTION: "1",
+            OLLAMA_KV_CACHE_TYPE: "q8_0"
+          }
+        },
+        directmlRuntime: { alive: true, staleEnvForSession: false, envKnown: true, env: { OLIVE_GPU_MEMORY_LIMIT: "12", OLIVE_CPU_THREADS: "6" } }
+      }
+    });
+    assert.equal(evalOptimalGpu.psGpuRatio, 1);
+    assert.equal(evalOptimalGpu.ollamaRunningOnCpu, false);
+    assert.equal(evalOptimalGpu.requiresOllamaRestart, false);
+    assert.equal(evalOptimalGpu.requiresDirectmlRestart, false);
   });
 });

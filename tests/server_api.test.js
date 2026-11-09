@@ -1,4 +1,4 @@
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it, beforeEach, afterEach, after } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const fs = require("node:fs");
@@ -9,6 +9,7 @@ const { execFileSync } = require("node:child_process");
 const envLoader = require("../env-loader.js");
 const memoryStore = require("../memory-store.js");
 const hardwareAdvisor = require("../hardware-advisor.js");
+const ttsBridge = require("../tts-bridge.js");
 const { createStudioServer } = require("../sidecars/local_ai_chat/server.js");
 
 let tempRoot = "";
@@ -30,12 +31,16 @@ const ENV_BACKUP_KEYS = [
   "LOCAL_AI_MEMORY_DIR",
   "LOCAL_AI_CONFIG_FILE",
   "LOCAL_AI_BRAIN_DIR",
+  "LOCAL_AI_DISABLE_EXTERNAL_ENV",
+  "LOCAL_AI_EXTERNAL_ENV_PATH",
   "FREEAI_BASE_URL",
   "FREEAI_API_KEY_1",
+  "FREEAI_API_KEY_2",
   "FREE_AI_API_KEY",
   ...hardwareAdvisor.SAFE_AI_ENV_KEYS
 ];
 let savedEnvValues = {};
+let savedSerpEnvValues = {};
 
 function listenServer(srv) {
   return new Promise((resolve, reject) => {
@@ -90,23 +95,79 @@ async function httpReq(endpointPath, options = {}) {
   };
 }
 
-function assertNoSecretsInPayload(payload) {
+function assertNoSecretsInPayload(payload, extraSecrets = []) {
   const serialized = typeof payload === "string" ? payload : JSON.stringify(payload);
+  const pools = typeof envLoader.getSerpApiKeyPools === "function"
+    ? envLoader.getSerpApiKeyPools()
+    : { allKeys: [] };
   const tokens = [
     envLoader.getGithubToken(),
     envLoader.getNetlifyToken(),
     envLoader.getHfToken(),
     process.env.FREEAI_API_KEY_1,
     process.env.FREEAI_API_KEY_2,
-    process.env.FREE_AI_API_KEY
-  ].filter((t) => t && t.trim().length >= 6);
+    process.env.FREE_AI_API_KEY,
+    ...(Array.isArray(pools.allKeys) ? pools.allKeys : []),
+    ...(Array.isArray(extraSecrets) ? extraSecrets : [])
+  ].filter((t) => t && String(t).trim().length >= 6);
 
   for (const tok of tokens) {
-    assert.equal(serialized.includes(tok), false, "La respuesta JSON nunca debe exponer tokens reales");
+    assert.equal(serialized.includes(String(tok)), false, "La respuesta JSON nunca debe exponer tokens reales");
   }
   assert.equal(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{10,}\b/.test(serialized), false);
   assert.equal(/\bhf_[A-Za-z0-9]{10,}\b/.test(serialized), false);
   assert.equal(/\bnfp_[A-Za-z0-9_]{10,}\b/.test(serialized), false);
+  assert.equal(/[?&]api_key=[^&\s"'\[\]]+/i.test(serialized), false, "La respuesta nunca debe exponer api_key en URL");
+}
+
+async function withIsolatedSerpEnv(overrides, fn) {
+  const backup = {
+    LOCAL_AI_DISABLE_EXTERNAL_ENV: process.env.LOCAL_AI_DISABLE_EXTERNAL_ENV,
+    LOCAL_AI_EXTERNAL_ENV_PATH: process.env.LOCAL_AI_EXTERNAL_ENV_PATH
+  };
+  for (const k of Object.keys(process.env)) {
+    if (k.startsWith("SERPAPI_")) {
+      backup[k] = process.env[k];
+      delete process.env[k];
+    }
+  }
+  process.env.LOCAL_AI_DISABLE_EXTERNAL_ENV = "1";
+  delete process.env.LOCAL_AI_EXTERNAL_ENV_PATH;
+
+  for (const [k, v] of Object.entries(overrides || {})) {
+    if (v === undefined || v === null) delete process.env[k];
+    else process.env[k] = String(v);
+  }
+  envLoader.getSerpApiKeyPools();
+
+  try {
+    return await fn();
+  } finally {
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) delete process.env[k];
+    }
+    for (const [k, v] of Object.entries(backup)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    envLoader.getSerpApiKeyPools();
+  }
+}
+
+async function withMockedSerpFetch(serpHandler, fn) {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const urlStr = String(url || "");
+    if (urlStr.includes("serpapi.com")) {
+      return serpHandler(urlStr, init);
+    }
+    return origFetch(url, init);
+  };
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 }
 
 function createMockAiEngineServer() {
@@ -236,6 +297,12 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     for (const k of ENV_BACKUP_KEYS) {
       savedEnvValues[k] = process.env[k];
     }
+    savedSerpEnvValues = {};
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) {
+        savedSerpEnvValues[k] = process.env[k];
+      }
+    }
     for (const k of hardwareAdvisor.SAFE_AI_ENV_KEYS) {
       delete process.env[k];
     }
@@ -297,11 +364,15 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
   });
 
   afterEach(async () => {
+    await ttsBridge.shutdownTtsWorker();
     await closeServer(studioServer);
     await closeServer(mockEngineServer);
     studioServer = null;
     mockEngineServer = null;
 
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) delete process.env[k];
+    }
     for (const k of ENV_BACKUP_KEYS) {
       if (savedEnvValues[k] === undefined) {
         delete process.env[k];
@@ -309,10 +380,21 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
         process.env[k] = savedEnvValues[k];
       }
     }
+    for (const [k, v] of Object.entries(savedSerpEnvValues)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    if (typeof envLoader.getSerpApiKeyPools === "function") {
+      envLoader.getSerpApiKeyPools();
+    }
 
     if (tempRoot && fs.existsSync(tempRoot)) {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  after(async () => {
+    await ttsBridge.shutdownTtsWorker();
   });
 
   it("responde /api/version 2.1.0 sin caché, CORS OPTIONS y /api/projects con projectState", async () => {
@@ -1210,5 +1292,287 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.ok(failEvents.some((e) => e.type === "agent_error" && e.agent === "A"));
     assert.ok(failEvents.some((e) => e.type === "agent_done" && e.agent === "B" && e.text.includes("Respuesta Ollama")));
     assert.equal(failEvents[failEvents.length - 1].partialFailure, true);
+  });
+
+  it("GET /api/tts/status y POST /api/tts/speak validan HTTP 400 y devuelven WAV PCM con cabeceras TTS", async () => {
+    ttsBridge.clearTtsStatusCache();
+    const stRes = await httpReq("/api/tts/status?refresh=1");
+    assert.equal(stRes.status, 200);
+    assert.equal(stRes.json.ok, true);
+    assert.equal(stRes.json.kokoroReady, true);
+    assert.equal(stRes.json.piperReady, true);
+    assert.ok(Array.isArray(stRes.json.voices));
+    assert.equal(stRes.json.voices.length, 13);
+    assert.ok(stRes.json.voices.some((v) => v.id === "es_blend_editorial"));
+    assert.ok(stRes.json.voices.some((v) => v.id === "vits-piper-es_ES-sharvard-f"));
+
+    const emptyRes = await httpReq("/api/tts/speak", {
+      method: "POST",
+      body: { text: "   ", voice: "vits-piper-es_ES-sharvard-f" }
+    });
+    assert.equal(emptyRes.status, 400);
+    assert.equal(emptyRes.json.ok, false);
+
+    const badVoiceRes = await httpReq("/api/tts/speak", {
+      method: "POST",
+      body: { text: "Hola prueba", voice: "../evil/voice" }
+    });
+    assert.equal(badVoiceRes.status, 400);
+    assert.equal(badVoiceRes.json.ok, false);
+
+    const speakRes = await fetch(`${studioBaseUrl}/api/tts/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: "Hola, prueba de voz neuronal local.",
+        voice: "vits-piper-es_ES-sharvard-f",
+        speed: 1.0
+      })
+    });
+    assert.equal(speakRes.status, 200);
+    assert.equal(speakRes.headers.get("content-type"), "audio/wav");
+    assert.equal(speakRes.headers.get("x-tts-engine"), "piper");
+    assert.equal(speakRes.headers.get("x-tts-voice"), "vits-piper-es_ES-sharvard-f");
+    assert.equal(speakRes.headers.get("x-tts-sample-rate"), "22050");
+
+    const wavBuf = Buffer.from(await speakRes.arrayBuffer());
+    assert.ok(wavBuf.length > 44, `WAV vacío o demasiado corto: ${wavBuf.length}`);
+    assert.equal(wavBuf.toString("ascii", 0, 4), "RIFF");
+    assert.equal(wavBuf.toString("ascii", 8, 12), "WAVE");
+  });
+
+  it("POST /api/directml/restart valida Zero-Trust y /api/system/apply-tuning reporta objeto restarts", async () => {
+    const evilRestart = await httpReq("/api/directml/restart", {
+      method: "POST",
+      body: { envOverrides: { GITHUB_TOKEN: "ghp_forbidden_secret_value" } }
+    });
+    assert.equal(evilRestart.status, 400);
+    assert.equal(evilRestart.json.ok, false);
+
+    const safeRestart = await httpReq("/api/directml/restart", {
+      method: "POST",
+      body: { envOverrides: { OLIVE_GPU_MEMORY_LIMIT: "16", OLIVE_CPU_THREADS: "10" } }
+    });
+    assert.equal(safeRestart.status, 200);
+    assert.equal(safeRestart.json.ok, true);
+    assert.equal(safeRestart.json.skippedHostControl, true);
+
+    capturedMockRequests = [];
+    const tuneRes = await httpReq("/api/system/apply-tuning", {
+      method: "POST",
+      body: {
+        scope: "session",
+        pair: "ollama+directml",
+        unloadOllama: true,
+        restartDirectML: true,
+        restartOllama: true
+      }
+    });
+    assert.equal(tuneRes.status, 200);
+    assert.equal(tuneRes.json.ok, true);
+    assert.ok(tuneRes.json.restarts && typeof tuneRes.json.restarts === "object");
+    assert.ok(Array.isArray(tuneRes.json.restarts.unloadedOllama) && tuneRes.json.restarts.unloadedOllama.length >= 1);
+    assert.equal(tuneRes.json.restarts.directml.ok, true);
+    assert.equal(tuneRes.json.restarts.directml.skippedHostControl, true);
+    assert.equal(tuneRes.json.restarts.ollama.ok, true);
+    assert.equal(tuneRes.json.restarts.ollama.skippedHostControl, true);
+    assert.ok(capturedMockRequests.some((r) => r.url === "/api/generate" && r.body && r.body.keep_alive === 0));
+  });
+
+  it("GET /api/integrations/serpapi/usage, POST /api/integrations/serpapi/reset y POST /api/search/web sin consumir cuota real", async () => {
+    // 1. Query faltante -> HTTP 400
+    const missingQuery = await httpReq("/api/search/web", {
+      method: "POST",
+      body: { query: "   ", mode: "web" }
+    });
+    assert.equal(missingQuery.status, 400);
+    assert.equal(missingQuery.json.ok, false);
+
+    // 2. Sin llaves con LOCAL_AI_DISABLE_EXTERNAL_ENV=1 -> HTTP 400
+    await withIsolatedSerpEnv({}, async () => {
+      const noKeysRes = await httpReq("/api/search/web", {
+        method: "POST",
+        body: { query: "directml amd", mode: "web" }
+      });
+      assert.equal(noKeysRes.status, 400);
+      assert.equal(noKeysRes.json.ok, false);
+      assert.equal(noKeysRes.json.configured, false);
+
+      const emptyUsage = await httpReq("/api/integrations/serpapi/usage");
+      assert.equal(emptyUsage.status, 200);
+      assert.equal(emptyUsage.json.configured, false);
+      assertNoSecretsInPayload(emptyUsage.json);
+    });
+
+    // 3. Con llaves falsas y fetch stubbeado SOLO para serpapi.com -> HTTP 200 + conteo + reset
+    const fakeWebKey = "serp_srv_mock_web_key_12345678";
+    const fakeJobsKey = "serp_srv_mock_jobs_key_87654321";
+
+    await withIsolatedSerpEnv(
+      { SERPAPI_NEWS_KEY: fakeWebKey, SERPAPI_JOBS_KEY: fakeJobsKey },
+      async () => {
+        await httpReq("/api/integrations/serpapi/reset", { method: "POST", body: { pool: "all" } });
+
+        await withMockedSerpFetch(
+          async (rawUrl) => {
+            const u = new URL(rawUrl);
+            assert.equal(u.searchParams.get("q"), "ONNX DirectML AMD 860M");
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify({
+                organic_results: [
+                  {
+                    title: "DirectML Execution Provider",
+                    link: "https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html",
+                    snippet: "Ejecución acelerada en GPU AMD mediante DirectML.",
+                    source: "ONNX Runtime"
+                  }
+                ]
+              })
+            };
+          },
+          async () => {
+            const searchRes = await httpReq("/api/search/web", {
+              method: "POST",
+              body: { query: "ONNX DirectML AMD 860M", mode: "web" }
+            });
+            assert.equal(searchRes.status, 200);
+            assert.equal(searchRes.json.ok, true);
+            assert.equal(searchRes.json.poolUsed, "web");
+            assert.equal(searchRes.json.totalResults, 1);
+            assert.equal(searchRes.json.results[0].title, "DirectML Execution Provider");
+            assertNoSecretsInPayload(searchRes.json, [fakeWebKey, fakeJobsKey]);
+
+            const usageRes = await httpReq("/api/integrations/serpapi/usage");
+            assert.equal(usageRes.status, 200);
+            assert.equal(usageRes.json.configured, true);
+            assert.equal(usageRes.json.usage.webUses, 1);
+            assert.equal(usageRes.json.usage.jobsUses, 0);
+            assertNoSecretsInPayload(usageRes.json, [fakeWebKey, fakeJobsKey]);
+
+            const resetRes = await httpReq("/api/integrations/serpapi/reset", {
+              method: "POST",
+              body: { pool: "web" }
+            });
+            assert.equal(resetRes.status, 200);
+            assert.equal(resetRes.json.ok, true);
+            assert.equal(resetRes.json.usage.webUses, 0);
+            assertNoSecretsInPayload(resetRes.json, [fakeWebKey, fakeJobsKey]);
+          }
+        );
+      }
+    );
+  });
+
+  it("POST /api/chat y POST /api/chat/dual con webSearchEnabled: true inyectan contexto web y emiten cabecera X-Web-Search-Meta / evento web_search", async () => {
+    const fakeWebKey = "serp_chat_mock_web_key_99999999";
+    process.env.FREEAI_BASE_URL = `http://127.0.0.1:${mockEnginePort}/freeai/v1`;
+    process.env.FREEAI_API_KEY_1 = "freeai_web_chat_mock_key";
+
+    await withIsolatedSerpEnv(
+      { SERPAPI_NEWS_KEY: fakeWebKey },
+      async () => {
+        await httpReq("/api/integrations/serpapi/reset", { method: "POST", body: { pool: "all" } });
+
+        await withMockedSerpFetch(
+          async (rawUrl) => {
+            const u = new URL(rawUrl);
+            const isNews = u.searchParams.get("engine") === "google_news";
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify(
+                isNews
+                  ? {
+                      news_results: [
+                        {
+                          title: "Lanzamiento ROCm Windows Ryzen",
+                          link: "https://news.example.com/rocm-win",
+                          snippet: "Soporte mejorado para iGPU Radeon 860M en Español.",
+                          source: { name: "TechEs" },
+                          date: "2026-11-09"
+                        }
+                      ]
+                    }
+                  : {
+                      organic_results: [
+                        {
+                          title: "Guía Kokoro TTS INT8 Español",
+                          link: "https://docs.example.com/kokoro-es",
+                          snippet: "Voces ef_dora y es_blend_editorial locales.",
+                          source: "DocsES"
+                        }
+                      ]
+                    }
+              )
+            };
+          },
+          async () => {
+            // 1. Single /api/chat con webSearchEnabled: true -> X-Web-Search-Meta Base64 UTF-8 + inyección en prompt
+            capturedMockRequests = [];
+            const singleRes = await httpReq("/api/chat", {
+              method: "POST",
+              body: {
+                project: "AlphaApp",
+                model: "qwen2.5-coder:latest",
+                source: "local",
+                webSearchEnabled: true,
+                webSearchMode: "web",
+                stream: true,
+                messages: [{ role: "user", content: "Explica Kokoro TTS en español" }]
+              }
+            });
+            assert.equal(singleRes.status, 200);
+            const rawHeader = singleRes.headers.get("x-web-search-meta");
+            assert.ok(rawHeader, "Debe incluir cabecera X-Web-Search-Meta");
+            const decodedMeta = JSON.parse(Buffer.from(rawHeader, "base64").toString("utf8"));
+            assert.equal(decodedMeta.ok, true);
+            assert.equal(decodedMeta.poolUsed, "web");
+            assert.equal(decodedMeta.results[0].title, "Guía Kokoro TTS INT8 Español");
+            assertNoSecretsInPayload(decodedMeta, [fakeWebKey]);
+
+            const ollamaReq = capturedMockRequests.find((r) => r.url === "/api/chat");
+            assert.ok(ollamaReq, "Ollama mock debió recibir la petición");
+            assert.ok(ollamaReq.body.messages[0].content.includes("<busqueda_web_en_tiempo_real"));
+            assert.ok(ollamaReq.body.messages[0].content.includes("Guía Kokoro TTS INT8 Español"));
+            assert.equal(ollamaReq.body.messages[0].content.includes(fakeWebKey), false);
+
+            // 2. Dual /api/chat/dual con webSearchEnabled: true -> evento NDJSON web_search + inyección en A y B
+            capturedMockRequests = [];
+            const dualRes = await httpReq("/api/chat/dual", {
+              method: "POST",
+              body: {
+                project: "AlphaApp",
+                pair: "freeai+ollama",
+                workflow: "pipeline",
+                webSearchEnabled: true,
+                webSearchMode: "news",
+                agentA: { source: "freeai", model: "qwen-2.5-coder" },
+                agentB: { source: "ollama", model: "qwen2.5-coder:latest" },
+                messages: [{ role: "user", content: "Resume novedades ROCm Windows" }]
+              }
+            });
+            assert.equal(dualRes.status, 200);
+            assertNoSecretsInPayload(dualRes.text, [fakeWebKey]);
+            const dualEvents = dualRes.text.trim().split("\n").map((l) => JSON.parse(l));
+            const webEvent = dualEvents.find((e) => e.type === "web_search");
+            assert.ok(webEvent, "Dual stream debe emitir evento NDJSON web_search");
+            assert.equal(webEvent.ok, true);
+            assert.equal(webEvent.mode, "news");
+            assert.equal(webEvent.poolUsed, "web");
+            assert.equal(webEvent.totalResults, 1);
+            assert.equal(webEvent.results[0].title, "Lanzamiento ROCm Windows Ryzen");
+
+            const freeReq = capturedMockRequests.find((r) => r.url === "/freeai/v1/chat/completions");
+            const dualOllamaReq = capturedMockRequests.find((r) => r.url === "/api/chat");
+            assert.ok(freeReq.body.messages[0].content.includes("<busqueda_web_en_tiempo_real"));
+            assert.ok(dualOllamaReq.body.messages[0].content.includes("<busqueda_web_en_tiempo_real"));
+            assert.equal(freeReq.body.messages[0].content.includes(fakeWebKey), false);
+            assert.equal(dualOllamaReq.body.messages[0].content.includes(fakeWebKey), false);
+          }
+        );
+      }
+    );
   });
 });

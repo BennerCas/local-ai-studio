@@ -2042,6 +2042,127 @@
       margin-left: 4px;
     }
 
+    .btn-dml-restart {
+      border-color: rgba(125, 207, 255, 0.35);
+      color: var(--accent-cyan);
+    }
+
+    .btn-stop-stream {
+      background: rgba(247, 118, 142, 0.16);
+      border: 1px solid rgba(247, 118, 142, 0.55);
+      color: var(--accent-red);
+      border-radius: 10px;
+      padding: 0 14px;
+      font-weight: 700;
+      font-size: var(--chrome-font-small);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.16s;
+    }
+    .btn-stop-stream:hover {
+      background: var(--accent-red);
+      color: #000000;
+    }
+    .btn-stop-stream:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .web-mode-select, .tts-voice-select {
+      background: transparent;
+      border: none;
+      border-left: 1px solid rgba(122, 162, 247, 0.18);
+      color: var(--text-main);
+      padding: 3px 5px;
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
+      max-width: 125px;
+    }
+    .web-mode-select option, .tts-voice-select option {
+      background: #07070b;
+      color: #ffffff;
+    }
+    .tts-status-pill {
+      padding: 3px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      white-space: nowrap;
+    }
+    .tts-status-pill.ready { color: var(--accent-green); }
+    .tts-status-pill.offline { color: var(--text-muted); }
+
+    .dual-hw-runtime-note {
+      background: rgba(224, 175, 104, 0.12);
+      border: 1px solid rgba(224, 175, 104, 0.4);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11.5px;
+      color: var(--accent-yellow);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .dual-hw-restarts {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+    .dual-hw-restart-opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+    .dual-hw-restart-opt input {
+      accent-color: var(--accent-cyan);
+    }
+
+    .web-citations-box {
+      background: #030408;
+      border: 1px solid rgba(125, 207, 255, 0.34);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
+      font-size: var(--font-ui-small);
+    }
+    .web-citations-box summary {
+      cursor: pointer;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      user-select: none;
+    }
+    .web-citations-list {
+      margin-top: 7px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(125, 207, 255, 0.16);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .web-citation-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .web-citation-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .web-citation-snippet {
+      font-size: 11.5px;
+      color: var(--text-main);
+    }
+
     /* Modales */
     .modal-backdrop {
       position: fixed;
@@ -2393,6 +2514,9 @@
         <span id="dml-icon">⚡</span>
         <span id="dml-label">DirectML GPU</span>
       </button>
+      <button type="button" id="btn-dml-restart" class="header-btn btn-dml-restart" style="display:none;" title="Reiniciar servidor DirectML GPU liberando VRAM">
+        <span>🔄</span><span>Reiniciar DirectML</span>
+      </button>
     </div>
 
     <div id="dual-bar-strip" class="dual-bar-strip">
@@ -2512,6 +2636,17 @@
       </div>
       <div id="dual-hw-warnings" class="dual-hw-list"></div>
       <div id="dual-hw-recommendations" class="dual-hw-list"></div>
+      <div id="dual-hw-runtime-note" class="dual-hw-runtime-note" style="display:none;"></div>
+      <div class="dual-hw-restarts">
+        <label class="dual-hw-restart-opt" title="Reinicia el servicio Ollama tras aplicar variables para activar aceleración iGPU / KV">
+          <input type="checkbox" id="dual-restart-ollama-check">
+          <span>Reiniciar Ollama al tunear</span>
+        </label>
+        <label class="dual-hw-restart-opt" title="Reinicia el servidor DirectML tras aplicar variables para refrescar límite de VRAM e hilos">
+          <input type="checkbox" id="dual-restart-directml-check">
+          <span>Reiniciar DirectML al tunear</span>
+        </label>
+      </div>
       <div class="dual-hw-actions">
         <button type="button" id="btn-dual-apply-recommended" class="header-btn btn-accent-cyan" title="Aplicar flujo, contexto y ajuste sugerido para este hardware y par">
           ✨ Aplicar Perfil Sugerido
@@ -3100,17 +3235,38 @@
           <span>🤗 Hugging Face</span>
           <span id="hf-pill-badge" style="display:none;"></span>
         </button>
+
+        <div class="int-chip-pair web-search-chip" title="Búsqueda web en tiempo real con SerpApi (2 APIs con contador mensual)">
+          <button type="button" id="toggle-web-search" class="int-toggle-btn" aria-pressed="false" title="Activar o desactivar búsqueda web real para enriquecer las respuestas (OFF por defecto)">
+            <span>🌐</span><span id="web-search-pill-state">Web: OFF</span>
+          </button>
+          <select id="web-search-mode" class="web-mode-select" aria-label="Modo de búsqueda web">
+            <option value="web">Web</option>
+            <option value="news">Noticias</option>
+            <option value="jobs">Empleos</option>
+          </select>
+          <button type="button" id="serpapi-usage-badge" class="int-quick-act" title="Uso mensual de SerpApi (clic para refrescar)">0/250</button>
+        </div>
+
+        <div class="int-chip-pair tts-voice-chip" title="Síntesis de voz neuronal local Kokoro TTS (ES) con fallback Piper">
+          <span id="tts-status-badge" class="tts-status-pill" title="Motor TTS local">🔊 Kokoro</span>
+          <select id="tts-voice-select" class="tts-voice-select" aria-label="Voz local TTS en español">
+            <option value="ef_dora">Dora (ES Fem.)</option>
+          </select>
+        </div>
       </div>
 
       <div id="int-env-dots" class="int-env-status" title="Estado de credenciales detectadas en .env">
         <span id="dot-gh" class="env-dot">GH</span>
         <span id="dot-nf" class="env-dot">NF</span>
         <span id="dot-hf" class="env-dot">HF</span>
+        <span id="dot-serp" class="env-dot">SERP</span>
       </div>
     </div>
 
     <div class="input-box">
       <textarea id="prompt-input" placeholder="Pregunta a tu modelo local sobre el proyecto activo..." aria-label="Mensaje para el modelo de IA"></textarea>
+      <button type="button" class="btn-stop-stream" id="btn-stop-stream" style="display:none;" title="Detener respuesta en curso">⏹️ Detener</button>
       <button type="button" class="send-btn" id="send-btn">Enviar</button>
     </div>
 
@@ -3160,7 +3316,9 @@
       SOURCE: 'local_ai_source_v1',
       MODEL: 'local_ai_model_v1',
       SYSTEM_OVERRIDE: 'local_ai_sys_override_v1',
-      HF_RECENT_DIRS: 'local_ai_hf_dirs_v1'
+      HF_RECENT_DIRS: 'local_ai_hf_dirs_v1',
+      WEB_SEARCH_MODE: 'local_ai_web_search_mode_v1',
+      TTS_VOICE: 'local_ai_tts_voice_v1'
     };
 
     const renderedCodeBlocks = new Map();
@@ -3225,6 +3383,21 @@
     let netlifyPublishDir = '';
 
     let isStreaming = false;
+    let activeStreamAbortController = null;
+    let userAbortedStream = false;
+
+    let webSearchEnabled = false;
+    let webSearchMode = localStorage.getItem(STORAGE_KEYS.WEB_SEARCH_MODE) || 'web';
+    if (!['web', 'news', 'jobs'].includes(webSearchMode)) webSearchMode = 'web';
+    let serpApiStatusData = null;
+
+    let ttsStatusData = { ok: false, kokoroReady: false, piperReady: false, voices: [] };
+    let selectedTtsVoice = localStorage.getItem(STORAGE_KEYS.TTS_VOICE) || 'ef_dora';
+    let activeAudio = null;
+    let activeAudioUrl = '';
+    let activeTtsAbortController = null;
+    let ttsPlaybackSeq = 0;
+
     let currentVersionBuild = null;
     let activeSpeechBtn = null;
     let toastTimeout = null;
@@ -3747,6 +3920,285 @@
       return card;
     }
 
+    function isChatCapableModel(m) {
+      if (!m || typeof m !== 'object') return false;
+      if (m.isFreeAi) {
+        const typeStr = String(m.type || (m.details && m.details.family) || '').trim().toLowerCase();
+        const nonChatTypes = ['image', 'audio', 'tts', 'stt', 'whisper', 'embedding', 'embed', 'rerank', 'moderation', 'diffusion', 'vision-gen', 'video', '3d', 'asr'];
+        if (typeStr && nonChatTypes.some((t) => typeStr === t || typeStr.includes(t))) {
+          return false;
+        }
+        const idName = `${m.rawId || ''} ${m.name || ''} ${m.displayName || ''}`.toLowerCase();
+        if (/\b(?:flux|sdxl|dall-?e|stable-diffusion|imagen|whisper|tts|kokoro|piper|bark|elevenlabs|embed|embedding|bge-|e5-|rerank|moderation|sora|veo|runway|midjourney)\b/i.test(idName)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function decodeBase64Utf8Json(b64) {
+      if (!b64 || typeof b64 !== 'string') return null;
+      try {
+        const clean = b64.trim();
+        if (!clean) return null;
+        const bin = atob(clean);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) {
+          bytes[i] = bin.charCodeAt(i);
+        }
+        const jsonStr = new TextDecoder('utf-8').decode(bytes);
+        return JSON.parse(jsonStr);
+      } catch (_e) {
+        return null;
+      }
+    }
+
+    function createWebCitationsElement(meta) {
+      if (!meta || typeof meta !== 'object') return null;
+      const results = Array.isArray(meta.results) ? meta.results : [];
+      if (results.length === 0 && !meta.error && !meta.query) return null;
+
+      const details = document.createElement('details');
+      details.className = 'web-citations-box';
+
+      const summary = document.createElement('summary');
+      const modeLabel = meta.mode === 'jobs' ? 'Empleos' : (meta.mode === 'news' ? 'Noticias' : 'Web');
+      const countText = results.length > 0
+        ? `${results.length} fuente(s)`
+        : (meta.error ? 'Sin resultados / Aviso' : '0 resultados');
+      const poolText = meta.poolUsed ? ` • Pool ${meta.poolUsed}` : '';
+      const qPreview = meta.query ? ` — "${meta.query}"` : '';
+      summary.textContent = `🌐 Búsqueda ${modeLabel}${poolText}: ${countText}${qPreview}`;
+      details.appendChild(summary);
+
+      const listEl = document.createElement('div');
+      listEl.className = 'web-citations-list';
+
+      if (meta.error) {
+        const errItem = document.createElement('div');
+        errItem.className = 'web-citation-item';
+        errItem.style.color = meta.configured === false ? 'var(--accent-yellow)' : 'var(--accent-red)';
+        errItem.textContent = `⚠️ ${meta.error}`;
+        listEl.appendChild(errItem);
+      }
+
+      results.forEach((r, idx) => {
+        if (!r || typeof r !== 'object') return;
+        const item = document.createElement('div');
+        item.className = 'web-citation-item';
+
+        const titleRow = document.createElement('div');
+        const numSpan = document.createElement('span');
+        numSpan.style.color = 'var(--text-muted)';
+        numSpan.style.marginRight = '5px';
+        numSpan.textContent = `[${idx + 1}]`;
+        titleRow.appendChild(numSpan);
+
+        if (r.link && isSafeHttpUrl(r.link)) {
+          const a = document.createElement('a');
+          a.href = r.link.trim();
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.style.color = 'var(--accent-cyan)';
+          a.style.textDecoration = 'underline';
+          a.textContent = r.title || r.source || r.link;
+          titleRow.appendChild(a);
+        } else {
+          const titleSpan = document.createElement('span');
+          titleSpan.style.color = 'var(--text-strong)';
+          titleSpan.textContent = r.title || r.source || 'Resultado';
+          titleRow.appendChild(titleSpan);
+        }
+        item.appendChild(titleRow);
+
+        const metaParts = [r.source, r.date].filter(Boolean);
+        if (metaParts.length > 0) {
+          const metaLine = document.createElement('div');
+          metaLine.className = 'web-citation-meta';
+          metaLine.textContent = metaParts.join(' • ');
+          item.appendChild(metaLine);
+        }
+
+        if (r.snippet) {
+          const snip = document.createElement('div');
+          snip.className = 'web-citation-snippet';
+          snip.textContent = r.snippet;
+          item.appendChild(snip);
+        }
+
+        listEl.appendChild(item);
+      });
+
+      details.appendChild(listEl);
+      return details;
+    }
+
+    function updateWebSearchUi() {
+      const btn = document.getElementById('toggle-web-search');
+      const stateSpan = document.getElementById('web-search-pill-state');
+      const modeSel = document.getElementById('web-search-mode');
+      if (btn) {
+        btn.classList.toggle('active', Boolean(webSearchEnabled));
+        btn.setAttribute('aria-pressed', String(Boolean(webSearchEnabled)));
+      }
+      if (stateSpan) {
+        stateSpan.textContent = webSearchEnabled ? 'Web: ON' : 'Web: OFF';
+      }
+      if (modeSel && ['web', 'news', 'jobs'].includes(webSearchMode)) {
+        modeSel.value = webSearchMode;
+      }
+    }
+
+    function updateSerpApiUsageBadge(statusObj = null) {
+      if (statusObj && typeof statusObj === 'object') {
+        serpApiStatusData = statusObj;
+      }
+      const badge = document.getElementById('serpapi-usage-badge');
+      const dot = document.getElementById('dot-serp');
+      const status = serpApiStatusData;
+      const usage = (status && status.usage && typeof status.usage === 'object')
+        ? status.usage
+        : (status && typeof status.webUses === 'number' ? status : null);
+
+      if (dot && status && status.configured !== undefined) {
+        dot.classList.toggle('ready', Boolean(status.configured));
+      }
+      if (!badge) return;
+
+      if (!usage) {
+        badge.textContent = '0/250';
+        return;
+      }
+      const webUses = Number(usage.webUses || 0);
+      const webLimit = Number(usage.webLimit || 250);
+      const jobsUses = Number(usage.jobsUses || 0);
+      const jobsLimit = Number(usage.jobsLimit || 250);
+      const webKeys = Number(status?.webKeysCount ?? integrationsStatus?.serpApiWebKeysCount ?? 0);
+      const jobsKeys = Number(status?.jobsKeysCount ?? integrationsStatus?.serpApiJobsKeysCount ?? 0);
+
+      if (webKeys > 0 && jobsKeys > 0) {
+        badge.textContent = `W:${webUses}/${webLimit} J:${jobsUses}/${jobsLimit}`;
+      } else if (webSearchMode === 'jobs' || (jobsKeys > 0 && webKeys === 0)) {
+        badge.textContent = `${jobsUses}/${jobsLimit}`;
+      } else {
+        badge.textContent = `${webUses}/${webLimit}`;
+      }
+      const monthLabel = usage.month ? `Mes ${usage.month} | ` : '';
+      badge.title = `${monthLabel}SerpApi Web: ${webUses}/${webLimit} (${webKeys} key) | Jobs: ${jobsUses}/${jobsLimit} (${jobsKeys} key). Clic para actualizar.`;
+    }
+
+    async function loadSerpApiUsage() {
+      try {
+        const data = await fetchJson('/api/integrations/serpapi/usage');
+        updateSerpApiUsageBadge(data);
+      } catch (_e) {}
+    }
+
+    async function loadTtsStatus() {
+      const badge = document.getElementById('tts-status-badge');
+      const sel = document.getElementById('tts-voice-select');
+      try {
+        const data = await fetchJson('/api/tts/status');
+        ttsStatusData = data && typeof data === 'object' ? data : { ok: false, voices: [] };
+        const voices = Array.isArray(ttsStatusData.voices) ? ttsStatusData.voices : [];
+
+        if (sel && voices.length > 0) {
+          sel.innerHTML = '';
+          voices.forEach((v) => {
+            if (!v || !v.id) return;
+            const opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.label || v.id;
+            sel.appendChild(opt);
+          });
+          if (voices.some((v) => v.id === selectedTtsVoice)) {
+            sel.value = selectedTtsVoice;
+          } else if (voices.some((v) => v.id === 'ef_dora')) {
+            selectedTtsVoice = 'ef_dora';
+            sel.value = 'ef_dora';
+          } else {
+            selectedTtsVoice = sel.options[0]?.value || 'ef_dora';
+            sel.value = selectedTtsVoice;
+          }
+          localStorage.setItem(STORAGE_KEYS.TTS_VOICE, selectedTtsVoice);
+        }
+
+        if (badge) {
+          badge.classList.remove('ready', 'offline');
+          if (ttsStatusData.kokoroReady) {
+            badge.classList.add('ready');
+            badge.textContent = '🔊 Kokoro';
+            badge.title = 'Kokoro TTS local listo (INT8 ES)';
+          } else if (ttsStatusData.piperReady) {
+            badge.classList.add('ready');
+            badge.textContent = '🔊 Piper ES';
+            badge.title = 'Piper ES local listo (fallback Kokoro)';
+          } else {
+            badge.classList.add('offline');
+            badge.textContent = '🔇 TTS Web';
+            badge.title = ttsStatusData.error || 'Motor TTS local no disponible (usará síntesis del navegador)';
+          }
+        }
+      } catch (_e) {
+        if (badge) {
+          badge.classList.remove('ready');
+          badge.classList.add('offline');
+          badge.textContent = '🔇 TTS Web';
+        }
+      }
+    }
+
+    function stopActiveTtsPlayback() {
+      ttsPlaybackSeq += 1;
+      if (activeTtsAbortController) {
+        try { activeTtsAbortController.abort(); } catch (_e) {}
+        activeTtsAbortController = null;
+      }
+      if (activeAudio) {
+        activeAudio.onended = null;
+        activeAudio.onerror = null;
+        try { activeAudio.pause(); } catch (_e) {}
+        activeAudio = null;
+      }
+      if (activeAudioUrl) {
+        try { URL.revokeObjectURL(activeAudioUrl); } catch (_e) {}
+        activeAudioUrl = '';
+      }
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (_e) {}
+      }
+      if (activeSpeechBtn) {
+        activeSpeechBtn.classList.remove('speaking');
+        activeSpeechBtn.textContent = activeSpeechBtn.dataset.idleLabel || '🔊 Leer';
+        activeSpeechBtn = null;
+      }
+    }
+
+    function setStreamingUiState(active, sendLabel = 'Enviar') {
+      isStreaming = Boolean(active);
+      const stopBtn = document.getElementById('btn-stop-stream');
+      const enterBtn = document.getElementById('btn-enter-context');
+      if (sendBtn) {
+        sendBtn.disabled = Boolean(active);
+        sendBtn.textContent = active ? sendLabel : 'Enviar';
+      }
+      if (enterBtn) enterBtn.disabled = Boolean(active);
+      if (stopBtn) {
+        stopBtn.style.display = active ? 'inline-flex' : 'none';
+        stopBtn.disabled = false;
+      }
+    }
+
+    function abortActiveStream() {
+      if (!activeStreamAbortController) return;
+      userAbortedStream = true;
+      const stopBtn = document.getElementById('btn-stop-stream');
+      if (stopBtn) stopBtn.disabled = true;
+      try {
+        activeStreamAbortController.abort();
+      } catch (_e) {}
+    }
+
     function appendMessage(role, text, skipScroll = false, extra = {}) {
       const div = document.createElement('div');
       div.className = `message ${role}`;
@@ -3759,6 +4211,10 @@
         if (extra && extra.telemetry) {
           const telCard = createTelemetryCardElement(extra.telemetry);
           if (telCard) div.appendChild(telCard);
+        }
+        if (extra && extra.webSearchMeta) {
+          const citEl = createWebCitationsElement(extra.webSearchMeta);
+          if (citEl) div.appendChild(citEl);
         }
         if (extra && extra.fallback) {
           const fbBanner = document.createElement('div');
@@ -3801,48 +4257,152 @@
       msgDiv.appendChild(actions);
     }
 
-    function toggleSpeechForMessage(btnEl, msgDiv) {
+    async function speakWithBrowserFallback(rawText, btnEl, seq) {
+      if (seq !== ttsPlaybackSeq || !btnEl) return;
       if (!('speechSynthesis' in window)) {
+        if (activeSpeechBtn === btnEl) activeSpeechBtn = null;
+        btnEl.classList.remove('speaking');
+        btnEl.textContent = btnEl.dataset.idleLabel || '🔊 Leer';
         showToast('Tu navegador no soporta síntesis de voz.', 'warn');
         return;
       }
-      const rawText = (msgDiv && msgDiv._rawText) || '';
-      if (btnEl.classList.contains('speaking')) {
-        window.speechSynthesis.cancel();
+      try { window.speechSynthesis.cancel(); } catch (_e) {}
+      const clean = String(rawText || '')
+        .replace(/<think(?:ing)?\b[^>]*>[\s\S]*?<\/think(?:ing)?>/gi, '')
+        .replace(/```[\s\S]*?```/g, ' bloque de código ')
+        .replace(/[*#_`]/g, '')
+        .trim();
+      if (!clean) {
+        if (activeSpeechBtn === btnEl) activeSpeechBtn = null;
         btnEl.classList.remove('speaking');
-        btnEl.textContent = '🔊 Leer';
-        activeSpeechBtn = null;
+        btnEl.textContent = btnEl.dataset.idleLabel || '🔊 Leer';
         return;
       }
-      if (activeSpeechBtn) {
-        activeSpeechBtn.classList.remove('speaking');
-        activeSpeechBtn.textContent = '🔊 Leer';
-      }
-      window.speechSynthesis.cancel();
-
-      const clean = rawText
-        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-        .replace(/```[\s\S]*?```/g, ' bloque de código ')
-        .replace(/[*#_`]/g, '');
 
       const utterance = new SpeechSynthesisUtterance(clean);
       utterance.lang = 'es-ES';
       utterance.rate = 1.05;
-      utterance.onend = () => {
-        btnEl.classList.remove('speaking');
-        btnEl.textContent = '🔊 Leer';
+      const finish = () => {
+        if (seq !== ttsPlaybackSeq) return;
         if (activeSpeechBtn === btnEl) activeSpeechBtn = null;
-      };
-      utterance.onerror = () => {
         btnEl.classList.remove('speaking');
-        btnEl.textContent = '🔊 Leer';
-        if (activeSpeechBtn === btnEl) activeSpeechBtn = null;
+        btnEl.textContent = btnEl.dataset.idleLabel || '🔊 Leer';
       };
+      utterance.onend = finish;
+      utterance.onerror = finish;
 
       activeSpeechBtn = btnEl;
       btnEl.classList.add('speaking');
       btnEl.textContent = '⏹️ Detener';
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (_e) {
+        finish();
+      }
+    }
+
+    async function toggleSpeechForMessage(btnEl, msgDiv) {
+      if (!btnEl) return;
+      if (!btnEl.dataset.idleLabel) {
+        btnEl.dataset.idleLabel = btnEl.textContent.trim() || '🔊 Leer';
+      }
+      const wasSpeaking = btnEl.classList.contains('speaking');
+      stopActiveTtsPlayback();
+      if (wasSpeaking) return;
+
+      const rawText = String((msgDiv && msgDiv._rawText) || '').trim();
+      if (!rawText) {
+        showToast('No hay texto para leer en voz alta.', 'warn');
+        return;
+      }
+
+      const seq = ttsPlaybackSeq;
+      const ctrl = new AbortController();
+      activeTtsAbortController = ctrl;
+      activeSpeechBtn = btnEl;
+      btnEl.classList.add('speaking');
+      btnEl.textContent = '⏳ Voz...';
+
+      const resetBtnIfCurrent = () => {
+        if (seq !== ttsPlaybackSeq) return;
+        if (activeSpeechBtn === btnEl) activeSpeechBtn = null;
+        btnEl.classList.remove('speaking');
+        btnEl.textContent = btnEl.dataset.idleLabel || '🔊 Leer';
+      };
+
+      try {
+        const res = await fetch('/api/tts/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: rawText,
+            voice: selectedTtsVoice || 'ef_dora',
+            speed: 1.0
+          }),
+          signal: ctrl.signal
+        });
+
+        if (seq !== ttsPlaybackSeq) return;
+        if (activeTtsAbortController === ctrl) activeTtsAbortController = null;
+
+        if (!res.ok) {
+          let errText = `HTTP ${res.status}`;
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errText = errJson.error;
+          } catch (_e) {}
+          throw new Error(errText);
+        }
+
+        const blob = await res.blob();
+        if (seq !== ttsPlaybackSeq) return;
+        if (!blob || blob.size === 0) {
+          throw new Error('Audio WAV vacío');
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        if (seq !== ttsPlaybackSeq) {
+          try { URL.revokeObjectURL(blobUrl); } catch (_e) {}
+          return;
+        }
+
+        const audio = new Audio(blobUrl);
+        activeAudio = audio;
+        activeAudioUrl = blobUrl;
+
+        const cleanupAudio = () => {
+          audio.onended = null;
+          audio.onerror = null;
+          if (activeAudio === audio) activeAudio = null;
+          if (activeAudioUrl === blobUrl) activeAudioUrl = '';
+          try { URL.revokeObjectURL(blobUrl); } catch (_e) {}
+        };
+
+        audio.onended = () => {
+          cleanupAudio();
+          resetBtnIfCurrent();
+        };
+        audio.onerror = () => {
+          cleanupAudio();
+          if (seq !== ttsPlaybackSeq) return;
+          speakWithBrowserFallback(rawText, btnEl, seq);
+        };
+
+        btnEl.textContent = '⏹️ Detener';
+        try {
+          await audio.play();
+        } catch (_playErr) {
+          cleanupAudio();
+          if (seq !== ttsPlaybackSeq) return;
+          await speakWithBrowserFallback(rawText, btnEl, seq);
+        }
+      } catch (err) {
+        if (activeTtsAbortController === ctrl) activeTtsAbortController = null;
+        if (seq !== ttsPlaybackSeq || (err && err.name === 'AbortError')) {
+          return;
+        }
+        await speakWithBrowserFallback(rawText, btnEl, seq);
+      }
     }
 
     function retryFromAiMessage(msgDiv) {
@@ -3896,7 +4456,12 @@
 
       const applyBtn = event.target.closest('[data-apply-act="execute"]');
       if (applyBtn) {
-        await executeFileCardAction(applyBtn.dataset.blockId, applyBtn, { batchMode: false });
+        const dualPane = applyBtn.closest('.dual-agent-pane');
+        await executeFileCardAction(applyBtn.dataset.blockId, applyBtn, {
+          batchMode: false,
+          sourceOverride: dualPane ? (dualPane.dataset.agentSource || null) : null,
+          modelOverride: dualPane ? (dualPane.dataset.agentModel || null) : null
+        });
         return;
       }
 
@@ -3989,7 +4554,7 @@
         if (res.githubSync && res.githubSync.ok) note += ` | 🐙 GitHub sync OK`;
         if (res.netlifyDeploy && res.netlifyDeploy.ok) note += ` | ▲ Netlify deploy OK`;
         showToast(note, 'success');
-        loadProjectContext();
+        loadProjectContext({ preserveDualConfig: true });
       } catch (err) {
         if (errEl) {
           errEl.textContent = err.message;
@@ -4131,7 +4696,7 @@
             if (res.githubSync && !res.githubSync.ok) msg += ` (⚠️ Sync GitHub: ${res.githubSync.error})`;
             showToast(msg, res.githubSync && !res.githubSync.ok ? 'warn' : 'success');
             await saveCurrentSessionToStorage();
-            loadProjectContext();
+            loadProjectContext({ preserveDualConfig: true });
           }
           return { ok: true, kind: 'write', relPath: res.relPath || block.filePath, content: block.code };
         }
@@ -4168,7 +4733,7 @@
             if (res.githubSync && !res.githubSync.ok) msg += ` (⚠️ Sync GitHub: ${res.githubSync.error})`;
             showToast(msg, res.githubSync && !res.githubSync.ok ? 'warn' : 'success');
             await saveCurrentSessionToStorage();
-            loadProjectContext();
+            loadProjectContext({ preserveDualConfig: true });
           }
           return { ok: true, kind: 'patch', relPath: res.relPath || block.filePath };
         }
@@ -4200,8 +4765,12 @@
       });
 
       const dmlBtn = document.getElementById('btn-dml-control');
+      const dmlRestartBtn = document.getElementById('btn-dml-restart');
       const mfBtn = document.getElementById('btn-modelfile');
       if (dmlBtn) dmlBtn.style.display = currentSource === 'directml' ? 'inline-flex' : 'none';
+      if (dmlRestartBtn) {
+        dmlRestartBtn.style.display = (currentSource === 'directml' && directmlStatus === 'online') ? 'inline-flex' : 'none';
+      }
       if (mfBtn) mfBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
 
       populateModelSelect();
@@ -4227,7 +4796,7 @@
       if (currentSource === 'directml') {
         filtered = allModels.filter((m) => m.isDirectML);
       } else if (currentSource === 'freeai') {
-        filtered = allModels.filter((m) => m.isFreeAi);
+        filtered = allModels.filter((m) => m.isFreeAi && isChatCapableModel(m));
       } else {
         filtered = allModels.filter((m) => m.isLocal);
       }
@@ -4284,6 +4853,7 @@
 
     async function checkDirectMLStatus() {
       const btn = document.getElementById('btn-dml-control');
+      const restartBtn = document.getElementById('btn-dml-restart');
       const icon = document.getElementById('dml-icon');
       const label = document.getElementById('dml-label');
       if (!btn || !icon || !label) return;
@@ -4295,37 +4865,87 @@
           label.textContent = data.active_model ? `DirectML: ${data.active_model}` : 'DirectML GPU Online';
           btn.style.borderColor = 'var(--accent-green)';
           btn.style.color = 'var(--accent-green)';
+          btn.title = 'Servidor DirectML activo — clic para detener y liberar VRAM';
+          if (restartBtn) restartBtn.style.display = currentSource === 'directml' ? 'inline-flex' : 'none';
         } else {
           icon.textContent = '🔴';
           label.textContent = 'Iniciar DirectML GPU';
           btn.style.borderColor = 'var(--accent-red)';
           btn.style.color = 'var(--accent-red)';
+          btn.title = 'Control y estado del servidor DirectML';
+          if (restartBtn) restartBtn.style.display = 'none';
         }
       } catch (_e) {
         directmlStatus = 'offline';
         icon.textContent = '⚠️';
         label.textContent = 'DirectML Offline';
+        if (restartBtn) restartBtn.style.display = 'none';
       }
     }
 
     async function handleDirectMLControl() {
-      if (directmlStatus === 'online') {
-        showToast('⚡ Servidor DirectML GPU activo en puerto 8002.', 'success');
-        return;
-      }
+      const btn = document.getElementById('btn-dml-control');
       const label = document.getElementById('dml-label');
-      if (label) label.textContent = 'Iniciando GPU...';
+      if (btn) btn.disabled = true;
       try {
+        if (directmlStatus === 'online') {
+          if (label) label.textContent = 'Deteniendo GPU...';
+          const data = await fetchJson('/api/directml/stop', { method: 'POST' });
+          showToast(
+            data.ok ? '🛑 Servidor DirectML detenido y VRAM liberada.' : `DirectML: ${data.message || 'ya detenido'}`,
+            'info'
+          );
+          await loadModels();
+          await checkDirectMLStatus();
+          if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+          return;
+        }
+        if (label) label.textContent = 'Iniciando GPU...';
         const data = await fetchJson('/api/directml/start', { method: 'POST' });
         if (data.ok) {
           showToast('🚀 Servidor DirectML GPU iniciado.', 'success');
           await loadModels();
           await checkDirectMLStatus();
+          if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
         } else {
           showToast(`Error DirectML: ${data.message || data.error || 'fallo'}`, 'error');
         }
       } catch (err) {
-        showToast(`Error iniciando DirectML: ${err.message}`, 'error');
+        showToast(`Error controlando DirectML: ${err.message}`, 'error');
+        await checkDirectMLStatus();
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function restartDirectmlControl() {
+      const restartBtn = document.getElementById('btn-dml-restart');
+      const origHtml = restartBtn ? restartBtn.innerHTML : '';
+      if (restartBtn) {
+        restartBtn.disabled = true;
+        restartBtn.textContent = '⏳ Reiniciando...';
+      }
+      try {
+        const data = await fetchJson('/api/directml/restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        });
+        if (data.ok) {
+          showToast('🔄 Servidor DirectML GPU reiniciado correctamente.', 'success');
+        } else {
+          showToast(`⚠️ DirectML restart: ${data.error || data.message || 'fallo'}`, 'warn');
+        }
+        await loadModels();
+        await checkDirectMLStatus();
+        if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+      } catch (err) {
+        showToast(`❌ Error reiniciando DirectML: ${err.message}`, 'error');
+      } finally {
+        if (restartBtn) {
+          restartBtn.disabled = false;
+          if (origHtml) restartBtn.innerHTML = origHtml;
+        }
       }
     }
 
@@ -4661,7 +5281,7 @@
     function getModelsForDualSource(source) {
       const s = normalizeDualSourceClient(source);
       if (s === 'directml') return allModels.filter((m) => m && m.isDirectML);
-      if (s === 'freeai') return allModels.filter((m) => m && m.isFreeAi);
+      if (s === 'freeai') return allModels.filter((m) => m && m.isFreeAi && isChatCapableModel(m));
       return allModels.filter((m) => m && m.isLocal);
     }
 
@@ -5022,9 +5642,12 @@
         const eff = (tel.env && tel.env.effective) || {};
         const dmlLim = eff.OLIVE_GPU_MEMORY_LIMIT || '20';
         const igpuOn = eff.OLLAMA_IGPU_ENABLE === '1' ? 'ON' : 'OFF';
+        const gpuPctText = (ev.psGpuRatio !== null && ev.psGpuRatio !== undefined)
+          ? ` • GPUps=${Math.round(Number(ev.psGpuRatio) * 100)}%`
+          : '';
         sumEl.textContent =
           `${cpuName} • ${gpuName} • RAM libre: ${ramFree.toFixed(2)}/${ramTotal.toFixed(1)} GB • ` +
-          `Pico Dual est.: ${ev.estimatedPeakLocalGb} GB • iGPU=${igpuOn} • DML=${dmlLim} GB`;
+          `Pico Dual est.: ${ev.estimatedPeakLocalGb} GB • iGPU=${igpuOn} • DML=${dmlLim} GB${gpuPctText}`;
       }
 
       const memTagA = document.getElementById('dual-a-mem-tag');
@@ -5056,6 +5679,38 @@
           line.textContent = `💡 ${r}`;
           recEl.appendChild(line);
         });
+      }
+
+      const runtimeNoteEl = document.getElementById('dual-hw-runtime-note');
+      if (runtimeNoteEl) {
+        const runtimeNotes = [];
+        if (ev.ollamaRunningOnCpu) {
+          const pctStr = (ev.psGpuRatio !== null && ev.psGpuRatio !== undefined)
+            ? ` (${Math.round(Number(ev.psGpuRatio) * 100)}% en GPU)`
+            : '';
+          runtimeNotes.push(`Ollama detectado corriendo en CPU${pctStr}. Marca "Reiniciar Ollama al tunear" para activar iGPU Radeon/ROCm.`);
+        } else if (ev.requiresOllamaRestart) {
+          runtimeNotes.push('Variables de entorno de Ollama actualizadas: se recomienda reiniciar el daemon de Ollama.');
+        }
+        if (ev.requiresDirectmlRestart) {
+          runtimeNotes.push('Límite/hilos DirectML actualizados: se recomienda reiniciar DirectML para aplicarlos al proceso ONNX.');
+        }
+        if (runtimeNotes.length > 0) {
+          runtimeNoteEl.innerHTML = runtimeNotes.map((msg) => `<div>🛠️ ${escapeHtml(msg)}</div>`).join('');
+          runtimeNoteEl.style.display = 'flex';
+        } else {
+          runtimeNoteEl.style.display = 'none';
+          runtimeNoteEl.innerHTML = '';
+        }
+      }
+
+      const restartOllamaChk = document.getElementById('dual-restart-ollama-check');
+      if (restartOllamaChk && restartOllamaChk.dataset.userTouched !== '1') {
+        restartOllamaChk.checked = Boolean(ev.requiresOllamaRestart || ev.ollamaRunningOnCpu);
+      }
+      const restartDirectmlChk = document.getElementById('dual-restart-directml-check');
+      if (restartDirectmlChk && restartDirectmlChk.dataset.userTouched !== '1') {
+        restartDirectmlChk.checked = Boolean(ev.requiresDirectmlRestart);
       }
     }
 
@@ -5093,6 +5748,10 @@
     async function applyDualSystemTuning(scope = 'session', { silentSuccess = false } = {}) {
       const btnId = scope === 'windows_user' ? 'btn-dual-tune-windows' : 'btn-dual-tune-session';
       const btn = document.getElementById(btnId);
+      const restartOllamaChk = document.getElementById('dual-restart-ollama-check');
+      const restartDirectmlChk = document.getElementById('dual-restart-directml-check');
+      const restartOllama = Boolean(restartOllamaChk && restartOllamaChk.checked);
+      const restartDirectML = Boolean(restartDirectmlChk && restartDirectmlChk.checked);
       if (btn) btn.disabled = true;
       try {
         const data = await fetchJson('/api/system/apply-tuning', {
@@ -5102,14 +5761,25 @@
             scope,
             pair: dualConfig.pair,
             unloadOllama: dualConfig.pair === 'ollama+directml',
-            restartDirectML: false,
-            restartOllama: false
+            restartDirectML,
+            restartOllama
           })
         });
+        if (restartOllamaChk) delete restartOllamaChk.dataset.userTouched;
+        if (restartDirectmlChk) delete restartDirectmlChk.dataset.userTouched;
+        await checkDirectMLStatus();
         await refreshDualHardwareEvaluation(true);
         if (!silentSuccess) {
           const scopeText = data.persistedToWindows ? 'Windows User Env + Sesión' : 'Sesión actual';
-          showToast(`⚡ Tuning aplicado en ${scopeText}: ${(data.appliedKeys || []).join(', ')}`, 'success');
+          const restartNotes = [];
+          if (data.restarts && data.restarts.directml) {
+            restartNotes.push(data.restarts.directml.ok ? 'DirectML reiniciado' : `DirectML: ${data.restarts.directml.error || 'aviso'}`);
+          }
+          if (data.restarts && data.restarts.ollama) {
+            restartNotes.push(data.restarts.ollama.ok ? 'Ollama reiniciado' : `Ollama: ${data.restarts.ollama.error || 'aviso'}`);
+          }
+          const suffix = restartNotes.length > 0 ? ` (${restartNotes.join(' • ')})` : '';
+          showToast(`⚡ Tuning aplicado en ${scopeText}: ${(data.appliedKeys || []).join(', ')}${suffix}`, 'success');
         }
       } catch (err) {
         showToast(`❌ Error aplicando tuning: ${err.message}`, 'error');
@@ -5287,7 +5957,8 @@
       }
     }
 
-    function applyProjectStateToUi(state) {
+    function applyProjectStateToUi(state, opts = {}) {
+      const preserveDualConfig = Boolean(opts && opts.preserveDualConfig);
       currentProjectState = state && typeof state === 'object' ? state : {};
       githubToggle = Boolean(currentProjectState.githubToggle);
       selectedGithubRepo = currentProjectState.githubRepo || '';
@@ -5297,8 +5968,10 @@
 
       updateIntegrationPillsUI();
 
-      dualConfig = normalizeDualConfigClient(currentProjectState.dualConfig);
-      syncDualUiFromState();
+      if (!preserveDualConfig) {
+        dualConfig = normalizeDualConfigClient(currentProjectState.dualConfig);
+        syncDualUiFromState();
+      }
 
       const pubInput = document.getElementById('nf-publish-dir');
       if (pubInput) pubInput.value = netlifyPublishDir || '';
@@ -5315,7 +5988,7 @@
       }
     }
 
-    async function loadProjectContext() {
+    async function loadProjectContext(opts = {}) {
       try {
         const proj = getActiveProjectDescriptor();
         const qs = new URLSearchParams();
@@ -5334,7 +6007,7 @@
           syncStatus.textContent = currentProject;
         }
         if (data.projectState) {
-          applyProjectStateToUi(data.projectState);
+          applyProjectStateToUi(data.projectState, opts);
         }
 
         document.getElementById('ctx-path').textContent = (data.project && data.project.path) || 'Global';
@@ -5705,12 +6378,10 @@
       }
 
       const proj = getActiveProjectDescriptor();
-      const enterBtn = document.getElementById('btn-enter-context');
-      if (enterBtn) enterBtn.disabled = true;
-
-      isStreaming = true;
-      sendBtn.disabled = true;
-      sendBtn.textContent = 'Analizando...';
+      const abortCtrl = new AbortController();
+      activeStreamAbortController = abortCtrl;
+      userAbortedStream = false;
+      setStreamingUiState(true, 'Analizando...');
 
       const userSummary = `🧠 Entrar en Contexto — Análisis forense y plan de continuidad para "${proj.name}"`;
       appendMessage('user', userSummary);
@@ -5738,6 +6409,7 @@
         const res = await fetch('/api/project/enter-context', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: abortCtrl.signal,
           body: JSON.stringify({
             project: proj.name,
             projectPath: proj.path || undefined,
@@ -5845,18 +6517,45 @@
           fallback: isFallback
         });
         await saveCurrentSessionToStorage();
-        await loadProjectContext();
+        await loadProjectContext({ preserveDualConfig: true });
 
         if (autoApplyEnabled && !isFallback) {
           await autoApplyActionsInContainer(aiDiv);
         }
       } catch (err) {
-        bodyEl.innerHTML = `<span style="color:var(--accent-red);">❌ Error ejecutando Entrar en Contexto: ${escapeHtml(err.message)}</span>`;
+        if ((err && err.name === 'AbortError') || userAbortedStream) {
+          const abortBadge = document.createElement('div');
+          abortBadge.className = 'tel-badge warn';
+          abortBadge.style.marginBottom = '8px';
+          abortBadge.style.display = 'inline-block';
+          abortBadge.textContent = '⏹️ Análisis detenido por el usuario';
+          telPlaceholder.appendChild(abortBadge);
+
+          if (fullReply) {
+            aiDiv._rawText = fullReply;
+            bodyEl.innerHTML = formatMarkdown(fullReply, { streaming: false });
+            attachMessageActionButtons(aiDiv);
+            chatHistory.push({ role: 'user', content: userSummary });
+            chatHistory.push({
+              role: 'assistant',
+              content: fullReply,
+              telemetry: telemetryData,
+              fallback: isFallback,
+              aborted: true
+            });
+            await saveCurrentSessionToStorage();
+          } else {
+            aiDiv._rawText = '';
+            bodyEl.innerHTML = '<span style="color:var(--text-muted);">_Análisis detenido antes de recibir salida._</span>';
+          }
+          showToast('⏹️ Análisis de contexto detenido.', 'info');
+        } else {
+          bodyEl.innerHTML = `<span style="color:var(--accent-red);">❌ Error ejecutando Entrar en Contexto: ${escapeHtml(err.message)}</span>`;
+        }
       } finally {
-        isStreaming = false;
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Enviar';
-        if (enterBtn) enterBtn.disabled = false;
+        if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
+        userAbortedStream = false;
+        setStreamingUiState(false);
       }
     }
 
@@ -5914,6 +6613,9 @@
       const proj = getActiveProjectDescriptor();
       const hasDualMsgs = chatHistory.some((m) => m && m.role === 'assistant_dual');
       const sessionMode = (dualConfig.enabled || hasDualMsgs) ? 'dual' : 'single';
+      const dualConfigSnapshot = sessionMode === 'dual'
+        ? JSON.parse(JSON.stringify(dualConfig))
+        : undefined;
       const dualConfigSummary = sessionMode === 'dual'
         ? {
             enabled: Boolean(dualConfig.enabled),
@@ -5943,6 +6645,7 @@
             projectPath: proj.path || undefined,
             convId: currentConversationId || undefined,
             mode: sessionMode,
+            dualConfig: dualConfigSnapshot,
             dualConfigSummary,
             model: sessionMode === 'dual'
               ? `${dualConfig.agentA.model || dualConfig.agentA.source} + ${dualConfig.agentB.model || dualConfig.agentB.source}`
@@ -6079,19 +6782,30 @@
             const role = m.role === 'assistant' ? 'ai' : (m.role === 'user' ? 'user' : 'info');
             appendMessage(role, m.content || '', true, {
               telemetry: m.telemetry || null,
-              fallback: Boolean(m.fallback)
+              fallback: Boolean(m.fallback),
+              webSearchMeta: m.webSearchMeta || null
             });
           }
         });
         restoreAppliedCardStatesInChat();
         chatContainer.scrollTop = chatContainer.scrollHeight;
 
-        if (s.source && ['local', 'directml', 'freeai'].includes(s.source)) {
-          switchAiSource(s.source);
-        }
-        if (s.model && Array.from(modelSelect.options).some((o) => o.value === s.model)) {
-          modelSelect.value = s.model;
-          currentModelName = s.model;
+        if (s.mode === 'dual') {
+          const savedDual = (s.dualConfig && typeof s.dualConfig === 'object')
+            ? s.dualConfig
+            : (s.dualConfigSummary && typeof s.dualConfigSummary === 'object' ? s.dualConfigSummary : dualConfig);
+          dualConfig = normalizeDualConfigClient({ ...savedDual, enabled: true });
+          syncDualUiFromState();
+        } else {
+          dualConfig.enabled = false;
+          syncDualUiFromState();
+          if (s.source && ['local', 'directml', 'freeai'].includes(s.source)) {
+            switchAiSource(s.source);
+          }
+          if (s.model && Array.from(modelSelect.options).some((o) => o.value === s.model)) {
+            modelSelect.value = s.model;
+            currentModelName = s.model;
+          }
         }
         if (typeof s.profileId === 'string') setActiveProfile(s.profileId);
         if (typeof s.skillId === 'string') setActiveSkill(s.skillId);
@@ -6302,9 +7016,12 @@
         const ghDot = document.getElementById('dot-gh');
         const nfDot = document.getElementById('dot-nf');
         const hfDot = document.getElementById('dot-hf');
+        const serpDot = document.getElementById('dot-serp');
         if (ghDot) ghDot.classList.toggle('ready', Boolean(integrationsStatus.githubConfigured));
         if (nfDot) nfDot.classList.toggle('ready', Boolean(integrationsStatus.netlifyConfigured));
         if (hfDot) hfDot.classList.toggle('ready', Boolean(integrationsStatus.hfConfigured));
+        if (serpDot) serpDot.classList.toggle('ready', Boolean(integrationsStatus.serpApiConfigured));
+        if (serpApiStatusData) updateSerpApiUsageBadge();
       } catch (_e) {}
     }
 
@@ -7196,7 +7913,7 @@
           });
         } catch (_e) {}
 
-        await loadProjectContext();
+        await loadProjectContext({ preserveDualConfig: true });
       }
     }
 
@@ -7234,6 +7951,8 @@
         const pane = document.createElement('div');
         pane.className = `dual-agent-pane pane-${slot.toLowerCase()}`;
         pane.dataset.agentSlot = slot;
+        pane.dataset.agentSource = normalizeDualSourceClient(slotMeta.source);
+        pane.dataset.agentModel = slotMeta.model || '';
         pane._rawText = '';
 
         const pHead = document.createElement('div');
@@ -7315,6 +8034,11 @@
         agentB: bMeta
       });
 
+      if (dual.webSearchMeta) {
+        const citEl = createWebCitationsElement(dual.webSearchMeta);
+        if (citEl) scaffold.noticesEl.appendChild(citEl);
+      }
+
       if (Array.isArray(dual.notices)) {
         dual.notices.forEach((msgText) => {
           const notice = document.createElement('div');
@@ -7327,6 +8051,8 @@
       const populateSavedPane = (paneObj, saved) => {
         const txt = String((saved && saved.text) || '');
         paneObj.pane._rawText = txt;
+        if (saved && saved.source) paneObj.pane.dataset.agentSource = normalizeDualSourceClient(saved.source);
+        if (saved && saved.model) paneObj.pane.dataset.agentModel = saved.model;
         paneObj.stagePill.textContent = (saved && saved.stageLabel) || (saved && saved.error ? 'Error' : 'Completado');
         if (saved && saved.elapsedMs) {
           paneObj.elapsedSpan.textContent = `${(saved.elapsedMs / 1000).toFixed(1)}s`;
@@ -7443,7 +8169,7 @@
           });
         } catch (_e) {}
 
-        await loadProjectContext();
+        await loadProjectContext({ preserveDualConfig: true });
       }
     }
 
@@ -7453,11 +8179,10 @@
       appendMessage('user', prompt);
       chatHistory.push({ role: 'user', content: prompt });
 
-      const enterBtn = document.getElementById('btn-enter-context');
-      if (enterBtn) enterBtn.disabled = true;
-      isStreaming = true;
-      sendBtn.disabled = true;
-      sendBtn.textContent = 'Orquestando...';
+      const abortCtrl = new AbortController();
+      activeStreamAbortController = abortCtrl;
+      userAbortedStream = false;
+      setStreamingUiState(true, 'Orquestando...');
 
       const scaffold = createDualTurnScaffold({
         pair: dualConfig.pair,
@@ -7497,11 +8222,13 @@
       let effectiveWorkflow = dualConfig.workflow;
       let requestedWorkflow = dualConfig.workflow;
       let preflightSummary = null;
+      let webSearchMeta = null;
 
       try {
         const res = await fetch('/api/chat/dual', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: abortCtrl.signal,
           body: JSON.stringify({
             pair: dualConfig.pair,
             workflow: dualConfig.workflow,
@@ -7511,6 +8238,8 @@
             projectPath: proj.path || undefined,
             conversationId: currentConversationId || undefined,
             customSystemPrompt: effectiveCustomPrompt || undefined,
+            webSearchEnabled: Boolean(webSearchEnabled),
+            webSearchMode: webSearchMode || 'web',
             agentA: { ...dualConfig.agentA },
             agentB: { ...dualConfig.agentB }
           })
@@ -7544,6 +8273,21 @@
             return;
           }
 
+          if (ev.type === 'web_search') {
+            webSearchMeta = ev;
+            const citEl = createWebCitationsElement(ev);
+            if (citEl) scaffold.noticesEl.appendChild(citEl);
+            if (ev.usage) {
+              updateSerpApiUsageBadge({
+                ...(serpApiStatusData || {}),
+                configured: ev.configured !== false,
+                usage: ev.usage
+              });
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
+          }
+
           if (ev.type === 'system_notice') {
             if (ev.message) noticesCollected.push(ev.message);
             const noteEl = document.createElement('div');
@@ -7564,8 +8308,12 @@
             if (ev.model) {
               st.model = ev.model;
               paneObj.modSpan.textContent = ev.model;
+              paneObj.pane.dataset.agentModel = ev.model;
             }
-            if (ev.source) st.source = ev.source;
+            if (ev.source) {
+              st.source = ev.source;
+              paneObj.pane.dataset.agentSource = normalizeDualSourceClient(ev.source);
+            }
             if (st.stage >= 3 && st.text) {
               st.text = `${st.text}\n\n---\n### Etapa ${st.stage}: ${st.stageLabel}\n\n`;
             } else if (st.stage === 1) {
@@ -7657,6 +8405,7 @@
             pair: dualConfig.pair,
             workflow: effectiveWorkflow,
             requestedWorkflow,
+            webSearchMeta,
             notices: noticesCollected,
             preflight: preflightSummary ? { workflow: preflightSummary.workflow, downgradedFromParallel: preflightSummary.downgradedFromParallel } : null,
             agentA: { ...paneState.A },
@@ -7665,22 +8414,66 @@
         });
 
         await saveCurrentSessionToStorage();
+        if (webSearchEnabled) loadSerpApiUsage();
 
         if (autoApplyEnabled) {
           await autoApplyDualTurn(scaffold.wrap, effectiveWorkflow, paneState);
         }
       } catch (err) {
-        const noticeEl = document.createElement('div');
-        noticeEl.className = 'dual-system-notice';
-        noticeEl.style.borderColor = 'var(--accent-red)';
-        noticeEl.style.color = 'var(--accent-red)';
-        noticeEl.textContent = `❌ Error en orquestación Dual: ${err.message}`;
-        scaffold.noticesEl.appendChild(noticeEl);
+        if ((err && err.name === 'AbortError') || userAbortedStream) {
+          ['A', 'B'].forEach((slot) => {
+            const paneObj = slot === 'B' ? scaffold.paneB : scaffold.paneA;
+            const st = paneState[slot];
+            paneObj.pane.classList.remove('pane-active');
+            paneObj.pane._rawText = st.text;
+            paneObj.stagePill.textContent = st.text ? `${st.stageLabel} (detenido)` : 'Detenido';
+            paneObj.pBody.innerHTML = st.text
+              ? formatMarkdown(st.text, { streaming: false })
+              : '<span style="color:var(--text-muted);">_Detenido antes de completar._</span>';
+          });
+          const stopNotice = '⏹️ Orquestación Dual detenida por el usuario (salida parcial conservada).';
+          noticesCollected.push(stopNotice);
+          const noteEl = document.createElement('div');
+          noteEl.className = 'dual-system-notice';
+          noteEl.textContent = stopNotice;
+          scaffold.noticesEl.appendChild(noteEl);
+
+          if (paneState.A.text || paneState.B.text || webSearchMeta) {
+            const combinedPartial = [
+              `[Agente A (${paneState.A.model}):\n${paneState.A.text}]`,
+              `[Agente B (${paneState.B.model}):\n${paneState.B.text}]`
+            ].join('\n\n');
+            chatHistory.push({
+              role: 'assistant_dual',
+              content: combinedPartial,
+              dual: {
+                pair: dualConfig.pair,
+                workflow: effectiveWorkflow,
+                requestedWorkflow,
+                aborted: true,
+                webSearchMeta,
+                notices: noticesCollected,
+                preflight: preflightSummary ? { workflow: preflightSummary.workflow, downgradedFromParallel: preflightSummary.downgradedFromParallel } : null,
+                agentA: { ...paneState.A },
+                agentB: { ...paneState.B }
+              }
+            });
+            await saveCurrentSessionToStorage();
+          }
+          if (webSearchEnabled) loadSerpApiUsage();
+          showToast('⏹️ Orquestación Dual detenida.', 'info');
+        } else {
+          const noticeEl = document.createElement('div');
+          noticeEl.className = 'dual-system-notice';
+          noticeEl.style.borderColor = 'var(--accent-red)';
+          noticeEl.style.color = 'var(--accent-red)';
+          noticeEl.textContent = `❌ Error en orquestación Dual: ${err.message}`;
+          scaffold.noticesEl.appendChild(noticeEl);
+        }
       } finally {
-        isStreaming = false;
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Enviar';
-        if (enterBtn) enterBtn.disabled = false;
+        if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
+        userAbortedStream = false;
+        setStreamingUiState(false);
       }
     }
 
@@ -7699,15 +8492,17 @@
       appendMessage('user', prompt);
       chatHistory.push({ role: 'user', content: prompt });
 
-      const enterBtn = document.getElementById('btn-enter-context');
-      if (enterBtn) enterBtn.disabled = true;
-      isStreaming = true;
-      sendBtn.disabled = true;
-      sendBtn.textContent = 'Pensando...';
+      const abortCtrl = new AbortController();
+      activeStreamAbortController = abortCtrl;
+      userAbortedStream = false;
+      setStreamingUiState(true, 'Pensando...');
 
       const aiDiv = document.createElement('div');
       aiDiv.className = 'message ai';
       aiDiv._rawText = '';
+
+      const metaPlaceholder = document.createElement('div');
+      aiDiv.appendChild(metaPlaceholder);
 
       const bodyEl = document.createElement('div');
       bodyEl.className = 'message-body';
@@ -7719,11 +8514,14 @@
 
       const proj = getActiveProjectDescriptor();
       const effectiveCustomPrompt = modelfileCustomPrompt || customSystemPrompt || '';
+      let fullReply = '';
+      let webSearchMeta = null;
 
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: abortCtrl.signal,
           body: JSON.stringify({
             model: currentModelName,
             messages: chatHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -7737,6 +8535,8 @@
             source: currentSource,
             isDirectML: currentSource === 'directml',
             isFreeAi: currentSource === 'freeai',
+            webSearchEnabled: Boolean(webSearchEnabled),
+            webSearchMode: webSearchMode || 'web',
             modelfileOptions: Object.keys(modelfileOptions).length ? modelfileOptions : undefined
           })
         });
@@ -7750,10 +8550,25 @@
           throw new Error(errMsg);
         }
 
+        const rawWebHeader = res.headers.get('X-Web-Search-Meta');
+        if (rawWebHeader) {
+          webSearchMeta = decodeBase64Utf8Json(rawWebHeader);
+          if (webSearchMeta) {
+            const citEl = createWebCitationsElement(webSearchMeta);
+            if (citEl) metaPlaceholder.appendChild(citEl);
+            if (webSearchMeta.usage) {
+              updateSerpApiUsageBadge({
+                ...(serpApiStatusData || {}),
+                configured: webSearchMeta.configured !== false,
+                usage: webSearchMeta.usage
+              });
+            }
+          }
+        }
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-        let fullReply = '';
 
         while (true) {
           const { done, value } = await reader.read();
@@ -7821,21 +8636,43 @@
         bodyEl.innerHTML = formatMarkdown(fullReply || '_El modelo no devolvió texto._', { streaming: false });
         attachMessageActionButtons(aiDiv);
 
-        chatHistory.push({ role: 'assistant', content: fullReply });
+        chatHistory.push({ role: 'assistant', content: fullReply, webSearchMeta });
         await saveCurrentSessionToStorage();
+        if (webSearchEnabled) loadSerpApiUsage();
 
         if (autoApplyEnabled) {
           await autoApplyActionsInContainer(aiDiv);
         }
       } catch (err) {
-        bodyEl.innerHTML =
-          `<span style="color:var(--accent-red);">❌ Error ejecutando modelo (${escapeHtml(currentSource)}): ${escapeHtml(err.message)}</span>` +
-          `<div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Verifica que el servidor correspondiente esté activo o cambia de motor arriba.</div>`;
+        if ((err && err.name === 'AbortError') || userAbortedStream) {
+          const abortBadge = document.createElement('div');
+          abortBadge.className = 'tel-badge warn';
+          abortBadge.style.marginBottom = '8px';
+          abortBadge.style.display = 'inline-block';
+          abortBadge.textContent = '⏹️ Respuesta detenida por el usuario';
+          metaPlaceholder.appendChild(abortBadge);
+
+          if (fullReply) {
+            aiDiv._rawText = fullReply;
+            bodyEl.innerHTML = formatMarkdown(fullReply, { streaming: false });
+            attachMessageActionButtons(aiDiv);
+            chatHistory.push({ role: 'assistant', content: fullReply, webSearchMeta, aborted: true });
+            await saveCurrentSessionToStorage();
+          } else {
+            aiDiv._rawText = '';
+            bodyEl.innerHTML = '<span style="color:var(--text-muted);">_Generación detenida antes de recibir texto._</span>';
+          }
+          if (webSearchEnabled) loadSerpApiUsage();
+          showToast('⏹️ Generación detenida.', 'info');
+        } else {
+          bodyEl.innerHTML =
+            `<span style="color:var(--accent-red);">❌ Error ejecutando modelo (${escapeHtml(currentSource)}): ${escapeHtml(err.message)}</span>` +
+            `<div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Verifica que el servidor correspondiente esté activo o cambia de motor arriba.</div>`;
+        }
       } finally {
-        isStreaming = false;
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Enviar';
-        if (enterBtn) enterBtn.disabled = false;
+        if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
+        userAbortedStream = false;
+        setStreamingUiState(false);
       }
     }
 
@@ -7920,6 +8757,64 @@
       modelSelect.addEventListener('change', onModelChanged);
       document.getElementById('btn-modelfile').addEventListener('click', openModelfileModal);
       document.getElementById('btn-dml-control').addEventListener('click', handleDirectMLControl);
+      const dmlRestartEl = document.getElementById('btn-dml-restart');
+      if (dmlRestartEl) dmlRestartEl.addEventListener('click', restartDirectmlControl);
+
+      const restartOllamaChk = document.getElementById('dual-restart-ollama-check');
+      if (restartOllamaChk) {
+        restartOllamaChk.addEventListener('change', () => {
+          restartOllamaChk.dataset.userTouched = '1';
+        });
+      }
+      const restartDmlChk = document.getElementById('dual-restart-directml-check');
+      if (restartDmlChk) {
+        restartDmlChk.addEventListener('change', () => {
+          restartDmlChk.dataset.userTouched = '1';
+        });
+      }
+
+      const webToggleEl = document.getElementById('toggle-web-search');
+      if (webToggleEl) {
+        webToggleEl.addEventListener('click', () => {
+          webSearchEnabled = !webSearchEnabled;
+          updateWebSearchUi();
+          if (webSearchEnabled) {
+            loadSerpApiUsage();
+            showToast(`🌐 Búsqueda web real activada (${webSearchMode}).`, 'info');
+          } else {
+            showToast('🌐 Búsqueda web desactivada.', 'info');
+          }
+        });
+      }
+      const webModeEl = document.getElementById('web-search-mode');
+      if (webModeEl) {
+        webModeEl.addEventListener('change', (e) => {
+          const val = String(e.target.value || 'web').toLowerCase();
+          webSearchMode = ['web', 'news', 'jobs'].includes(val) ? val : 'web';
+          localStorage.setItem(STORAGE_KEYS.WEB_SEARCH_MODE, webSearchMode);
+          updateSerpApiUsageBadge();
+        });
+      }
+      const serpBadgeEl = document.getElementById('serpapi-usage-badge');
+      if (serpBadgeEl) {
+        serpBadgeEl.addEventListener('click', async () => {
+          await loadSerpApiUsage();
+          showToast('📊 Contador mensual SerpApi actualizado.', 'info');
+        });
+      }
+
+      const ttsVoiceEl = document.getElementById('tts-voice-select');
+      if (ttsVoiceEl) {
+        ttsVoiceEl.addEventListener('change', (e) => {
+          selectedTtsVoice = String(e.target.value || 'ef_dora');
+          localStorage.setItem(STORAGE_KEYS.TTS_VOICE, selectedTtsVoice);
+        });
+      }
+
+      const stopStreamEl = document.getElementById('btn-stop-stream');
+      if (stopStreamEl) {
+        stopStreamEl.addEventListener('click', abortActiveStream);
+      }
 
       document.getElementById('btn-mf-compile').addEventListener('click', compileModelfile);
       document.getElementById('btn-mf-apply').addEventListener('click', applyModelfileToSession);
@@ -8193,6 +9088,7 @@
     async function initApp() {
       applyFontSize(localStorage.getItem(STORAGE_KEYS.FONT_SIZE) || '16');
       initAutoApply();
+      updateWebSearchUi();
       syncDualUiFromState();
       bindEventListeners();
       switchAiSource(currentSource);
@@ -8203,6 +9099,8 @@
         loadSkills(),
         loadProjects(),
         loadIntegrationsStatus(),
+        loadSerpApiUsage(),
+        loadTtsStatus(),
         loadPersistentChats({ silent: true }),
         refreshHfDownloads()
       ]);

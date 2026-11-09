@@ -1,4 +1,6 @@
+const fs = require("node:fs");
 const os = require("node:os");
+const path = require("node:path");
 const { execFile } = require("node:child_process");
 
 const CANONICAL_PAIRS = Object.freeze([
@@ -31,8 +33,14 @@ const SAFE_AI_ENV_SCHEMA = Object.freeze({
 const SAFE_AI_ENV_KEYS = Object.freeze(Object.keys(SAFE_AI_ENV_SCHEMA));
 
 const HARDWARE_CACHE_TTL_MS = 15000;
+const OLLAMA_LOG_MAX_READ_BYTES = 2 * 1024 * 1024;
+const OLLAMA_LOG_HEAD_BYTES = 128 * 1024;
+const OLLAMA_LOG_TAIL_BYTES = 1024 * 1024;
+
 let cachedCimSnapshot = null;
 let cachedCimTimestamp = 0;
+let lastSessionTuningAppliedAt = 0;
+let lastSessionAppliedEnv = {};
 
 function roundGb(val) {
   const n = Number(val);
@@ -169,6 +177,8 @@ function estimateModelMemoryGb(source, modelName = "", catalogEntry = null) {
         weightGb = 8.5;
       } else if (lower.includes("llama-3.2-3b") && lower.includes("fp16")) {
         weightGb = 7.2;
+      } else if (lower.includes("llama-3.2-3b")) {
+        weightGb = 2.3;
       } else if (lower.includes("3b")) {
         weightGb = 2.6;
       } else {
@@ -207,7 +217,12 @@ function estimateKvOverheadGb(source, weightGb, isCloud, numCtx, envSnapshot = {
   const normSource = normalizeEngineSource(source);
 
   if (normSource === "directml") {
-    return roundGb(Math.max(0.45, (weightGb * 0.14) + (ctx / 8192) * 0.35));
+    // Calibración realista DirectML / WDDM: workspace DXGI + buffers DML + KV cache proporcional a peso y ctx
+    const baseWorkspace = 0.55 + (weightGb * 0.22);
+    const ctxRatio = ctx / 4096;
+    const ctxScale = ctx >= 16384 ? Math.pow(ctxRatio, 1.15) : ctxRatio;
+    const kvPer4k = 0.38 + (weightGb * 0.045);
+    return roundGb(Math.max(0.95, baseWorkspace + (ctxScale * kvPer4k)));
   }
 
   const fa = String(envSnapshot.OLLAMA_FLASH_ATTENTION || "").trim() === "1";
@@ -262,7 +277,8 @@ async function queryWindowsCimSnapshot(forceRefresh = false) {
     `$keys = @(${keysLiteral})`,
     "$userEnv = @{}",
     "foreach ($k in $keys) { $val = [Environment]::GetEnvironmentVariable($k, 'User'); $userEnv[$k] = if ($null -eq $val) { '' } else { [string]$val } }",
-    "@{ cpu = $cpu; gpu = $gpu; npu = $npu; userEnv = $userEnv } | ConvertTo-Json -Depth 4 -Compress"
+    "$procs = @(Get-CimInstance Win32_Process -Filter \"Name = 'ollama.exe' OR Name = 'ollama app.exe' OR Name LIKE 'python%'\" | ForEach-Object { $n = [string]$_.Name; $isDml = ($n -like 'python*') -and ([string]$_.CommandLine -match 'api_openai\\.py'); if ($n -eq 'ollama.exe' -or $n -eq 'ollama app.exe' -or $isDml) { $cDate = ''; try { if ($_.CreationDate) { $cDate = ([DateTime]$_.CreationDate).ToUniversalTime().ToString('o') } } catch {}; @{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = $n; startedAt = $cDate; kind = $(if ($isDml) { 'directml' } else { 'ollama' }) } } })",
+    "@{ cpu = $cpu; gpu = $gpu; npu = $npu; userEnv = $userEnv; processes = $procs } | ConvertTo-Json -Depth 4 -Compress"
   ].join("; ");
 
   const data = await runPowerShellJson(psScript, {}, 5000);
@@ -284,6 +300,333 @@ function sanitizeEnvSubset(rawMap = {}) {
   return out;
 }
 
+function normalizeRuntimeEnvValue(key, rawVal) {
+  const str = String(rawVal ?? "").trim();
+  if (!str) return "";
+  if (key === "OLLAMA_IGPU_ENABLE" || key === "OLLAMA_FLASH_ATTENTION" || key === "OLIVE_USE_DIRECTML") {
+    const lower = str.toLowerCase();
+    if (lower === "true") return "1";
+    if (lower === "false") return "0";
+    return str;
+  }
+  if (key === "OLLAMA_KV_CACHE_TYPE") {
+    return str.toLowerCase();
+  }
+  if (key === "OLLAMA_KEEP_ALIVE") {
+    return str
+      .toLowerCase()
+      .replace(/^(\d+)m0s$/, "$1m")
+      .replace(/^(\d+)h0m0s$/, "$1h")
+      .replace(/^0s$/, "0");
+  }
+  return str;
+}
+
+function extractSafeEnvFromOllamaServerConfigLine(line) {
+  const marker = 'env="map[';
+  const startIdx = line.indexOf(marker);
+  if (startIdx < 0) return null;
+  const tail = line.slice(startIdx + marker.length);
+  const endIdx = tail.lastIndexOf(']"');
+  const mapBody = endIdx >= 0 ? tail.slice(0, endIdx) : tail;
+
+  const parsed = {};
+  for (const key of SAFE_AI_ENV_KEYS) {
+    const match = mapBody.match(new RegExp(`(?:^|\\s)${key}:([^\\s\\]]*)`));
+    if (match) {
+      parsed[key] = normalizeRuntimeEnvValue(key, match[1]);
+    }
+  }
+  return sanitizeEnvSubset(parsed);
+}
+
+function parseOllamaServerLog(logText = "") {
+  const lines = String(logText || "").split(/\r?\n/);
+  let bootTimestampIso = null;
+  let bootTimestampMs = 0;
+  let lastEventMs = 0;
+  let envKnown = false;
+  let env = sanitizeEnvSubset({});
+  let lastDroppingIndex = -1;
+  let lastGpuIndex = -1;
+  let cpuOnlyInLog = false;
+  let gpuDetectedInLog = false;
+  let computeBackend = "unknown";
+  let totalVramText = "";
+
+  const resetBootSegment = (tsIso, tsMs) => {
+    bootTimestampIso = tsIso || bootTimestampIso;
+    bootTimestampMs = tsMs || bootTimestampMs;
+    lastDroppingIndex = -1;
+    lastGpuIndex = -1;
+    cpuOnlyInLog = false;
+    gpuDetectedInLog = false;
+    computeBackend = "unknown";
+    totalVramText = "";
+  };
+
+  for (let idx = 0; idx < lines.length; idx += 1) {
+    const line = lines[idx];
+    if (!line) continue;
+
+    const timeMatch = line.match(/^time=([^\s]+)/);
+    const tsIso = timeMatch ? timeMatch[1] : null;
+    const tsMs = tsIso ? Date.parse(tsIso) : NaN;
+    if (Number.isFinite(tsMs)) {
+      lastEventMs = tsMs;
+    }
+
+    if (line.includes('msg="server config"')) {
+      resetBootSegment(tsIso, Number.isFinite(tsMs) ? tsMs : 0);
+      const extracted = extractSafeEnvFromOllamaServerConfigLine(line);
+      if (extracted) {
+        env = extracted;
+        envKnown = true;
+      }
+      continue;
+    }
+
+    if (line.includes('msg="Listening on')) {
+      if (!bootTimestampMs || (Number.isFinite(tsMs) && Math.abs(tsMs - bootTimestampMs) > 30000)) {
+        resetBootSegment(tsIso, Number.isFinite(tsMs) ? tsMs : 0);
+        envKnown = false;
+        env = sanitizeEnvSubset({});
+      }
+      continue;
+    }
+
+    if (line.includes("dropping integrated GPU; to enable, set OLLAMA_IGPU_ENABLE=1")) {
+      lastDroppingIndex = idx;
+      if (!bootTimestampMs && Number.isFinite(tsMs)) {
+        bootTimestampIso = tsIso;
+        bootTimestampMs = tsMs;
+      }
+      continue;
+    }
+
+    if (line.includes('msg="inference compute"')) {
+      const libMatch = line.match(/\blibrary=([^\s"]+)/);
+      const lib = libMatch ? libMatch[1].toLowerCase() : "";
+      if (lib === "cpu") {
+        cpuOnlyInLog = !gpuDetectedInLog;
+        if (!gpuDetectedInLog) computeBackend = "cpu";
+      } else if (/^(rocm|vulkan|cuda|metal|oneapi|sycl)$/.test(lib)) {
+        gpuDetectedInLog = true;
+        cpuOnlyInLog = false;
+        computeBackend = lib;
+        lastGpuIndex = idx;
+      }
+      continue;
+    }
+
+    if (line.includes('msg="vram-based default context"')) {
+      const vramMatch = line.match(/total_vram="([^"]+)"/);
+      if (vramMatch) {
+        totalVramText = vramMatch[1];
+        const parsedVramGb = parseModelSizeGb(totalVramText);
+        if (parsedVramGb !== null && parsedVramGb > 0.05) {
+          gpuDetectedInLog = true;
+          cpuOnlyInLog = false;
+          lastGpuIndex = idx;
+        }
+      }
+    }
+  }
+
+  const droppingIgpuInLog = lastDroppingIndex >= 0 && lastDroppingIndex > lastGpuIndex;
+  return {
+    bootTimestampIso,
+    bootTimestampMs,
+    lastEventMs,
+    envKnown,
+    env,
+    droppingIgpuInLog,
+    gpuDetectedInLog: gpuDetectedInLog && !droppingIgpuInLog,
+    cpuOnlyInLog: cpuOnlyInLog || droppingIgpuInLog,
+    computeBackend,
+    totalVramText
+  };
+}
+
+function readOllamaServerLogBounded(logPath) {
+  if (!logPath || !fs.existsSync(logPath)) {
+    return { found: false, text: "", mtimeMs: 0 };
+  }
+  try {
+    const stat = fs.statSync(logPath);
+    if (stat.size <= OLLAMA_LOG_MAX_READ_BYTES) {
+      return {
+        found: true,
+        text: fs.readFileSync(logPath, "utf8"),
+        mtimeMs: stat.mtimeMs
+      };
+    }
+    const fd = fs.openSync(logPath, "r");
+    try {
+      const headBuf = Buffer.alloc(OLLAMA_LOG_HEAD_BYTES);
+      const headRead = fs.readSync(fd, headBuf, 0, OLLAMA_LOG_HEAD_BYTES, 0);
+      const tailOffset = Math.max(0, stat.size - OLLAMA_LOG_TAIL_BYTES);
+      const tailBuf = Buffer.alloc(stat.size - tailOffset);
+      const tailRead = fs.readSync(fd, tailBuf, 0, tailBuf.length, tailOffset);
+      return {
+        found: true,
+        text: `${headBuf.subarray(0, headRead).toString("utf8")}\n${tailBuf.subarray(0, tailRead).toString("utf8")}`,
+        mtimeMs: stat.mtimeMs
+      };
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (_err) {
+    return { found: false, text: "", mtimeMs: 0 };
+  }
+}
+
+async function detectLiveOllamaAcceleration(options = {}) {
+  const cim = options.cim !== undefined
+    ? options.cim
+    : (options.processes !== undefined ? null : await queryWindowsCimSnapshot(Boolean(options.forceRefresh)));
+
+  const rawProcesses = Array.isArray(options.processes)
+    ? options.processes
+    : (Array.isArray(cim?.processes) ? cim.processes : (cim?.processes ? [cim.processes] : []));
+
+  const ollamaProcs = rawProcesses.filter((p) => p && String(p.name || "").toLowerCase() === "ollama.exe");
+  const ollamaAppProcs = rawProcesses.filter((p) => p && String(p.name || "").toLowerCase() === "ollama app.exe");
+  const directmlProcs = rawProcesses.filter((p) => p && String(p.kind || "").toLowerCase() === "directml");
+
+  const pids = ollamaProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
+  const appPids = ollamaAppProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
+  const alive = pids.length > 0 || appPids.length > 0;
+
+  let startedAtMs = 0;
+  let startedAt = null;
+  for (const proc of [...ollamaProcs, ...ollamaAppProcs]) {
+    if (!proc.startedAt) continue;
+    const ms = Date.parse(proc.startedAt);
+    if (Number.isFinite(ms) && ms > startedAtMs) {
+      startedAtMs = ms;
+      startedAt = new Date(ms).toISOString();
+    }
+  }
+
+  const studioPid = Number(options.studioPid ?? process.pid);
+  const spawnedByStudio = ollamaProcs.some((p) => Number(p.ppid) === studioPid);
+
+  const defaultLogPath = process.env.LOCALAPPDATA
+    ? path.join(process.env.LOCALAPPDATA, "Ollama", "server.log")
+    : "";
+  const logPath = options.logPath !== undefined ? options.logPath : defaultLogPath;
+
+  let logFound = false;
+  let logMtimeMs = 0;
+  let parsedLog = parseOllamaServerLog("");
+  if (typeof options.logContent === "string") {
+    logFound = true;
+    logMtimeMs = Number(options.logMtimeMs || Date.now());
+    parsedLog = parseOllamaServerLog(options.logContent);
+  } else if (logPath) {
+    const readRes = readOllamaServerLogBounded(logPath);
+    logFound = readRes.found;
+    logMtimeMs = readRes.mtimeMs;
+    if (readRes.found) {
+      parsedLog = parseOllamaServerLog(readRes.text);
+    }
+  }
+
+  const referenceLogMs = parsedLog.bootTimestampMs || parsedLog.lastEventMs || logMtimeMs;
+  const logMatchesLiveProcess = Boolean(
+    alive &&
+    logFound &&
+    (startedAtMs === 0 || (referenceLogMs > 0 && referenceLogMs >= (startedAtMs - 10000)))
+  );
+
+  const sessionAtMs = Number(options.sessionAppliedAtMs ?? lastSessionTuningAppliedAt);
+  const sessionEnv = options.sessionAppliedEnv ?? lastSessionAppliedEnv;
+  const baseProcEnv = options.processEnv ?? process.env;
+  const restartedFromStudioTuning = Boolean(
+    alive &&
+    (spawnedByStudio || (sessionAtMs > 0 && startedAtMs > 0 && startedAtMs >= (sessionAtMs - 2000)))
+  );
+
+  let droppingIgpu = false;
+  let gpuDetected = false;
+  let cpuOnly = false;
+  let computeBackend = "unknown";
+  let totalVramText = "";
+  let envKnown = false;
+  let env = sanitizeEnvSubset({});
+
+  if (alive && logMatchesLiveProcess) {
+    droppingIgpu = parsedLog.droppingIgpuInLog;
+    gpuDetected = parsedLog.gpuDetectedInLog;
+    cpuOnly = parsedLog.cpuOnlyInLog;
+    computeBackend = parsedLog.computeBackend;
+    totalVramText = parsedLog.totalVramText;
+    envKnown = parsedLog.envKnown;
+    env = parsedLog.env;
+  } else if (restartedFromStudioTuning) {
+    const mergedLive = sanitizeEnvSubset({ ...baseProcEnv, ...sessionEnv });
+    const igpuEnabled = normalizeRuntimeEnvValue("OLLAMA_IGPU_ENABLE", mergedLive.OLLAMA_IGPU_ENABLE) === "1";
+    droppingIgpu = !igpuEnabled;
+    gpuDetected = igpuEnabled;
+    cpuOnly = !igpuEnabled;
+    computeBackend = igpuEnabled ? "rocm" : "cpu";
+    envKnown = true;
+    env = mergedLive;
+  }
+
+  const dmlPids = directmlProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
+  let dmlStartedAtMs = 0;
+  let dmlStartedAt = null;
+  for (const proc of directmlProcs) {
+    if (!proc.startedAt) continue;
+    const ms = Date.parse(proc.startedAt);
+    if (Number.isFinite(ms) && ms > dmlStartedAtMs) {
+      dmlStartedAtMs = ms;
+      dmlStartedAt = new Date(ms).toISOString();
+    }
+  }
+  const dmlSpawnedByStudio = directmlProcs.some((p) => Number(p.ppid) === studioPid);
+  const dmlStaleEnvForSession = Boolean(
+    directmlProcs.length > 0 &&
+    sessionAtMs > 0 &&
+    dmlStartedAtMs > 0 &&
+    dmlStartedAtMs < (sessionAtMs - 500) &&
+    (sessionEnv.OLIVE_GPU_MEMORY_LIMIT !== undefined || sessionEnv.OLIVE_CPU_THREADS !== undefined)
+  );
+
+  return {
+    ollamaRuntime: {
+      alive,
+      pids,
+      appPids,
+      startedAt,
+      spawnedByStudio,
+      logPath,
+      logFound,
+      logMatchesLiveProcess,
+      droppingIgpu,
+      gpuDetected,
+      cpuOnly,
+      computeBackend,
+      totalVramText,
+      envKnown,
+      env
+    },
+    directmlRuntime: {
+      alive: dmlPids.length > 0,
+      pids: dmlPids,
+      startedAt: dmlStartedAt,
+      spawnedByStudio: dmlSpawnedByStudio,
+      staleEnvForSession: dmlStaleEnvForSession,
+      envKnown: dmlSpawnedByStudio && !dmlStaleEnvForSession,
+      env: (dmlSpawnedByStudio && !dmlStaleEnvForSession)
+        ? sanitizeEnvSubset({ ...baseProcEnv, ...sessionEnv })
+        : sanitizeEnvSubset({})
+    }
+  };
+}
+
 async function getHostHardwareTelemetry(options = {}) {
   if (options && options.telemetryOverride && typeof options.telemetryOverride === "object") {
     const ov = options.telemetryOverride;
@@ -293,6 +636,8 @@ async function getHostHardwareTelemetry(options = {}) {
     for (const key of SAFE_AI_ENV_KEYS) {
       effective[key] = processEnv[key] || userEnv[key] || "";
     }
+    const ovOllama = ov.ollamaRuntime && typeof ov.ollamaRuntime === "object" ? ov.ollamaRuntime : null;
+    const ovDml = ov.directmlRuntime && typeof ov.directmlRuntime === "object" ? ov.directmlRuntime : null;
     return {
       platform: ov.platform || process.platform,
       collectedAt: new Date().toISOString(),
@@ -322,6 +667,56 @@ async function getHostHardwareTelemetry(options = {}) {
         process: processEnv,
         user: userEnv,
         effective
+      },
+      ollamaRuntime: ovOllama ? {
+        alive: ovOllama.alive !== false,
+        pids: Array.isArray(ovOllama.pids) ? ovOllama.pids : [],
+        appPids: Array.isArray(ovOllama.appPids) ? ovOllama.appPids : [],
+        startedAt: ovOllama.startedAt || null,
+        spawnedByStudio: Boolean(ovOllama.spawnedByStudio),
+        logPath: ovOllama.logPath || "",
+        logFound: Boolean(ovOllama.logFound),
+        logMatchesLiveProcess: Boolean(ovOllama.logMatchesLiveProcess),
+        droppingIgpu: Boolean(ovOllama.droppingIgpu),
+        gpuDetected: Boolean(ovOllama.gpuDetected),
+        cpuOnly: Boolean(ovOllama.cpuOnly),
+        computeBackend: ovOllama.computeBackend || "unknown",
+        totalVramText: ovOllama.totalVramText || "",
+        envKnown: Boolean(ovOllama.envKnown || (ovOllama.env && Object.keys(ovOllama.env).length > 0)),
+        env: sanitizeEnvSubset(ovOllama.env || {})
+      } : {
+        alive: false,
+        pids: [],
+        appPids: [],
+        startedAt: null,
+        spawnedByStudio: false,
+        logPath: "",
+        logFound: false,
+        logMatchesLiveProcess: false,
+        droppingIgpu: false,
+        gpuDetected: false,
+        cpuOnly: false,
+        computeBackend: "unknown",
+        totalVramText: "",
+        envKnown: false,
+        env: sanitizeEnvSubset({})
+      },
+      directmlRuntime: ovDml ? {
+        alive: ovDml.alive !== false,
+        pids: Array.isArray(ovDml.pids) ? ovDml.pids : [],
+        startedAt: ovDml.startedAt || null,
+        spawnedByStudio: Boolean(ovDml.spawnedByStudio),
+        staleEnvForSession: Boolean(ovDml.staleEnvForSession),
+        envKnown: Boolean(ovDml.envKnown || (ovDml.env && Object.keys(ovDml.env).length > 0)),
+        env: sanitizeEnvSubset(ovDml.env || {})
+      } : {
+        alive: false,
+        pids: [],
+        startedAt: null,
+        spawnedByStudio: false,
+        staleEnvForSession: false,
+        envKnown: false,
+        env: sanitizeEnvSubset({})
       }
     };
   }
@@ -345,6 +740,11 @@ async function getHostHardwareTelemetry(options = {}) {
   for (const key of SAFE_AI_ENV_KEYS) {
     effective[key] = processEnv[key] || userEnv[key] || "";
   }
+
+  const { ollamaRuntime, directmlRuntime } = await detectLiveOllamaAcceleration({
+    cim,
+    forceRefresh: Boolean(options.forceRefresh)
+  });
 
   return {
     platform: process.platform,
@@ -375,7 +775,9 @@ async function getHostHardwareTelemetry(options = {}) {
       process: processEnv,
       user: userEnv,
       effective
-    }
+    },
+    ollamaRuntime,
+    directmlRuntime
   };
 }
 
@@ -385,7 +787,7 @@ function getRecommendedProfiles(telemetry = null) {
   const dmlThreadsSolo = Math.min(12, Math.max(4, totalThreads - 4));
   const dmlThreadsShared = Math.min(8, Math.max(4, Math.floor(totalThreads * 0.4)));
   const dmlLimitSolo = freeGb >= 12 ? "24" : "20";
-  const dmlLimitShared = freeGb >= 14 ? "14" : "12";
+  const dmlLimitShared = "12";
 
   return {
     "freeai+directml": {
@@ -572,11 +974,98 @@ function evaluateDualConfiguration({
     warnings.push("Los motores asignados a Agente A y B se ajustarán para coincidir con el par dual elegido.");
   }
 
-  // Verificar entorno Windows Radeon 860M / Ollama
+  // Inspección viva de /api/ps + runtime real de ollama.exe
+  const psList = Array.isArray(ollamaPs) ? ollamaPs : [];
+  let psShowsCpuOnly = false;
+  let psTotalBytes = 0;
+  let psVramBytes = 0;
+  let psZeroVramCount = 0;
+
+  for (const p of psList) {
+    if (!p || typeof p !== "object") continue;
+    const pName = String(p.name || p.model || "").trim();
+    if (isCloudModelName("ollama", pName, p)) continue;
+
+    const hasVramField = p.size_vram !== undefined && p.size_vram !== null && Number.isFinite(Number(p.size_vram));
+    const hasSizeField = p.size !== undefined && p.size !== null && Number.isFinite(Number(p.size));
+    if (!hasVramField && !hasSizeField) continue;
+
+    const vramVal = hasVramField ? Math.max(0, Number(p.size_vram)) : 0;
+    const sizeVal = hasSizeField ? Math.max(0, Number(p.size)) : 0;
+
+    if (hasVramField) {
+      if (vramVal === 0) {
+        psShowsCpuOnly = true;
+        psZeroVramCount += 1;
+      } else if (sizeVal > 0 && (vramVal / sizeVal) < 0.5) {
+        psShowsCpuOnly = true;
+      }
+    }
+
+    if (sizeVal > 0 && hasVramField) {
+      psTotalBytes += sizeVal;
+      psVramBytes += Math.min(sizeVal, vramVal);
+    }
+  }
+
+  const psGpuRatio = psTotalBytes > 0
+    ? Math.min(1, Math.max(0, Math.round((psVramBytes / psTotalBytes) * 1000) / 1000))
+    : (psZeroVramCount > 0 ? 0 : null);
+
+  // Verificar entorno Windows Radeon 860M / Ollama y estado del proceso vivo
   const igpuMissing = hasLocalOllama && String(envEff.OLLAMA_IGPU_ENABLE || "").trim() !== "1";
   const hsaMissing = hasLocalOllama && String(envEff.HSA_OVERRIDE_GFX_VERSION || "").trim() !== "11.0.0";
   const faMissing = hasLocalOllama && String(envEff.OLLAMA_FLASH_ATTENTION || "").trim() !== "1";
   const kvNotQuantized = hasLocalOllama && String(envEff.OLLAMA_KV_CACHE_TYPE || "").trim().toLowerCase() !== "q8_0";
+
+  const ollamaRuntime = effectiveTelemetry.ollamaRuntime && typeof effectiveTelemetry.ollamaRuntime === "object"
+    ? effectiveTelemetry.ollamaRuntime
+    : null;
+  const liveOllamaAlive = Boolean(ollamaRuntime && ollamaRuntime.alive);
+  const runtimeDroppingIgpu = Boolean(ollamaRuntime && ollamaRuntime.droppingIgpu === true);
+  const liveOllamaEnv = (ollamaRuntime && ollamaRuntime.env && typeof ollamaRuntime.env === "object")
+    ? ollamaRuntime.env
+    : {};
+  const liveOllamaEnvKnown = Boolean(ollamaRuntime && (ollamaRuntime.envKnown || Object.values(liveOllamaEnv).some((v) => String(v || "").trim() !== "")));
+
+  const ollamaCompareKeys = [
+    "OLLAMA_IGPU_ENABLE",
+    "HSA_OVERRIDE_GFX_VERSION",
+    "OLLAMA_FLASH_ATTENTION",
+    "OLLAMA_KV_CACHE_TYPE",
+    "OLLAMA_MAX_LOADED_MODELS",
+    "OLLAMA_NUM_PARALLEL",
+    "OLLAMA_CONTEXT_LENGTH",
+    "OLLAMA_KEEP_ALIVE"
+  ];
+  let liveOllamaEnvDiffers = false;
+  if (liveOllamaAlive && liveOllamaEnvKnown) {
+    for (const k of ollamaCompareKeys) {
+      const targetVal = normalizeRuntimeEnvValue(k, envEff[k]);
+      if (!targetVal) continue;
+      const liveVal = normalizeRuntimeEnvValue(k, liveOllamaEnv[k]);
+      if (liveVal !== targetVal) {
+        liveOllamaEnvDiffers = true;
+        break;
+      }
+    }
+  }
+  const liveOllamaMissingIgpu = Boolean(
+    liveOllamaAlive &&
+    liveOllamaEnvKnown &&
+    normalizeRuntimeEnvValue("OLLAMA_IGPU_ENABLE", liveOllamaEnv.OLLAMA_IGPU_ENABLE) !== "1"
+  );
+
+  const ollamaRunningOnCpu = Boolean(
+    psShowsCpuOnly ||
+    runtimeDroppingIgpu ||
+    igpuMissing ||
+    (hasLocalOllama && liveOllamaMissingIgpu)
+  );
+  const requiresOllamaRestart = Boolean(
+    (hasLocalOllama && (igpuMissing || ollamaRunningOnCpu)) ||
+    (liveOllamaAlive && (runtimeDroppingIgpu || psShowsCpuOnly || liveOllamaMissingIgpu || liveOllamaEnvDiffers))
+  );
 
   if (igpuMissing) {
     elevateRisk("caution");
@@ -587,18 +1076,81 @@ function evaluateDualConfiguration({
     warnings.push("Falta HSA_OVERRIDE_GFX_VERSION=11.0.0 para RDNA 3 / Radeon 860M.");
   }
 
+  if (hasLocalOllama && (ollamaRunningOnCpu || igpuMissing)) {
+    elevateRisk("caution");
+    warnings.push("Ollama vivo ejecutándose en CPU (iGPU Radeon 860M inactiva en proceso actual). Reinicia Ollama tras aplicar tuning.");
+    recommendations.push("Aplica el tuning y ejecuta restartOllama para reiniciar ollama.exe con OLLAMA_IGPU_ENABLE=1 en la iGPU Radeon 860M.");
+  } else if (liveOllamaAlive && liveOllamaEnvDiffers && hasLocalOllama) {
+    recommendations.push("El proceso vivo de Ollama usa variables previas; ejecuta restartOllama tras aplicar tuning para activar Flash Attention / KV q8_0.");
+  }
+
   if (faMissing || kvNotQuantized) {
     recommendations.push("Activar OLLAMA_FLASH_ATTENTION=1 y OLLAMA_KV_CACHE_TYPE=q8_0 reduce ~45-50% el consumo KV en VRAM compartida.");
   }
 
   const currentDmlLimit = Number(envEff.OLIVE_GPU_MEMORY_LIMIT || 20);
   const currentDmlThreads = Number(envEff.OLIVE_CPU_THREADS || 12);
-  if (bothLocalModels && currentDmlLimit > 14) {
+  const directmlIsAlive = Boolean(
+    directmlStatus &&
+    (directmlStatus.isAlive === true || directmlStatus.status === "online" || directmlStatus.ok === true)
+  );
+  const liveDmlEnv = (directmlStatus && directmlStatus.env && typeof directmlStatus.env === "object")
+    ? directmlStatus.env
+    : ((effectiveTelemetry.directmlRuntime && effectiveTelemetry.directmlRuntime.env) || {});
+  const liveDmlLimit = Number(
+    directmlStatus?.oliveGpuMemoryLimit ??
+    liveDmlEnv.OLIVE_GPU_MEMORY_LIMIT ??
+    currentDmlLimit
+  );
+  const liveDmlThreads = Number(
+    directmlStatus?.oliveCpuThreads ??
+    liveDmlEnv.OLIVE_CPU_THREADS ??
+    currentDmlThreads
+  );
+  const recommendedDmlLimit = bothLocalModels
+    ? Number(profiles["ollama+directml"].suggestedEnv.OLIVE_GPU_MEMORY_LIMIT || 12)
+    : Number(profiles["freeai+directml"].suggestedEnv.OLIVE_GPU_MEMORY_LIMIT || 20);
+  const recommendedDmlThreads = bothLocalModels
+    ? Number(profiles["ollama+directml"].suggestedEnv.OLIVE_CPU_THREADS || 6)
+    : Number(profiles["freeai+directml"].suggestedEnv.OLIVE_CPU_THREADS || 12);
+  const dmlEnvKnownDiffers = Boolean(
+    effectiveTelemetry.directmlRuntime?.staleEnvForSession ||
+    (liveDmlEnv.OLIVE_GPU_MEMORY_LIMIT && envEff.OLIVE_GPU_MEMORY_LIMIT && Number(liveDmlEnv.OLIVE_GPU_MEMORY_LIMIT) !== Number(envEff.OLIVE_GPU_MEMORY_LIMIT)) ||
+    (liveDmlEnv.OLIVE_CPU_THREADS && envEff.OLIVE_CPU_THREADS && Number(liveDmlEnv.OLIVE_CPU_THREADS) !== Number(envEff.OLIVE_CPU_THREADS))
+  );
+  const requiresDirectmlRestart = Boolean(
+    hasDirectml &&
+    directmlIsAlive &&
+    (
+      (bothLocalModels && (liveDmlLimit >= 14 || liveDmlLimit !== recommendedDmlLimit || liveDmlThreads !== recommendedDmlThreads)) ||
+      (!bothLocalModels && (liveDmlLimit !== recommendedDmlLimit || liveDmlThreads !== recommendedDmlThreads)) ||
+      dmlEnvKnownDiffers
+    )
+  );
+
+  if (bothLocalModels && (currentDmlLimit >= 14 || liveDmlLimit >= 14)) {
     elevateRisk("caution");
-    warnings.push(`OLIVE_GPU_MEMORY_LIMIT está en ${currentDmlLimit} GB; en Modo 3 (Ollama+DirectML local) se recomienda limitar DirectML a 12 GB y 6 hilos.`);
-    recommendations.push("Usar 'Tunear Sesión' para reiniciar/limitar DirectML a OLIVE_GPU_MEMORY_LIMIT=12 y OLIVE_CPU_THREADS=6.");
+    const effectiveShownLimit = Math.max(currentDmlLimit, liveDmlLimit);
+    warnings.push(`OLIVE_GPU_MEMORY_LIMIT está en ${effectiveShownLimit} GB; en Modo 3 (Ollama+DirectML local) se recomienda limitar DirectML a 12 GB y ${recommendedDmlThreads} hilos.`);
+    recommendations.push("Usar 'Tunear Sesión' con restartDirectML para reiniciar y limitar DirectML a OLIVE_GPU_MEMORY_LIMIT=12 y OLIVE_CPU_THREADS=6.");
+  } else if (requiresDirectmlRestart) {
+    recommendations.push(`Reinicia DirectML (restartDirectML) para aplicar OLIVE_GPU_MEMORY_LIMIT=${recommendedDmlLimit} y OLIVE_CPU_THREADS=${recommendedDmlThreads} en el proceso vivo.`);
   } else if (!bothLocalModels && hasDirectml && currentDmlLimit < 16) {
     recommendations.push("En este modo Free.ai no usa VRAM local: puedes elevar OLIVE_GPU_MEMORY_LIMIT a 22-25 GB y 12 hilos.");
+  }
+
+  const maxDmlCtx = Math.max(
+    normA.source === "directml" ? Number(normA.numCtx || 0) : 0,
+    normB.source === "directml" ? Number(normB.numCtx || 0) : 0
+  );
+  if (hasDirectml && maxDmlCtx >= 16384) {
+    elevateRisk("caution");
+    const peakDmlKv = Math.max(
+      normA.source === "directml" ? kvA : 0,
+      normB.source === "directml" ? kvB : 0
+    );
+    warnings.push(`Contexto DirectML elevado (${maxDmlCtx} tokens) incrementa riesgo de contención WDDM/DXGI (~${peakDmlKv} GB de workspace/KV).`);
+    recommendations.push("Reduce numCtx de DirectML a 4096-8192 si observas latencia o presión WDDM.");
   }
 
   const combinedWeights = roundGb(memA.weightGb + memB.weightGb);
@@ -649,6 +1201,10 @@ function evaluateDualConfiguration({
     estimatedPeakLocalGb,
     additionalNeededGb,
     projectedHeadroomGb,
+    ollamaRunningOnCpu,
+    requiresOllamaRestart,
+    requiresDirectmlRestart,
+    psGpuRatio,
     agentA: {
       source: normA.source,
       model: normA.model || "",
@@ -673,7 +1229,12 @@ function evaluateDualConfiguration({
       faMissing,
       kvNotQuantized,
       currentDmlLimit,
-      currentDmlThreads
+      currentDmlThreads,
+      psShowsCpuOnly,
+      psGpuRatio,
+      ollamaRunningOnCpu,
+      requiresOllamaRestart,
+      requiresDirectmlRestart
     },
     suggestedEnv: profile.suggestedEnv,
     suggestedRuntime: {
@@ -768,6 +1329,11 @@ async function applySystemTuning({
   for (const [k, v] of Object.entries(validated)) {
     process.env[k] = v;
   }
+  if (appliedKeys.length > 0) {
+    lastSessionTuningAppliedAt = Date.now();
+    lastSessionAppliedEnv = { ...lastSessionAppliedEnv, ...validated };
+    cachedCimSnapshot = null;
+  }
 
   let persistedToWindows = false;
   if (cleanScope === "windows_user" && appliedKeys.length > 0 && !skipWindowsApply) {
@@ -829,6 +1395,10 @@ module.exports = {
   isCloudModelName,
   estimateModelMemoryGb,
   estimateKvOverheadGb,
+  OLLAMA_LOG_MAX_READ_BYTES,
+  parseOllamaServerLog,
+  readOllamaServerLogBounded,
+  detectLiveOllamaAcceleration,
   getHostHardwareTelemetry,
   getRecommendedProfiles,
   evaluateDualConfiguration,

@@ -21,19 +21,59 @@ function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-function assertNoSecretsInJson(payload) {
-  const serialized = JSON.stringify(payload);
+function assertNoSecretsInJson(payload, extraSecrets = []) {
+  const serialized = typeof payload === "string" ? payload : JSON.stringify(payload);
+  const pools = typeof envLoader.getSerpApiKeyPools === "function"
+    ? envLoader.getSerpApiKeyPools()
+    : { allKeys: [] };
   const tokens = [
     envLoader.getGithubToken(),
     envLoader.getNetlifyToken(),
-    envLoader.getHfToken()
-  ].filter(t => t && t.trim().length >= 6);
+    envLoader.getHfToken(),
+    ...(Array.isArray(pools.allKeys) ? pools.allKeys : []),
+    ...(Array.isArray(extraSecrets) ? extraSecrets : [])
+  ].filter(t => t && String(t).trim().length >= 6);
 
   for (const tok of tokens) {
-    assert.equal(serialized.includes(tok), false, "Response JSON must NEVER contain raw secret tokens");
+    assert.equal(serialized.includes(String(tok)), false, "Response JSON must NEVER contain raw secret tokens");
   }
   assert.equal(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{10,}\b/.test(serialized), false);
   assert.equal(/\bhf_[A-Za-z0-9]{10,}\b/.test(serialized), false);
+  assert.equal(/[?&]api_key=[^&\s"'\[\]]+/i.test(serialized), false, "Response JSON must NEVER leak api_key query param");
+}
+
+async function withIsolatedSerpEnv(overrides, fn) {
+  const backup = {
+    LOCAL_AI_DISABLE_EXTERNAL_ENV: process.env.LOCAL_AI_DISABLE_EXTERNAL_ENV,
+    LOCAL_AI_EXTERNAL_ENV_PATH: process.env.LOCAL_AI_EXTERNAL_ENV_PATH
+  };
+  for (const k of Object.keys(process.env)) {
+    if (k.startsWith("SERPAPI_")) {
+      backup[k] = process.env[k];
+      delete process.env[k];
+    }
+  }
+  process.env.LOCAL_AI_DISABLE_EXTERNAL_ENV = "1";
+  delete process.env.LOCAL_AI_EXTERNAL_ENV_PATH;
+
+  for (const [k, v] of Object.entries(overrides || {})) {
+    if (v === undefined || v === null) delete process.env[k];
+    else process.env[k] = String(v);
+  }
+  envLoader.getSerpApiKeyPools();
+
+  try {
+    return await fn();
+  } finally {
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("SERPAPI_")) delete process.env[k];
+    }
+    for (const [k, v] of Object.entries(backup)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    envLoader.getSerpApiKeyPools();
+  }
 }
 
 test("DEFAULT_MODELS_DIR matches central Antigravity models path", () => {
@@ -336,4 +376,245 @@ test("Read-only smoke test: searchHuggingFace returns ok: true and valid mapped 
   assert.equal(resDatasets.type, "dataset");
   assert.ok(resDatasets.items.length > 0);
   assertNoSecretsInJson(resDatasets);
+});
+
+test("SerpApi: valida query vacía y entorno sin llaves con aislamiento Zero-Trust", async () => {
+  await withIsolatedSerpEnv({}, async () => {
+    const emptyRes = await bridge.searchWebSerpApi({
+      query: "   ",
+      fetchImpl: () => {
+        throw new Error("No debe invocar fetch con query vacía");
+      }
+    });
+    assert.equal(emptyRes.ok, false);
+    assert.equal(emptyRes.attempts, 0);
+    assert.match(emptyRes.error, /vacía/i);
+
+    const statusEmpty = bridge.getSerpApiStatus();
+    assert.equal(statusEmpty.ok, true);
+    assert.equal(statusEmpty.configured, false);
+    assert.equal(statusEmpty.totalKeysCount, 0);
+
+    const unconfRes = await bridge.searchWebSerpApi({
+      query: "directml onnx",
+      fetchImpl: () => {
+        throw new Error("No debe invocar fetch sin llaves configuradas");
+      }
+    });
+    assert.equal(unconfRes.ok, false);
+    assert.equal(unconfRes.configured, false);
+    assert.equal(unconfRes.attempts, 0);
+    assertNoSecretsInJson(unconfRes);
+  });
+});
+
+test("SerpApi: enrutamiento por pools (web/news vs jobs), conteo de uso, status y reset sin red real", async () => {
+  const fakeWebKey = "serp_fake_web_key_9876543210abcdef";
+  const fakeJobsKey = "serp_fake_jobs_key_1234567890abcdef";
+
+  await withIsolatedSerpEnv(
+    {
+      SERPAPI_NEWS_KEY: fakeWebKey,
+      SERPAPI_JOBS_KEY: fakeJobsKey
+    },
+    async () => {
+      bridge.resetSerpApiUsage("all");
+
+      const calls = [];
+      const mockFetch = async (rawUrl) => {
+        const u = new URL(rawUrl);
+        calls.push({
+          engine: u.searchParams.get("engine"),
+          q: u.searchParams.get("q"),
+          apiKey: u.searchParams.get("api_key")
+        });
+        const engine = u.searchParams.get("engine");
+        if (engine === "google_jobs") {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({
+              jobs_results: [
+                {
+                  title: "AI Engineer",
+                  company_name: "Acme Lab",
+                  location: "Remoto",
+                  description: "Trabajo con ONNX DirectML",
+                  share_link: "https://jobs.example.com/1"
+                }
+              ]
+            })
+          };
+        }
+        if (engine === "google_news") {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({
+              news_results: [
+                {
+                  title: "Noticia Ryzen AI",
+                  link: "https://news.example.com/ryzen",
+                  snippet: "Actualización ROCm e iGPU",
+                  source: { name: "TechNews" },
+                  date: "2026-11-09"
+                }
+              ]
+            })
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            organic_results: [
+              {
+                title: "Documentación DirectML",
+                link: "https://docs.example.com/dml",
+                snippet: "Guía oficial DirectML",
+                source: "Docs"
+              }
+            ]
+          })
+        };
+      };
+
+      const webRes = await bridge.searchWebSerpApi({ query: "directml docs", mode: "web", fetchImpl: mockFetch });
+      assert.equal(webRes.ok, true);
+      assert.equal(webRes.engine, "google");
+      assert.equal(webRes.poolUsed, "web");
+      assert.equal(webRes.totalResults, 1);
+      assert.ok(webRes.contextBlock.includes("<busqueda_web_en_tiempo_real"));
+      assertNoSecretsInJson(webRes, [fakeWebKey, fakeJobsKey]);
+
+      const newsRes = await bridge.searchWebSerpApi({ query: "ryzen ai", mode: "news", fetchImpl: mockFetch });
+      assert.equal(newsRes.ok, true);
+      assert.equal(newsRes.engine, "google_news");
+      assert.equal(newsRes.poolUsed, "web");
+      assertNoSecretsInJson(newsRes, [fakeWebKey, fakeJobsKey]);
+
+      const jobsRes = await bridge.searchWebSerpApi({ query: "ai engineer", mode: "jobs", fetchImpl: mockFetch });
+      assert.equal(jobsRes.ok, true);
+      assert.equal(jobsRes.engine, "google_jobs");
+      assert.equal(jobsRes.poolUsed, "jobs");
+      assert.equal(jobsRes.results[0].source, "Acme Lab");
+      assertNoSecretsInJson(jobsRes, [fakeWebKey, fakeJobsKey]);
+
+      assert.equal(calls.length, 3);
+      assert.equal(calls[0].apiKey, fakeWebKey);
+      assert.equal(calls[1].apiKey, fakeWebKey);
+      assert.equal(calls[2].apiKey, fakeJobsKey);
+
+      const statusMid = bridge.getSerpApiStatus();
+      assert.equal(statusMid.configured, true);
+      assert.equal(statusMid.webKeysCount, 1);
+      assert.equal(statusMid.jobsKeysCount, 1);
+      assert.equal(statusMid.totalKeysCount, 2);
+      assert.equal(statusMid.usage.webUses, 2);
+      assert.equal(statusMid.usage.jobsUses, 1);
+      assertNoSecretsInJson(statusMid, [fakeWebKey, fakeJobsKey]);
+
+      const resetJobs = bridge.resetSerpApiUsage("jobs");
+      assert.equal(resetJobs.ok, true);
+      assert.equal(resetJobs.pool, "jobs");
+      assert.equal(resetJobs.usage.webUses, 2);
+      assert.equal(resetJobs.usage.jobsUses, 0);
+
+      const resetAll = bridge.resetSerpApiUsage("all");
+      assert.equal(resetAll.ok, true);
+      assert.equal(resetAll.usage.webUses, 0);
+      assert.equal(resetAll.usage.jobsUses, 0);
+    }
+  );
+});
+
+test("SerpApi: rota llave ante HTTP 429 o error rotatorio, NO rota ante AbortError y redacta secretos en errores", async () => {
+  const key1 = "serp_key_one_SECRET_1111111111";
+  const key2 = "serp_key_two_SECRET_2222222222";
+
+  await withIsolatedSerpEnv(
+    {
+      SERPAPI_NEWS_KEY: key1,
+      SERPAPI_JOBS_KEY: key2
+    },
+    async () => {
+      bridge.resetSerpApiUsage("all");
+
+      // 1. Failover ante HTTP 429
+      const seen429 = [];
+      const res429Failover = await bridge.searchWebSerpApi({
+        query: "failover 429",
+        mode: "web",
+        fetchImpl: async (rawUrl) => {
+          const k = new URL(rawUrl).searchParams.get("api_key");
+          seen429.push(k);
+          if (seen429.length === 1) {
+            return {
+              ok: false,
+              status: 429,
+              text: async () => JSON.stringify({ error: `Rate limit exceeded for ${rawUrl}` })
+            };
+          }
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({
+              organic_results: [{ title: "OK Backup Key", link: "https://ok.example.com", snippet: "Funciona", source: "OK" }]
+            })
+          };
+        }
+      });
+      assert.equal(res429Failover.ok, true);
+      assert.equal(res429Failover.attempts, 2);
+      assert.equal(res429Failover.poolUsed, "jobs");
+      assert.deepEqual(seen429, [key1, key2]);
+      assertNoSecretsInJson(res429Failover, [key1, key2]);
+
+      // 2. Failover ante error JSON HTTP 200 rotatorio ("run out of searches")
+      const seenQuota = [];
+      const resQuotaFailover = await bridge.searchWebSerpApi({
+        query: "failover quota",
+        mode: "web",
+        fetchImpl: async (rawUrl) => {
+          seenQuota.push(new URL(rawUrl).searchParams.get("api_key"));
+          if (seenQuota.length === 1) {
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify({ error: `Your account has run out of searches (${key1})` })
+            };
+          }
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({
+              organic_results: [{ title: "Second Key Success", link: "https://ok2.example.com", snippet: "Fallback OK", source: "OK2" }]
+            })
+          };
+        }
+      });
+      assert.equal(resQuotaFailover.ok, true);
+      assert.equal(resQuotaFailover.attempts, 2);
+      assertNoSecretsInJson(resQuotaFailover, [key1, key2]);
+
+      // 3. NO rotación ante AbortError / timeout (debe fallar rápido en intento 1) y redactar secreto si aparece en error
+      let abortCalls = 0;
+      const resAbort = await bridge.searchWebSerpApi({
+        query: "timeout no rotation",
+        mode: "web",
+        fetchImpl: async (rawUrl) => {
+          abortCalls += 1;
+          const err = new Error(`Aborted request to ${rawUrl} using ${key1}`);
+          err.name = "AbortError";
+          throw err;
+        }
+      });
+      assert.equal(abortCalls, 1, "AbortError/timeout NO debe rotar a llaves secundarias");
+      assert.equal(resAbort.ok, false);
+      assert.equal(resAbort.attempts, 1);
+      assert.equal(resAbort.error.includes(key1), false, "El mensaje de error nunca debe exponer la llave API");
+      assert.equal(resAbort.error.includes("[REDACTED]"), true);
+      assertNoSecretsInJson(resAbort, [key1, key2]);
+    }
+  );
 });

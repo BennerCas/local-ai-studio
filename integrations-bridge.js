@@ -1,5 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const http = require("node:http");
+const https = require("node:https");
 const crypto = require("node:crypto");
 const { execFile, execFileSync, spawn } = require("node:child_process");
 const { promisify } = require("node:util");
@@ -13,6 +15,7 @@ const HF_DOWNLOADER_PY = path.join(__dirname, "hf_downloader.py");
 const MEMORY_STORE_PATH = path.join(__dirname, "memory-store.js");
 const CACHE_TTL_MS = 60 * 1000;
 const HTTP_TIMEOUT_MS = 15000;
+const DEFAULT_GLOBAL_FETCH = typeof globalThis.fetch === "function" ? globalThis.fetch : null;
 
 const SAFE_GITIGNORE_ENTRIES = [
   ".env",
@@ -35,8 +38,29 @@ let usingFallbackStore = false;
 const fallbackMemoryState = {
   downloads: new Map(),
   changes: [],
-  projectStates: new Map()
+  projectStates: new Map(),
+  serpapiUsage: null
 };
+
+function getDefaultFallbackSerpUsage() {
+  const month = new Date().toISOString().slice(0, 7);
+  if (!fallbackMemoryState.serpapiUsage || fallbackMemoryState.serpapiUsage.month !== month) {
+    fallbackMemoryState.serpapiUsage = {
+      month,
+      webUses: 0,
+      webLimit: 100,
+      jobsUses: 0,
+      jobsLimit: 100,
+      lastUsedAt: null,
+      lastQuery: "",
+      lastPool: null,
+      lastMode: null,
+      history: [],
+      updatedAt: null
+    };
+  }
+  return fallbackMemoryState.serpapiUsage;
+}
 
 function createFallbackMemoryStore() {
   return {
@@ -72,6 +96,48 @@ function createFallbackMemoryStore() {
       const merged = { ...existing, ...patch, updatedAt: new Date().toISOString() };
       fallbackMemoryState.projectStates.set(projectKey, merged);
       return merged;
+    },
+    getSerpApiUsage() {
+      const u = getDefaultFallbackSerpUsage();
+      return { ...u, history: [...u.history] };
+    },
+    incrementSerpApiUsage(pool = "web", meta = {}) {
+      const u = getDefaultFallbackSerpUsage();
+      const normPool = String(pool || "web").toLowerCase() === "jobs" ? "jobs" : "web";
+      const nowIso = new Date().toISOString();
+      if (normPool === "jobs") u.jobsUses += 1;
+      else u.webUses += 1;
+      u.lastUsedAt = nowIso;
+      u.lastQuery = String(meta?.query || "").slice(0, 160);
+      u.lastPool = normPool;
+      u.lastMode = String(meta?.mode || normPool);
+      u.updatedAt = nowIso;
+      u.history = [{
+        timestamp: nowIso,
+        pool: normPool,
+        mode: u.lastMode,
+        engine: String(meta?.engine || ""),
+        query: u.lastQuery,
+        count: Number(meta?.count || 0)
+      }, ...u.history].slice(0, 30);
+      return { ...u, history: [...u.history] };
+    },
+    resetSerpApiUsage(pool = "all") {
+      const u = getDefaultFallbackSerpUsage();
+      const norm = String(pool || "all").toLowerCase();
+      if (norm === "web") u.webUses = 0;
+      else if (norm === "jobs") u.jobsUses = 0;
+      else {
+        u.webUses = 0;
+        u.jobsUses = 0;
+        u.lastUsedAt = null;
+        u.lastQuery = "";
+        u.lastPool = null;
+        u.lastMode = null;
+        u.history = [];
+      }
+      u.updatedAt = new Date().toISOString();
+      return { ...u, history: [...u.history] };
     }
   };
 }
@@ -126,7 +192,10 @@ function collectKnownSecrets(extraSecrets = []) {
     const gh = envLoader.getGithubToken();
     const nf = envLoader.getNetlifyToken();
     const hf = envLoader.getHfToken();
-    for (const t of [gh, nf, hf]) {
+    const serpKeys = typeof envLoader.getSerpApiKeyPools === "function"
+      ? envLoader.getSerpApiKeyPools().allKeys
+      : [envLoader.getSerpApiKey()];
+    for (const t of [gh, nf, hf, ...serpKeys]) {
       if (t && t.trim().length >= 4) {
         list.push(t.trim());
         list.push(Buffer.from(`x-access-token:${t.trim()}`, "utf8").toString("base64"));
@@ -154,7 +223,8 @@ function sanitizeSecrets(input, extraSecrets = []) {
     }
   }
 
-  // Scrub common token prefixes and auth header encodings
+  // Scrub common token prefixes, API query params and auth header encodings
+  text = text.replace(/([?&]api_key=)[^&\s"']+/gi, "$1[REDACTED]");
   text = text.replace(/\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{6,}\b/g, "[REDACTED]");
   text = text.replace(/\bhf_[A-Za-z0-9]{8,}\b/g, "[REDACTED]");
   text = text.replace(/\bnfp_[A-Za-z0-9_]{8,}\b/g, "[REDACTED]");
@@ -1844,6 +1914,727 @@ function cancelHfDownload(jobId) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// D. SerpApi Web / News / Jobs Search (Dual-Pool + Rotation)
+// ---------------------------------------------------------------------------
+const SERPAPI_DEFAULT_TIMEOUT_MS = 12000;
+const SERPAPI_MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+const SERPAPI_CONTEXT_MAX_CHARS = 2500;
+
+function httpsGetJson(targetUrl, options = {}) {
+  const {
+    headers = {},
+    timeoutMs = SERPAPI_DEFAULT_TIMEOUT_MS,
+    maxBytes = SERPAPI_MAX_RESPONSE_BYTES,
+    secrets = []
+  } = options || {};
+
+  return new Promise((resolve, reject) => {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(String(targetUrl || ""));
+    } catch (err) {
+      reject(new Error(sanitizeSecrets(`URL inválida: ${err.message}`, secrets)));
+      return;
+    }
+
+    if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+      reject(new Error(sanitizeSecrets(`Protocolo no soportado: ${parsedUrl.protocol}`, secrets)));
+      return;
+    }
+
+    const transport = parsedUrl.protocol === "http:" ? http : https;
+    const boundedTimeout = Number.isFinite(Number(timeoutMs))
+      ? Math.min(60000, Math.max(50, Math.floor(Number(timeoutMs))))
+      : SERPAPI_DEFAULT_TIMEOUT_MS;
+
+    let settled = false;
+    const finishResolve = val => {
+      if (settled) return;
+      settled = true;
+      resolve(val);
+    };
+    const finishReject = err => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+
+    const req = transport.request(
+      parsedUrl,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "Local-AI-Studio-Antigravity/1.0",
+          Accept: "application/json",
+          ...headers
+        }
+      },
+      res => {
+        const statusCode = Number(res.statusCode || 0);
+        const chunks = [];
+        let totalBytes = 0;
+
+        res.on("data", chunk => {
+          totalBytes += chunk.length;
+          if (totalBytes > maxBytes) {
+            const overflowErr = new Error(`Respuesta HTTP excedió el límite de ${maxBytes} bytes`);
+            req.destroy(overflowErr);
+            finishReject(overflowErr);
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on("end", () => {
+          if (settled) return;
+          const rawText = Buffer.concat(chunks).toString("utf8");
+          let parsed = null;
+          let parseFailed = false;
+
+          if (rawText.trim()) {
+            try {
+              parsed = JSON.parse(rawText);
+            } catch (_jsonErr) {
+              parseFailed = true;
+              parsed = rawText;
+            }
+          }
+
+          if (statusCode < 200 || statusCode >= 300) {
+            const detail =
+              (parsed && typeof parsed === "object" && (parsed.error || parsed.message || parsed.error_description)) ||
+              (typeof parsed === "string" && parsed.trim()) ||
+              `HTTP ${statusCode}`;
+            const httpErr = new Error(sanitizeSecrets(`HTTP ${statusCode}: ${detail}`, secrets));
+            httpErr.status = statusCode;
+            httpErr.data = parsed;
+            finishReject(httpErr);
+            return;
+          }
+
+          if (parseFailed) {
+            finishReject(new Error(sanitizeSecrets("La respuesta HTTP no contiene JSON válido.", secrets)));
+            return;
+          }
+
+          finishResolve(parsed && typeof parsed === "object" ? parsed : {});
+        });
+
+        res.on("error", err => {
+          finishReject(new Error(sanitizeSecrets(err, secrets)));
+        });
+      }
+    );
+
+    req.setTimeout(boundedTimeout, () => {
+      const timeoutErr = new Error(`Timeout tras ${boundedTimeout}ms esperando respuesta HTTP`);
+      timeoutErr.code = "ETIMEDOUT";
+      req.destroy(timeoutErr);
+      finishReject(timeoutErr);
+    });
+
+    req.on("error", err => {
+      if (err && err.status) {
+        err.message = sanitizeSecrets(err.message, secrets);
+        finishReject(err);
+        return;
+      }
+      const wrapped = new Error(sanitizeSecrets(err, secrets));
+      if (err && err.code) wrapped.code = err.code;
+      finishReject(wrapped);
+    });
+
+    req.end();
+  });
+}
+
+function escapeXmlAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[\r\n\t]+/g, " ");
+}
+
+function cleanSerpText(value, secrets = [], maxLen = 400) {
+  let text = sanitizeSecrets(value == null ? "" : String(value), secrets);
+  text = text
+    .replace(/<\/?busqueda_web_en_tiempo_real[^>]*>/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (maxLen > 0 && text.length > maxLen) {
+    text = `${text.slice(0, Math.max(0, maxLen - 3)).trim()}...`;
+  }
+  return text;
+}
+
+function extractHostname(rawUrl) {
+  try {
+    if (!rawUrl) return "";
+    return new URL(rawUrl).hostname.replace(/^www\./i, "");
+  } catch (_e) {
+    return "";
+  }
+}
+
+function isRotatableSerpError(message, statusCode = 0) {
+  const status = Number(statusCode || 0);
+  if (status === 401 || status === 403 || status === 429) {
+    return true;
+  }
+  const msg = String(message || "").toLowerCase();
+  if (!msg) return false;
+  return (
+    msg.includes("out of searches") ||
+    msg.includes("run out of searches") ||
+    msg.includes("account has run out") ||
+    msg.includes("invalid api key") ||
+    msg.includes("unauthorized") ||
+    msg.includes("forbidden") ||
+    msg.includes("rate limit") ||
+    msg.includes("too many requests") ||
+    msg.includes("quota") ||
+    msg.includes("credits exhausted") ||
+    msg.includes("api_key") ||
+    msg.includes("api key")
+  );
+}
+
+function normalizeSerpItem(raw, secrets = [], fallbackSource = "") {
+  if (!raw || typeof raw !== "object") return null;
+  const link = cleanSerpText(raw.link || "", secrets, 500);
+  const title = cleanSerpText(raw.title || "", secrets, 220);
+  const snippet = cleanSerpText(raw.snippet || "", secrets, 420);
+  const source = cleanSerpText(raw.source || fallbackSource || extractHostname(link) || "", secrets, 100);
+  const date = cleanSerpText(raw.date || "", secrets, 80);
+
+  if (!title && !snippet && !link) return null;
+  return {
+    title: title || source || link || "Resultado",
+    link,
+    snippet,
+    source,
+    date
+  };
+}
+
+function extractSerpApiResults(data, mode, limit = 5, secrets = []) {
+  if (!data || typeof data !== "object") return [];
+  const items = [];
+  const seen = new Set();
+
+  const pushNormalized = normalized => {
+    if (!normalized) return;
+    const dedupKey = (normalized.link || normalized.title).toLowerCase();
+    if (seen.has(dedupKey)) return;
+    seen.add(dedupKey);
+    items.push(normalized);
+  };
+
+  // 1. Answer box (especially valuable in web mode for direct answers)
+  if (data.answer_box && typeof data.answer_box === "object") {
+    const ab = data.answer_box;
+    const abText = [
+      ab.answer,
+      ab.snippet,
+      ab.result,
+      Array.isArray(ab.list) ? ab.list.slice(0, 5).join("; ") : ""
+    ]
+      .filter(Boolean)
+      .join(" — ");
+    pushNormalized(
+      normalizeSerpItem(
+        {
+          title: ab.title || ab.question || "Respuesta directa",
+          link: ab.link || "",
+          snippet: abText,
+          source: ab.source || ab.displayed_link || "Answer Box",
+          date: ab.date || ""
+        },
+        secrets
+      )
+    );
+  }
+
+  // 2. Jobs results (engine=google_jobs)
+  if (mode === "jobs" && Array.isArray(data.jobs_results)) {
+    for (const job of data.jobs_results) {
+      if (items.length >= limit) break;
+      const applyLink =
+        job.share_link ||
+        job.link ||
+        (Array.isArray(job.apply_options) && job.apply_options[0] && job.apply_options[0].link) ||
+        (Array.isArray(job.related_links) && job.related_links[0] && job.related_links[0].link) ||
+        "";
+      const ext = job.detected_extensions && typeof job.detected_extensions === "object"
+        ? job.detected_extensions
+        : {};
+      const metaParts = [
+        job.location ? `Ubicación: ${job.location}` : "",
+        ext.schedule_type || "",
+        ext.salary || ""
+      ].filter(Boolean);
+      const rawDesc = String(job.description || job.snippet || "").trim();
+      const snippetText = metaParts.length
+        ? `${metaParts.join(" | ")}${rawDesc ? ` — ${rawDesc}` : ""}`
+        : rawDesc;
+
+      pushNormalized(
+        normalizeSerpItem(
+          {
+            title: job.title || "",
+            link: applyLink,
+            snippet: snippetText,
+            source: job.company_name || job.via || job.source || "",
+            date: ext.posted_at || job.date || ""
+          },
+          secrets
+        )
+      );
+    }
+  }
+
+  // 3. News results (engine=google_news, handles both flat items and nested stories)
+  if (Array.isArray(data.news_results)) {
+    const flatNews = [];
+    for (const entry of data.news_results) {
+      if (!entry || typeof entry !== "object") continue;
+      if (entry.title || entry.link) flatNews.push(entry);
+      if (Array.isArray(entry.stories)) {
+        for (const st of entry.stories) {
+          if (st && typeof st === "object") flatNews.push(st);
+        }
+      }
+    }
+    for (const news of flatNews) {
+      if (items.length >= limit) break;
+      const sourceName =
+        news.source && typeof news.source === "object"
+          ? news.source.name || news.source.title || ""
+          : news.source || "";
+      pushNormalized(
+        normalizeSerpItem(
+          {
+            title: news.title || "",
+            link: news.link || "",
+            snippet: news.snippet || "",
+            source: sourceName,
+            date: news.date || news.iso_date || ""
+          },
+          secrets
+        )
+      );
+    }
+  }
+
+  // 4. Organic web results (engine=google and fallback if present)
+  if (Array.isArray(data.organic_results)) {
+    for (const org of data.organic_results) {
+      if (items.length >= limit) break;
+      const snippetFallback = Array.isArray(org.snippet_highlighted_words)
+        ? org.snippet_highlighted_words.join(" ")
+        : "";
+      pushNormalized(
+        normalizeSerpItem(
+          {
+            title: org.title || "",
+            link: org.link || org.url || "",
+            snippet: org.snippet || snippetFallback,
+            source: org.source || org.displayed_link || "",
+            date: org.date || ""
+          },
+          secrets
+        )
+      );
+    }
+  }
+
+  return items.slice(0, limit);
+}
+
+function buildSerpContextBlock(query, engine, results = [], maxChars = SERPAPI_CONTEXT_MAX_CHARS) {
+  const header = `<busqueda_web_en_tiempo_real query="${escapeXmlAttr(query)}" engine="${escapeXmlAttr(engine)}">`;
+  const footer = "</busqueda_web_en_tiempo_real>";
+  const budget = Math.max(80, maxChars - header.length - footer.length - 2);
+
+  if (!Array.isArray(results) || results.length === 0) {
+    const emptyLine = "Sin resultados encontrados para esta consulta.";
+    return `${header}\n${emptyLine.slice(0, budget)}\n${footer}`;
+  }
+
+  const blocks = [];
+  let used = 0;
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const meta = [
+      r.source ? `Fuente: ${r.source}` : "",
+      r.date ? `Fecha: ${r.date}` : "",
+      r.link ? `URL: ${r.link}` : ""
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const entryLines = [`[${i + 1}] ${r.title}`];
+    if (meta) entryLines.push(meta);
+    if (r.snippet) entryLines.push(`Resumen: ${r.snippet}`);
+
+    const block = entryLines.join("\n");
+    const sepLen = blocks.length > 0 ? 2 : 0;
+
+    if (used + sepLen + block.length <= budget) {
+      blocks.push(block);
+      used += sepLen + block.length;
+    } else {
+      const remaining = budget - used - sepLen;
+      if (remaining >= 60) {
+        blocks.push(`${block.slice(0, remaining - 3).trim()}...`);
+      }
+      break;
+    }
+  }
+
+  const body = blocks.join("\n\n");
+  return `${header}\n${body}\n${footer}`;
+}
+
+async function callSerpApiWithImpl(fetchImpl, requestUrl, timeoutMs, secrets = []) {
+  if (typeof fetchImpl !== "function") {
+    return await httpsGetJson(requestUrl, { timeoutMs, secrets });
+  }
+
+  const reqInit = {
+    method: "GET",
+    headers: { Accept: "application/json" }
+  };
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    reqInit.signal = AbortSignal.timeout(timeoutMs);
+  }
+
+  const res = await fetchImpl(requestUrl, reqInit);
+
+  // Support Response-like objects (Web Fetch API / undici / mocks)
+  if (
+    res &&
+    (typeof res.text === "function" ||
+      typeof res.json === "function" ||
+      typeof res.ok === "boolean" ||
+      typeof res.status === "number")
+  ) {
+    let parsed = null;
+    if (typeof res.text === "function") {
+      const rawText = await res.text();
+      if (rawText && String(rawText).trim()) {
+        try {
+          parsed = JSON.parse(rawText);
+        } catch (_e) {
+          parsed = rawText;
+        }
+      }
+    } else if (typeof res.json === "function") {
+      parsed = await res.json();
+    }
+
+    const status = typeof res.status === "number" ? res.status : (res.ok === false ? 500 : 200);
+    if (res.ok === false || status < 200 || status >= 300) {
+      const detail =
+        (parsed && typeof parsed === "object" && (parsed.error || parsed.message || parsed.error_description)) ||
+        (typeof parsed === "string" && parsed.trim()) ||
+        `HTTP ${status}`;
+      const httpErr = new Error(sanitizeSecrets(`HTTP ${status}: ${detail}`, secrets));
+      httpErr.status = status;
+      httpErr.data = parsed;
+      throw httpErr;
+    }
+
+    return parsed && typeof parsed === "object" ? parsed : {};
+  }
+
+  // Support mocks returning plain parsed JSON directly
+  if (res && typeof res === "object") {
+    return res;
+  }
+
+  throw new Error("Respuesta inválida de fetchImpl para SerpApi");
+}
+
+async function searchWebSerpApi(options = {}) {
+  const opts = typeof options === "string" ? { query: options } : (options || {});
+  const rawQuery = String(opts.query || "").trim();
+
+  const rawMode = String(opts.mode || "web").trim().toLowerCase();
+  const mode =
+    rawMode === "jobs" || rawMode === "google_jobs"
+      ? "jobs"
+      : rawMode === "news" || rawMode === "google_news"
+        ? "news"
+        : "web";
+
+  const engine =
+    mode === "jobs" ? "google_jobs" : mode === "news" ? "google_news" : "google";
+
+  const rawPool = String(opts.pool || "auto").trim().toLowerCase();
+  const poolPref = rawPool === "jobs" || rawPool === "web" ? rawPool : "auto";
+
+  const numParsed = parseInt(opts.num, 10);
+  const num = Number.isFinite(numParsed) ? Math.min(20, Math.max(1, numParsed)) : 5;
+  const gl = String(opts.gl || "co").trim().toLowerCase() || "co";
+  const hl = String(opts.hl || "es").trim().toLowerCase() || "es";
+  const timeoutParsed = parseInt(opts.timeoutMs, 10);
+  const timeoutMs = Number.isFinite(timeoutParsed)
+    ? Math.min(60000, Math.max(50, timeoutParsed))
+    : SERPAPI_DEFAULT_TIMEOUT_MS;
+  const fetchImpl = typeof opts.fetchImpl === "function"
+    ? opts.fetchImpl
+    : (typeof globalThis.fetch === "function" && globalThis.fetch !== DEFAULT_GLOBAL_FETCH
+        ? globalThis.fetch
+        : null);
+
+  const { webKeys, jobsKeys, allKeys } = envLoader.getSerpApiKeyPools();
+  const safeQuery = sanitizeSecrets(rawQuery, allKeys);
+
+  if (!safeQuery) {
+    return {
+      ok: false,
+      configured: allKeys.length > 0,
+      query: "",
+      mode,
+      engine,
+      poolUsed: null,
+      keySlot: null,
+      attempts: 0,
+      totalResults: 0,
+      results: [],
+      contextBlock: "",
+      usage: safeCallStore("getSerpApiUsage"),
+      error: "La consulta (query) de búsqueda no puede estar vacía."
+    };
+  }
+
+  const webCandidates = webKeys.map((key, idx) => ({ key, pool: "web", keySlot: idx + 1 }));
+  const jobsCandidates = jobsKeys.map((key, idx) => ({ key, pool: "jobs", keySlot: idx + 1 }));
+
+  const prioritizeJobs = poolPref === "jobs" || (poolPref === "auto" && mode === "jobs");
+  const primary = prioritizeJobs ? jobsCandidates : webCandidates;
+  const secondary = prioritizeJobs ? webCandidates : jobsCandidates;
+
+  const seenKeys = new Set();
+  const candidates = [];
+  for (const item of [...primary, ...secondary]) {
+    if (!item || !item.key || seenKeys.has(item.key)) continue;
+    seenKeys.add(item.key);
+    candidates.push(item);
+  }
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      configured: false,
+      query: safeQuery,
+      mode,
+      engine,
+      poolUsed: null,
+      keySlot: null,
+      attempts: 0,
+      totalResults: 0,
+      results: [],
+      contextBlock: "",
+      usage: safeCallStore("getSerpApiUsage"),
+      error: "SERPAPI no configurado. Añade SERPAPI_NEWS_KEY, SERPAPI_JOBS_KEY o SERPAPI_KEY en .env"
+    };
+  }
+
+  let attempts = 0;
+  let lastError = "Error desconocido consultando SerpApi";
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    attempts += 1;
+
+    const params = new URLSearchParams({
+      engine,
+      q: safeQuery,
+      gl,
+      hl,
+      api_key: candidate.key
+    });
+    if (engine === "google") {
+      params.set("num", String(num));
+    }
+    const requestUrl = `https://serpapi.com/search.json?${params.toString()}`;
+
+    try {
+      const data = await callSerpApiWithImpl(fetchImpl, requestUrl, timeoutMs, allKeys);
+
+      if (data && typeof data.error === "string" && data.error.trim()) {
+        const apiErr = sanitizeSecrets(data.error, allKeys);
+        if (apiErr.toLowerCase().includes("hasn't returned any results")) {
+          return {
+            ok: true,
+            configured: true,
+            query: safeQuery,
+            mode,
+            engine,
+            poolUsed: candidate.pool,
+            keySlot: candidate.keySlot,
+            attempts,
+            totalResults: 0,
+            results: [],
+            contextBlock: buildSerpContextBlock(safeQuery, engine, [], SERPAPI_CONTEXT_MAX_CHARS),
+            usage: safeCallStore("getSerpApiUsage")
+          };
+        }
+        lastError = apiErr;
+        if (isRotatableSerpError(apiErr, 200) && i < candidates.length - 1) {
+          continue;
+        }
+        return {
+          ok: false,
+          configured: true,
+          query: safeQuery,
+          mode,
+          engine,
+          poolUsed: candidate.pool,
+          keySlot: candidate.keySlot,
+          attempts,
+          totalResults: 0,
+          results: [],
+          contextBlock: "",
+          usage: safeCallStore("getSerpApiUsage"),
+          error: apiErr
+        };
+      }
+
+      const results = extractSerpApiResults(data, mode, num, allKeys);
+      if (results.length > 0) {
+        const usage =
+          safeCallStore("incrementSerpApiUsage", candidate.pool, {
+            query: safeQuery,
+            mode,
+            engine,
+            count: results.length,
+            keySlot: candidate.keySlot
+          }) || safeCallStore("getSerpApiUsage");
+
+        return {
+          ok: true,
+          configured: true,
+          query: safeQuery,
+          mode,
+          engine,
+          poolUsed: candidate.pool,
+          keySlot: candidate.keySlot,
+          attempts,
+          totalResults: results.length,
+          results,
+          contextBlock: buildSerpContextBlock(safeQuery, engine, results, SERPAPI_CONTEXT_MAX_CHARS),
+          usage
+        };
+      }
+
+      return {
+        ok: true,
+        configured: true,
+        query: safeQuery,
+        mode,
+        engine,
+        poolUsed: candidate.pool,
+        keySlot: candidate.keySlot,
+        attempts,
+        totalResults: 0,
+        results: [],
+        contextBlock: buildSerpContextBlock(safeQuery, engine, [], SERPAPI_CONTEXT_MAX_CHARS),
+        usage: safeCallStore("getSerpApiUsage")
+      };
+    } catch (err) {
+      const statusCode = Number((err && err.status) || 0);
+      const rawErrDetail =
+        err && err.data && typeof err.data === "object" && (err.data.error || err.data.message)
+          ? err.data.error || err.data.message
+          : err;
+      const cleanErr = sanitizeSecrets(rawErrDetail, allKeys);
+      lastError = sanitizeSecrets((err && err.message) || cleanErr, allKeys);
+
+      const isTimeoutOrAbort =
+        (err && (err.name === "AbortError" || err.name === "TimeoutError" || err.code === "ETIMEDOUT")) ||
+        /timeout/i.test(lastError);
+
+      const canRotate =
+        !isTimeoutOrAbort &&
+        i < candidates.length - 1 &&
+        (isRotatableSerpError(cleanErr, statusCode) ||
+          isRotatableSerpError(lastError, statusCode) ||
+          statusCode >= 500);
+
+      if (canRotate) {
+        continue;
+      }
+
+      return {
+        ok: false,
+        configured: true,
+        query: safeQuery,
+        mode,
+        engine,
+        poolUsed: candidate.pool,
+        keySlot: candidate.keySlot,
+        attempts,
+        totalResults: 0,
+        results: [],
+        contextBlock: "",
+        usage: safeCallStore("getSerpApiUsage"),
+        error: lastError
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    configured: true,
+    query: safeQuery,
+    mode,
+    engine,
+    poolUsed: null,
+    keySlot: null,
+    attempts,
+    totalResults: 0,
+    results: [],
+    contextBlock: "",
+    usage: safeCallStore("getSerpApiUsage"),
+    error: sanitizeSecrets(lastError, allKeys)
+  };
+}
+
+function getSerpApiStatus() {
+  const status = envLoader.getEnvStatus();
+  const pools = typeof envLoader.getSerpApiKeyPools === "function"
+    ? envLoader.getSerpApiKeyPools()
+    : { webKeys: [], jobsKeys: [], allKeys: [] };
+  const usage = safeCallStore("getSerpApiUsage");
+
+  return {
+    ok: true,
+    configured: Boolean(status.serpApiConfigured),
+    webKeysCount: Number(status.serpApiWebKeysCount ?? pools.webKeys.length ?? 0),
+    jobsKeysCount: Number(status.serpApiJobsKeysCount ?? pools.jobsKeys.length ?? 0),
+    totalKeysCount: Array.isArray(pools.allKeys) ? pools.allKeys.length : 0,
+    usage
+  };
+}
+
+function resetSerpApiUsage(pool = "all") {
+  const norm = String(pool || "all").trim().toLowerCase();
+  const targetPool = norm === "web" || norm === "jobs" ? norm : "all";
+  const usage = safeCallStore("resetSerpApiUsage", targetPool);
+  return {
+    ok: true,
+    pool: targetPool,
+    usage
+  };
+}
+
 module.exports = {
   DEFAULT_MODELS_DIR,
   // Security & helpers
@@ -1852,6 +2643,7 @@ module.exports = {
   parseGitHubRepoFromRemote,
   detectGitProjectMeta,
   buildEphemGitEnv,
+  httpsGetJson,
   // A. GitHub
   getGitHubStatusAndRepos,
   createGitHubRepo,
@@ -1867,5 +2659,9 @@ module.exports = {
   startHfDownload,
   listHfDownloads,
   getHfDownload,
-  cancelHfDownload
+  cancelHfDownload,
+  // D. SerpApi Web Search
+  searchWebSerpApi,
+  getSerpApiStatus,
+  resetSerpApiUsage
 };

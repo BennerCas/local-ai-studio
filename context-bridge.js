@@ -764,42 +764,55 @@ function buildProjectContext(projectName = null, convId = null, token = null, op
   const proj = getActiveProject(targetProjName, targetConvId, token);
   if (!proj) return null;
 
+  const isGen = Boolean(proj.isGeneral || String(proj.name || "").toLowerCase() === "general");
   const projectPath = proj.path;
-  const files = scanProjectFiles(projectPath);
 
+  let files = [];
   let packageInfo = null;
-  const pkgFile = path.join(projectPath, "package.json");
-  if (fs.existsSync(pkgFile)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgFile, "utf-8"));
-      packageInfo = {
-        name: pkg.name || proj.name,
-        version: pkg.version || "1.0.0",
-        scripts: pkg.scripts ? Object.keys(pkg.scripts) : [],
-        dependencies: pkg.dependencies ? Object.keys(pkg.dependencies) : [],
-        devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies) : []
-      };
-    } catch (e) {}
-  }
-
   let readmeSnippet = "";
-  const readmeFile = path.join(projectPath, "README.md");
-  if (fs.existsSync(readmeFile)) {
-    try {
-      readmeSnippet = fs.readFileSync(readmeFile, "utf-8").slice(0, 800);
-    } catch (e) {}
-  }
-
-  const progressFile = path.join(projectPath, "AVANCES_LOCAL_AI.md");
-  const pastProgress = readCleanProgressTail(progressFile, 1200);
+  let pastProgress = "";
+  let selectedFiles = [];
+  let codeSnippets = "";
 
   const convInfo = (targetConvId || token) ? resolveConversationProject(targetConvId, token) : null;
   const recentPrompts = getConversationHistory(targetConvId);
 
-  const selectedFiles = Array.isArray(opts.selectedFiles) ? opts.selectedFiles : getSelectedFiles(projectPath);
-  const codeSnippets = readCodeFilesContext(projectPath, selectedFiles, 24000);
+  if (isGen) {
+    // Modo General ligero: no caminar los repositorios ni leer archivos de código
+    files = listProjects()
+      .filter((p) => p && !p.isGeneral && String(p.name || "").toLowerCase() !== "general")
+      .slice(0, 15)
+      .map((p) => `${p.name}/`);
+  } else {
+    files = scanProjectFiles(projectPath);
 
-  const isGen = proj.isGeneral || proj.name.toLowerCase() === "general";
+    const pkgFile = path.join(projectPath, "package.json");
+    if (fs.existsSync(pkgFile)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgFile, "utf-8"));
+        packageInfo = {
+          name: pkg.name || proj.name,
+          version: pkg.version || "1.0.0",
+          scripts: pkg.scripts ? Object.keys(pkg.scripts) : [],
+          dependencies: pkg.dependencies ? Object.keys(pkg.dependencies) : [],
+          devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies) : []
+        };
+      } catch (e) {}
+    }
+
+    const readmeFile = path.join(projectPath, "README.md");
+    if (fs.existsSync(readmeFile)) {
+      try {
+        readmeSnippet = fs.readFileSync(readmeFile, "utf-8").slice(0, 800);
+      } catch (e) {}
+    }
+
+    const progressFile = path.join(projectPath, "AVANCES_LOCAL_AI.md");
+    pastProgress = readCleanProgressTail(progressFile, 1200);
+
+    selectedFiles = Array.isArray(opts.selectedFiles) ? opts.selectedFiles : getSelectedFiles(projectPath);
+    codeSnippets = readCodeFilesContext(projectPath, selectedFiles, 24000);
+  }
 
   // 1. Master Prompt (+ overrides de modelo y sesión)
   const masterParts = [];
@@ -829,7 +842,19 @@ function buildProjectContext(projectName = null, convId = null, token = null, op
   const stateSummarySection = buildStateSummarySection(proj, projectState, recentChanges);
 
   // 4. Contexto del Proyecto XML
-  const projectContextXml = `Eres el asistente de IA local y extensión de Antigravity para ${isGen ? "el Entorno General de Trabajo" : `el proyecto "${proj.name}"`}.
+  const promptsForContext = isGen ? recentPrompts.slice(-2) : recentPrompts;
+  const projectContextXml = isGen
+    ? `Eres el asistente de IA local y extensión de Antigravity para el Entorno General de Trabajo.
+
+<contexto_del_proyecto>
+- Entorno: General
+- Directorio Base: ${projectPath}
+${convInfo && convInfo.title ? `- Sesión de Antigravity: "${String(convInfo.title).slice(0, 80)}"` : ""}
+- Proyectos Principales Disponibles (${files.length}):
+${files.length ? files.map((f) => `  • ${f}`).join("\n") : "  • (Ninguno detectado)"}
+${promptsForContext.length ? `\n- Tareas recientes en Antigravity:\n${promptsForContext.map((p) => `  > "${p.slice(0, 100)}"`).join("\n")}` : ""}
+</contexto_del_proyecto>`
+    : `Eres el asistente de IA local y extensión de Antigravity para el proyecto "${proj.name}".
 
 <contexto_del_proyecto>
 - Entorno: ${proj.name}
@@ -846,7 +871,7 @@ ${pastProgress ? `\n- Últimos avances registrados por IA local:\n${pastProgress
 
   // 5. Código Fuente XML
   const codeContextXml = `<codigo_fuente_del_proyecto>
-${codeSnippets || "No se han seleccionado archivos de código fuente específicos aún."}
+${isGen ? "Modo General activo: no se escanean repositorios ni código fuente. Selecciona un proyecto específico si necesitas editar archivos." : (codeSnippets || "No se han seleccionado archivos de código fuente específicos aún.")}
 </codigo_fuente_del_proyecto>`;
 
   // 6. Directivas de Mutación

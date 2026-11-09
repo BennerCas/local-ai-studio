@@ -200,6 +200,13 @@ function normalizeChatSession(sessionObj, existing = null) {
     updatedAt = sessionObj.timestamp;
   }
 
+  const rawDual = (sessionObj?.dualConfig && typeof sessionObj.dualConfig === "object" && !Array.isArray(sessionObj.dualConfig))
+    ? sessionObj.dualConfig
+    : (existing?.dualConfig && typeof existing.dualConfig === "object" && !Array.isArray(existing.dualConfig)
+      ? existing.dualConfig
+      : null);
+  const dualConfig = rawDual ? normalizeDualConfig(rawDual) : null;
+
   return {
     id: safeId,
     title: String(sessionObj?.title || sessionObj?.name || existing?.title || "Nuevo Chat"),
@@ -212,6 +219,7 @@ function normalizeChatSession(sessionObj, existing = null) {
     skillId: String(sessionObj?.skillId ?? existing?.skillId ?? ""),
     profileId: String(sessionObj?.profileId ?? existing?.profileId ?? ""),
     customSystemPrompt: String(sessionObj?.customSystemPrompt ?? existing?.customSystemPrompt ?? ""),
+    dualConfig,
     dualConfigSummary: sessionObj?.dualConfigSummary ?? existing?.dualConfigSummary ?? null,
     appliedFiles,
     messages,
@@ -277,6 +285,10 @@ function getChat(id) {
     const filePath = getChatFilePath(cleaned);
     const data = readJsonSafe(filePath, null);
     if (!data || typeof data !== "object") return null;
+    const dualConfig = (data.dualConfig && typeof data.dualConfig === "object" && !Array.isArray(data.dualConfig))
+      ? normalizeDualConfig(data.dualConfig)
+      : null;
+
     return {
       id: data.id || cleaned,
       title: data.title || "Chat",
@@ -289,6 +301,7 @@ function getChat(id) {
       skillId: data.skillId || "",
       profileId: data.profileId || "",
       customSystemPrompt: data.customSystemPrompt || "",
+      dualConfig,
       dualConfigSummary: data.dualConfigSummary || null,
       appliedFiles: Array.isArray(data.appliedFiles) ? data.appliedFiles : [],
       messages: Array.isArray(data.messages) ? data.messages : [],
@@ -920,6 +933,196 @@ function saveMasterPromptConfig(input = {}) {
   return getMasterPromptConfig(input && input.project ? input.project : null);
 }
 
+// ==========================================
+// 6. USO DE INTEGRACIONES (integrations_usage.json)
+// ==========================================
+
+const INTEGRATIONS_USAGE_FILE = "integrations_usage.json";
+const DEFAULT_SERPAPI_MONTHLY_LIMIT = 100;
+const MAX_SERPAPI_HISTORY = 30;
+
+function getIntegrationsUsagePath() {
+  return path.join(getMemoryDir(), INTEGRATIONS_USAGE_FILE);
+}
+
+function getCurrentYearMonth(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+function sanitizeUsageQuery(rawQuery) {
+  let clean = String(rawQuery || "");
+  clean = clean.replace(/([?&]api_key=)[^&\s"']+/gi, "$1[REDACTED]");
+  clean = clean.replace(/\s+/g, " ").trim().slice(0, 160);
+  return clean;
+}
+
+function sanitizeUsageHistoryEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  return {
+    timestamp: String(entry.timestamp || new Date().toISOString()),
+    pool: entry.pool === "jobs" ? "jobs" : "web",
+    mode: String(entry.mode || (entry.pool === "jobs" ? "jobs" : "web")).slice(0, 32),
+    engine: String(entry.engine || "").slice(0, 40),
+    query: sanitizeUsageQuery(entry.query || ""),
+    count: Number.isFinite(Number(entry.count)) ? Math.max(0, Math.floor(Number(entry.count))) : 0,
+    ...(Number.isFinite(Number(entry.keySlot)) && Number(entry.keySlot) >= 1
+      ? { keySlot: Math.floor(Number(entry.keySlot)) }
+      : {})
+  };
+}
+
+function readAndNormalizeIntegrationsUsage() {
+  const filePath = getIntegrationsUsagePath();
+  const fileExists = fs.existsSync(filePath);
+  const raw = readJsonSafe(filePath, null);
+  const currentMonth = getCurrentYearMonth();
+  const nowIso = new Date().toISOString();
+
+  const baseRaw = (raw && typeof raw === "object" && !Array.isArray(raw)) ? { ...raw } : {};
+  const rawSerp = (baseRaw.serpapi && typeof baseRaw.serpapi === "object" && !Array.isArray(baseRaw.serpapi))
+    ? baseRaw.serpapi
+    : (typeof baseRaw.month === "string" ? baseRaw : null);
+
+  const storedMonth = rawSerp && typeof rawSerp.month === "string" ? rawSerp.month.trim() : "";
+  const monthChanged = Boolean(storedMonth && storedMonth !== currentMonth);
+
+  const webLimit = Number.isFinite(Number(rawSerp?.webLimit)) && Number(rawSerp.webLimit) > 0
+    ? Math.floor(Number(rawSerp.webLimit))
+    : DEFAULT_SERPAPI_MONTHLY_LIMIT;
+  const jobsLimit = Number.isFinite(Number(rawSerp?.jobsLimit)) && Number(rawSerp.jobsLimit) > 0
+    ? Math.floor(Number(rawSerp.jobsLimit))
+    : DEFAULT_SERPAPI_MONTHLY_LIMIT;
+
+  const webUses = monthChanged
+    ? 0
+    : (Number.isFinite(Number(rawSerp?.webUses)) && Number(rawSerp.webUses) >= 0 ? Math.floor(Number(rawSerp.webUses)) : 0);
+  const jobsUses = monthChanged
+    ? 0
+    : (Number.isFinite(Number(rawSerp?.jobsUses)) && Number(rawSerp.jobsUses) >= 0 ? Math.floor(Number(rawSerp.jobsUses)) : 0);
+
+  const history = Array.isArray(rawSerp?.history)
+    ? rawSerp.history.map(sanitizeUsageHistoryEntry).filter(Boolean).slice(0, MAX_SERPAPI_HISTORY)
+    : [];
+
+  const serpapi = {
+    month: currentMonth,
+    webUses,
+    webLimit,
+    jobsUses,
+    jobsLimit,
+    lastUsedAt: rawSerp?.lastUsedAt || null,
+    lastQuery: sanitizeUsageQuery(rawSerp?.lastQuery || ""),
+    lastPool: rawSerp?.lastPool === "web" || rawSerp?.lastPool === "jobs" ? rawSerp.lastPool : null,
+    lastMode: typeof rawSerp?.lastMode === "string" && rawSerp.lastMode ? String(rawSerp.lastMode).slice(0, 32) : null,
+    history,
+    updatedAt: monthChanged ? nowIso : (rawSerp?.updatedAt || null)
+  };
+
+  const container = {
+    version: 1,
+    updatedAt: monthChanged ? nowIso : (baseRaw.updatedAt || serpapi.updatedAt || null),
+    serpapi
+  };
+
+  if (fileExists && monthChanged) {
+    writeJsonAtomic(filePath, container);
+  }
+
+  return container;
+}
+
+function getIntegrationsUsage() {
+  const container = readAndNormalizeIntegrationsUsage();
+  return {
+    ...container,
+    serpapi: {
+      ...container.serpapi,
+      history: [...container.serpapi.history]
+    }
+  };
+}
+
+function getSerpApiUsage() {
+  return getIntegrationsUsage().serpapi;
+}
+
+function incrementSerpApiUsage(pool = "web", meta = {}) {
+  const container = readAndNormalizeIntegrationsUsage();
+  const normPool = String(pool || "web").trim().toLowerCase() === "jobs" ? "jobs" : "web";
+  const nowIso = new Date().toISOString();
+  const safeMeta = (meta && typeof meta === "object") ? meta : {};
+
+  const safeQuery = sanitizeUsageQuery(safeMeta.query || "");
+  const cleanMode = safeMeta.mode
+    ? String(safeMeta.mode).trim().toLowerCase().slice(0, 32)
+    : (normPool === "jobs" ? "jobs" : "web");
+  const cleanEngine = safeMeta.engine ? String(safeMeta.engine).trim().slice(0, 40) : "";
+  const cleanCount = Number.isFinite(Number(safeMeta.count)) ? Math.max(0, Math.floor(Number(safeMeta.count))) : 0;
+
+  const serpapi = container.serpapi;
+  if (normPool === "jobs") {
+    serpapi.jobsUses += 1;
+  } else {
+    serpapi.webUses += 1;
+  }
+  serpapi.lastUsedAt = nowIso;
+  serpapi.lastQuery = safeQuery;
+  serpapi.lastPool = normPool;
+  serpapi.lastMode = cleanMode;
+  serpapi.updatedAt = nowIso;
+
+  const entry = sanitizeUsageHistoryEntry({
+    timestamp: nowIso,
+    pool: normPool,
+    mode: cleanMode,
+    engine: cleanEngine,
+    query: safeQuery,
+    count: cleanCount,
+    keySlot: safeMeta.keySlot
+  });
+  if (entry) {
+    serpapi.history = [entry, ...serpapi.history].slice(0, MAX_SERPAPI_HISTORY);
+  }
+
+  container.updatedAt = nowIso;
+  writeJsonAtomic(getIntegrationsUsagePath(), container);
+
+  return {
+    ...serpapi,
+    history: [...serpapi.history]
+  };
+}
+
+function resetSerpApiUsage(pool = "all") {
+  const container = readAndNormalizeIntegrationsUsage();
+  const norm = String(pool || "all").trim().toLowerCase();
+  const nowIso = new Date().toISOString();
+  const serpapi = container.serpapi;
+
+  if (norm === "web") {
+    serpapi.webUses = 0;
+  } else if (norm === "jobs") {
+    serpapi.jobsUses = 0;
+  } else {
+    serpapi.webUses = 0;
+    serpapi.jobsUses = 0;
+    serpapi.lastUsedAt = null;
+    serpapi.lastQuery = "";
+    serpapi.lastPool = null;
+    serpapi.lastMode = null;
+    serpapi.history = [];
+  }
+
+  serpapi.updatedAt = nowIso;
+  container.updatedAt = nowIso;
+  writeJsonAtomic(getIntegrationsUsagePath(), container);
+
+  return {
+    ...serpapi,
+    history: [...serpapi.history]
+  };
+}
+
 module.exports = {
   getMemoryDir,
   readJsonSafe,
@@ -944,5 +1147,10 @@ module.exports = {
   DEFAULT_MASTER_PROMPT,
   DEFAULT_CONTEXT_ANALYZER_PROMPT,
   getMasterPromptConfig,
-  saveMasterPromptConfig
+  saveMasterPromptConfig,
+  INTEGRATIONS_USAGE_FILE,
+  getIntegrationsUsage,
+  getSerpApiUsage,
+  incrementSerpApiUsage,
+  resetSerpApiUsage
 };
