@@ -414,8 +414,76 @@ function pickDefaultModelForSource(catalog, source) {
   return (firstLocal && (firstLocal.name || firstLocal.model)) || "";
 }
 
+function formatMessageAttachmentsForEngine(rawMsg, targetEngine = "any") {
+  if (!rawMsg || typeof rawMsg !== "object") return { content: "", images: [] };
+  const attachments = Array.isArray(rawMsg.attachments) ? rawMsg.attachments : [];
+  const rawContent = rawMsg.content;
+
+  if (Array.isArray(rawContent)) {
+    const textParts = [];
+    const imageUrls = [];
+    const ollamaB64 = [];
+    for (const part of rawContent) {
+      if (!part || typeof part !== "object") continue;
+      if (part.type === "text" && part.text) {
+        textParts.push(String(part.text));
+      } else if (part.type === "image_url" && part.image_url && part.image_url.url) {
+        const u = String(part.image_url.url);
+        imageUrls.push(u);
+        const m = u.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+        if (m && m[1]) ollamaB64.push(m[1]);
+      }
+    }
+    if (targetEngine === "freeai" && imageUrls.length > 0) {
+      return { content: rawContent, images: [] };
+    }
+    if (targetEngine === "ollama" && ollamaB64.length > 0) {
+      return { content: textParts.join("\n").trim() || "[Imagen adjunta]", images: ollamaB64 };
+    }
+    const fallbackNote = imageUrls.length > 0 ? `\n[Adjunto multimodal: ${imageUrls.length} imagen(es) incluida(s)]` : "";
+    return { content: (textParts.join("\n") + fallbackNote).trim(), images: ollamaB64 };
+  }
+
+  let baseText = String(rawContent ?? "");
+  const extraTextBlocks = [];
+  const imageUrls = [];
+  const ollamaB64 = [];
+
+  for (const att of attachments) {
+    if (!att || typeof att !== "object") continue;
+    const name = String(att.name || "adjunto").slice(0, 120);
+    const kind = String(att.kind || att.type || "").toLowerCase();
+    if (kind.startsWith("image") || (typeof att.dataUrl === "string" && att.dataUrl.startsWith("data:image/"))) {
+      const dataUrl = String(att.dataUrl || att.url || "");
+      if (dataUrl) {
+        imageUrls.push(dataUrl);
+        const m = dataUrl.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+        if (m && m[1]) ollamaB64.push(m[1]);
+      }
+      extraTextBlocks.push(`[Imagen adjunta: ${name}]`);
+    } else if (typeof att.content === "string" && att.content.trim()) {
+      extraTextBlocks.push(`<archivo_adjunto nombre="${name}">\n${att.content.slice(0, 16000)}\n</archivo_adjunto>`);
+    }
+  }
+
+  const combinedText = [baseText, ...extraTextBlocks].filter(Boolean).join("\n\n");
+  if (targetEngine === "freeai" && imageUrls.length > 0) {
+    const contentArr = [{ type: "text", text: combinedText || "Analiza la imagen adjunta." }];
+    for (const url of imageUrls) {
+      contentArr.push({ type: "image_url", image_url: { url } });
+    }
+    return { content: contentArr, images: [] };
+  }
+
+  return {
+    content: combinedText,
+    images: ollamaB64
+  };
+}
+
 function flattenHistoryMessagesForDual(rawMessages, options = {}) {
   const preserveSystem = Boolean(options && options.preserveSystem);
+  const targetEngine = (options && options.targetEngine) || "any";
   const list = Array.isArray(rawMessages) ? rawMessages : [];
   const out = [];
   for (const raw of list) {
@@ -446,9 +514,37 @@ function flattenHistoryMessagesForDual(rawMessages, options = {}) {
       continue;
     }
     const cleanRole = role === "assistant" || role === "user" ? role : "assistant";
-    out.push({ role: cleanRole, content: String(raw.content ?? "") });
+    const formatted = formatMessageAttachmentsForEngine(raw, targetEngine);
+    const msgEntry = { role: cleanRole, content: formatted.content };
+    if (formatted.images && formatted.images.length > 0 && targetEngine === "ollama") {
+      msgEntry.images = formatted.images;
+    }
+    out.push(msgEntry);
   }
   return out;
+}
+
+function extractMentionedFilesFromMessages(rawMessages = [], explicitMentions = []) {
+  const found = new Set();
+  if (Array.isArray(explicitMentions)) {
+    for (const m of explicitMentions) {
+      if (typeof m === "string" && m.trim()) found.add(m.trim().replace(/^@+/, ""));
+    }
+  }
+  const list = Array.isArray(rawMessages) ? rawMessages : [];
+  for (let i = list.length - 1; i >= Math.max(0, list.length - 3); i--) {
+    const msg = list[i];
+    if (!msg || msg.role !== "user") continue;
+    const rawText = typeof msg.content === "string"
+      ? msg.content
+      : (Array.isArray(msg.content) ? msg.content.map((p) => (p && p.text) || "").join(" ") : "");
+    const regex = /@([a-zA-Z0-9_./\\-]+\.[a-zA-Z0-9]{1,10})/g;
+    let match;
+    while ((match = regex.exec(rawText)) !== null) {
+      if (match[1]) found.add(match[1].replace(/\\/g, "/"));
+    }
+  }
+  return Array.from(found);
 }
 
 function extractLastUserQuery(rawMessages) {
@@ -456,7 +552,10 @@ function extractLastUserQuery(rawMessages) {
   for (let i = list.length - 1; i >= 0; i--) {
     const msg = list[i];
     if (!msg || msg.role !== "user") continue;
-    const text = String(msg.content ?? "").replace(/\s+/g, " ").trim();
+    const rawText = typeof msg.content === "string"
+      ? msg.content
+      : (Array.isArray(msg.content) ? msg.content.map((p) => (p && p.text) || "").join(" ") : "");
+    const text = String(rawText ?? "").replace(/\s+/g, " ").trim();
     if (text) return text.slice(0, 220);
   }
   return "";
@@ -1292,10 +1391,18 @@ function createStudioServer(options = {}) {
 
     return new Promise((resolve, reject) => {
       const messages = Array.isArray(providedMessages) && providedMessages.length > 0
-        ? providedMessages.map((m) => ({
-            role: String((m && m.role) || "user"),
-            content: String((m && m.content) ?? "")
-          }))
+        ? providedMessages.map((m) => {
+            const role = String((m && m.role) || "user");
+            if (role === "system") {
+              return { role: "system", content: String((m && m.content) ?? "") };
+            }
+            const formatted = formatMessageAttachmentsForEngine(m, engine);
+            const item = { role, content: formatted.content };
+            if (engine === "ollama" && formatted.images && formatted.images.length > 0) {
+              item.images = formatted.images;
+            }
+            return item;
+          })
         : [
             { role: "system", content: String(systemPrompt || "") },
             { role: "user", content: String(userPrompt || "") }
@@ -1810,6 +1917,23 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    if (pathname === "/api/skills/fuse" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const result = skillsBridge.saveSkillFusion({
+        name: payload.name || payload.fusionName || "",
+        description: payload.description || "",
+        profileId: payload.profileId || null,
+        skillIds: payload.skillIds || payload.skills || payload.skillId || [],
+        rules: payload.rules || ""
+      });
+      if (!result.ok) {
+        sendJsonError(res, 400, result.error || "Error guardando fusión de skills.");
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
     // ---------------------------------------------------------
     // Proyectos y Preview Puro (Sin Escribir en Disco)
     // ---------------------------------------------------------
@@ -1822,7 +1946,7 @@ function createStudioServer(options = {}) {
         projectName: query.project || null,
         convId,
         token,
-        skillId: query.skillId || null,
+        skillId: query.skillIds || query.skillId || null,
         profileId: query.profileId || null,
         customSystemPrompt: query.customSystemPrompt || null
       });
@@ -1850,6 +1974,7 @@ function createStudioServer(options = {}) {
       const ctx = bridge.buildProjectContext(projName, convId, token, {
         writeToDisk: false,
         skillId: query.skillId || null,
+        skillIds: query.skillIds || query.skillId || null,
         profileId: query.profileId || null,
         customSystemPrompt: query.customSystemPrompt || null
       });
@@ -1868,6 +1993,7 @@ function createStudioServer(options = {}) {
       const ctx = bridge.buildProjectContext(proj, convId, token, {
         writeToDisk: false,
         skillId: query.skillId || null,
+        skillIds: query.skillIds || query.skillId || null,
         profileId: query.profileId || null,
         customSystemPrompt: query.customSystemPrompt || null
       });
@@ -1885,6 +2011,7 @@ function createStudioServer(options = {}) {
       const ctx = bridge.buildProjectContext(target, payload.conversationId || null, payload.token || null, {
         writeToDisk: false,
         skillId: payload.skillId || null,
+        skillIds: payload.skillIds || payload.skillId || null,
         profileId: payload.profileId || null,
         customSystemPrompt: payload.customSystemPrompt || null
       });
@@ -1904,6 +2031,9 @@ function createStudioServer(options = {}) {
       if (Array.isArray(payload.selectedFiles)) {
         statePatch.selectedFiles = payload.selectedFiles;
       }
+      if (Array.isArray(payload.pinnedFiles)) {
+        statePatch.pinnedFiles = payload.pinnedFiles;
+      }
       if (typeof payload.githubToggle === "boolean") statePatch.githubToggle = payload.githubToggle;
       if (typeof payload.githubRepo === "string") statePatch.githubRepo = payload.githubRepo;
       if (typeof payload.netlifyToggle === "boolean") statePatch.netlifyToggle = payload.netlifyToggle;
@@ -1921,6 +2051,22 @@ function createStudioServer(options = {}) {
         metrics: ctx ? ctx.metrics : null,
         directmlCompatibility: ctx ? ctx.directmlCompatibility : null
       });
+      return;
+    }
+
+    if (pathname === "/api/project/create" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const result = bridge.createNewStandardProject({
+        name: payload.name || payload.projectName || "",
+        template: payload.template || "web-vanilla",
+        description: payload.description || "",
+        initGit: payload.initGit !== false
+      });
+      if (!result.ok) {
+        sendJsonError(res, 400, result.error || "Error creando proyecto estándar.");
+        return;
+      }
+      sendJson(res, 200, result);
       return;
     }
 
@@ -2158,6 +2304,378 @@ function createStudioServer(options = {}) {
         filesModified: Array.isArray(payload.filesModified) ? payload.filesModified : []
       });
       sendJson(res, 200, { ok: Boolean(ok) });
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Fase 1: Diff Visual Real, Lote Transaccional y Rollback 1-Clic
+    // ---------------------------------------------------------
+    if (pathname === "/api/project/diff-preview" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectName = payload.project || payload.projectPath || null;
+      const result = bridge.computeProjectDiffPreview(projectName, {
+        kind: payload.kind || "write",
+        filePath: payload.filePath || payload.relPath || "",
+        content: payload.content,
+        search: payload.search,
+        replace: payload.replace
+      });
+      if (!result.ok) {
+        sendJsonError(res, getMutationErrorStatus(result.error), result.error);
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (pathname === "/api/project/apply-batch" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectName = payload.project || payload.projectPath || null;
+      const actions = Array.isArray(payload.actions) ? payload.actions : [];
+      if (actions.length === 0) {
+        sendJsonError(res, 400, "Se requiere un arreglo 'actions' con al menos una operación.");
+        return;
+      }
+
+      const batchRes = bridge.applyProjectBatchTransactional(projectName, actions, {
+        model: payload.model,
+        source: payload.source,
+        summary: payload.summary,
+        tool: payload.tool || "Lote Transaccional"
+      });
+
+      if (!batchRes.ok) {
+        sendJson(res, getMutationErrorStatus(batchRes.error), batchRes);
+        return;
+      }
+
+      const projInfo = resolveProjectInfo(projectName, payload.projectPath || null);
+      let githubSync = null;
+      if (payload.syncGithub && payload.githubRepo) {
+        try {
+          const filesModified = (batchRes.results || []).map((r) => {
+            const fullP = r.path || (projInfo.path ? path.join(projInfo.path, r.relPath) : "");
+            const content = fullP && fs.existsSync(fullP) ? fs.readFileSync(fullP, "utf-8") : undefined;
+            return { relPath: r.relPath, ...(content !== undefined ? { content } : {}) };
+          });
+          githubSync = await integrations.syncProjectToGitHub({
+            projectName: projInfo.name,
+            projectPath: projInfo.isGeneral ? null : (projInfo.path || null),
+            repoFullName: payload.githubRepo,
+            commitMessage: payload.commitMessage || `Batch update (${filesModified.length} files) via Local AI Studio`,
+            filesModified,
+            initRemoteOnLocal: Boolean(payload.initRemoteOnLocal)
+          });
+        } catch (syncErr) {
+          githubSync = { ok: false, error: safeErrMsg(syncErr) };
+        }
+      }
+
+      let netlifyDeploy = null;
+      if (payload.deployNetlify && payload.netlifySite) {
+        try {
+          netlifyDeploy = await integrations.deployToNetlify({
+            projectName: projInfo.name,
+            projectPath: projInfo.isGeneral ? null : (projInfo.path || null),
+            siteId: payload.netlifySite,
+            publishDir: payload.netlifyPublishDir || null,
+            prod: payload.prod !== false,
+            message: payload.commitMessage || `Deploy batch (${batchRes.appliedCount} files) via Local AI Studio`
+          });
+        } catch (depErr) {
+          netlifyDeploy = { ok: false, error: safeErrMsg(depErr) };
+        }
+      }
+
+      sendJson(res, 200, {
+        ...batchRes,
+        githubSync,
+        netlifyDeploy
+      });
+      return;
+    }
+
+    if (pathname === "/api/project/backups" && req.method === "GET") {
+      const projName = query.project || query.projectPath || null;
+      const relPath = query.relPath || query.filePath || null;
+      const limit = query.limit ? Number(query.limit) : 50;
+      const backups = memoryStore.listProjectBackups(projName, relPath, limit);
+      sendJson(res, 200, { ok: true, backups });
+      return;
+    }
+
+    if (pathname === "/api/project/rollback" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectName = payload.project || payload.projectPath || null;
+      const result = bridge.rollbackProjectChange(projectName, {
+        changeId: payload.changeId || payload.id || null,
+        backupPath: payload.backupPath || null,
+        relPath: payload.relPath || payload.filePath || null
+      });
+      if (!result.ok) {
+        sendJsonError(res, getMutationErrorStatus(result.error), result.error);
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Fase 2: Runner Seguro (POST /api/project/run & GET /api/project/scripts)
+    // ---------------------------------------------------------
+    if (pathname === "/api/project/scripts" && req.method === "GET") {
+      const projName = query.project || query.projectPath || null;
+      const result = bridge.getProjectRunnableScripts(projName);
+      if (!result.ok) {
+        sendJsonError(res, 404, result.error || "Proyecto no encontrado");
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (pathname === "/api/project/run" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectName = payload.project || payload.projectPath || null;
+      const result = await bridge.runProjectCommand(projectName, {
+        commandKey: payload.commandKey || payload.command || "node_test",
+        scriptName: payload.scriptName || payload.script || "",
+        targetFile: payload.targetFile || payload.filePath || "",
+        timeoutMs: payload.timeoutMs
+      });
+      if (!result.ok) {
+        sendJsonError(res, 400, result.error || "Error ejecutando comando del proyecto.");
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Fase 5: Buscador Grep en Código y Pinned Files
+    // ---------------------------------------------------------
+    if (pathname === "/api/project/search" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectName = payload.project || payload.projectPath || null;
+      const result = bridge.searchProjectCode(projectName, {
+        query: payload.query || payload.q || "",
+        caseSensitive: Boolean(payload.caseSensitive),
+        filePattern: payload.filePattern || "",
+        maxResults: payload.maxResults || 60
+      });
+      if (!result.ok) {
+        sendJsonError(res, 400, result.error || "Error buscando en el proyecto.");
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (pathname === "/api/project/pin-files" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || null);
+      const pinnedFiles = Array.isArray(payload.pinnedFiles)
+        ? payload.pinnedFiles.map((f) => String(f || "").trim()).filter(Boolean)
+        : [];
+      const state = memoryStore.updateProjectState(projInfo.stateKey, { pinnedFiles });
+      const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
+        projectName: projInfo.isGeneral ? "General" : (projInfo.path || projInfo.name)
+      });
+      sendJson(res, 200, {
+        ok: true,
+        pinnedFiles: state.pinnedFiles || [],
+        metrics: ctx ? ctx.metrics : null,
+        directmlCompatibility
+      });
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // Fase 4: Live Preview Estático y Estado de Preview
+    // ---------------------------------------------------------
+    if (pathname === "/api/project/preview/status" && req.method === "GET") {
+      const projInfo = resolveProjectInfo(query.project || null, query.projectPath || null);
+      if (projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
+        sendJson(res, 200, {
+          ok: true,
+          mode: "none",
+          running: false,
+          previewUrl: null,
+          entryFile: null
+        });
+        return;
+      }
+      const entryCandidates = ["src/ui/index.html", "index.html", "public/index.html", "dist/index.html"];
+      let entryFile = null;
+      for (const cand of entryCandidates) {
+        const safe = bridge.resolveSafeProjectPath(projInfo.path, cand);
+        if (safe.ok && fs.existsSync(safe.fullPath) && fs.statSync(safe.fullPath).isFile()) {
+          entryFile = safe.cleanRelPath;
+          break;
+        }
+      }
+      const encodedProj = encodeURIComponent(projInfo.name);
+      const previewUrl = entryFile
+        ? `/api/project/static/${encodedProj}/${entryFile}`
+        : `/api/project/static/${encodedProj}/index.html`;
+      sendJson(res, 200, {
+        ok: true,
+        project: projInfo.name,
+        mode: "static",
+        running: Boolean(entryFile),
+        previewUrl,
+        entryFile
+      });
+      return;
+    }
+
+    if (pathname === "/api/project/preview/start" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || null);
+      const entryCandidates = ["src/ui/index.html", "index.html", "public/index.html", "dist/index.html"];
+      let entryFile = "index.html";
+      if (!projInfo.isGeneral && projInfo.path && fs.existsSync(projInfo.path)) {
+        for (const cand of entryCandidates) {
+          const safe = bridge.resolveSafeProjectPath(projInfo.path, cand);
+          if (safe.ok && fs.existsSync(safe.fullPath) && fs.statSync(safe.fullPath).isFile()) {
+            entryFile = safe.cleanRelPath;
+            break;
+          }
+        }
+      }
+      const encodedProj = encodeURIComponent(projInfo.name);
+      sendJson(res, 200, {
+        ok: true,
+        project: projInfo.name,
+        mode: "static",
+        running: true,
+        entryFile,
+        previewUrl: `/api/project/static/${encodedProj}/${entryFile}`
+      });
+      return;
+    }
+
+    if (pathname === "/api/project/preview/stop" && req.method === "POST") {
+      sendJson(res, 200, { ok: true, stopped: true });
+      return;
+    }
+
+    if (pathname.startsWith("/api/project/static/") && (req.method === "GET" || req.method === "HEAD")) {
+      const rest = pathname.slice("/api/project/static/".length);
+      const slashIdx = rest.indexOf("/");
+      const rawProjSeg = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+      const rawRelFile = slashIdx === -1 ? "index.html" : (rest.slice(slashIdx + 1) || "index.html");
+      let projSeg = "";
+      let relFile = "";
+      try {
+        projSeg = decodeURIComponent(rawProjSeg).trim();
+        relFile = decodeURIComponent(rawRelFile).trim() || "index.html";
+      } catch (_e) {
+        sendJsonError(res, 400, "Ruta de preview malformada.");
+        return;
+      }
+
+      const projInfo = resolveProjectInfo(projSeg, null);
+      if (!projInfo || projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
+        sendJsonError(res, 404, `Proyecto no encontrado para preview: ${projSeg}`);
+        return;
+      }
+
+      let safe = bridge.resolveSafeProjectPath(projInfo.path, relFile);
+      if ((!safe.ok || !fs.existsSync(safe.fullPath)) && relFile === "index.html") {
+        for (const alt of ["src/ui/index.html", "public/index.html", "dist/index.html"]) {
+          const trySafe = bridge.resolveSafeProjectPath(projInfo.path, alt);
+          if (trySafe.ok && fs.existsSync(trySafe.fullPath)) {
+            safe = trySafe;
+            break;
+          }
+        }
+      }
+
+      if (!safe.ok) {
+        sendJsonError(res, 403, safe.error || "Ruta protegida o fuera del proyecto");
+        return;
+      }
+      if (!fs.existsSync(safe.fullPath) || !fs.statSync(safe.fullPath).isFile()) {
+        sendJsonError(res, 404, `Archivo de preview no encontrado: ${safe.cleanRelPath}`);
+        return;
+      }
+
+      const STATIC_MIMES = {
+        ".html": "text/html; charset=utf-8",
+        ".htm": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".mjs": "application/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".ico": "image/x-icon",
+        ".txt": "text/plain; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8"
+      };
+      const ext = path.extname(safe.fullPath).toLowerCase();
+      const mimeType = STATIC_MIMES[ext] || "application/octet-stream";
+
+      if (ext === ".html" || ext === ".htm") {
+        let htmlText = fs.readFileSync(safe.fullPath, "utf-8");
+        const bridgeScript = `<script data-local-ai-preview-bridge="1">
+(function(){
+  window.addEventListener("error", function(ev){
+    try {
+      window.parent.postMessage({
+        type: "local-ai-preview-error",
+        message: ev.message || "Error de ejecución en UI",
+        source: ev.filename || "",
+        lineno: ev.lineno || 0,
+        colno: ev.colno || 0,
+        stack: (ev.error && ev.error.stack) ? String(ev.error.stack) : ""
+      }, "*");
+    } catch(_e){}
+  });
+  window.addEventListener("unhandledrejection", function(ev){
+    try {
+      var reason = ev.reason ? (ev.reason.stack || ev.reason.message || String(ev.reason)) : "Unhandled Promise Rejection";
+      window.parent.postMessage({
+        type: "local-ai-preview-error",
+        message: String(reason),
+        source: "Promise",
+        lineno: 0,
+        colno: 0,
+        stack: String(reason)
+      }, "*");
+    } catch(_e){}
+  });
+})();
+</script>`;
+        if (/<\/body>/i.test(htmlText)) {
+          htmlText = htmlText.replace(/<\/body>/i, `${bridgeScript}\n</body>`);
+        } else {
+          htmlText += `\n${bridgeScript}`;
+        }
+        const buf = Buffer.from(htmlText, "utf-8");
+        res.writeHead(200, {
+          "Content-Type": mimeType,
+          "Content-Length": buf.length,
+          "Cache-Control": "no-store"
+        });
+        if (req.method === "HEAD") res.end();
+        else res.end(buf);
+        return;
+      }
+
+      const st = fs.statSync(safe.fullPath);
+      res.writeHead(200, {
+        "Content-Type": mimeType,
+        "Content-Length": st.size,
+        "Cache-Control": "no-store"
+      });
+      if (req.method === "HEAD") res.end();
+      else fs.createReadStream(safe.fullPath).pipe(res);
       return;
     }
 
@@ -3129,16 +3647,20 @@ function createStudioServer(options = {}) {
         return;
       }
 
+      const target = detectEngineTarget(payload);
       const flattenedMessages = payload.messages !== undefined
-        ? flattenHistoryMessagesForDual(payload.messages, { preserveSystem: true })
+        ? flattenHistoryMessagesForDual(payload.messages, { preserveSystem: true, targetEngine: target.engine })
         : undefined;
+      const mentionedFiles = extractMentionedFilesFromMessages(payload.messages || [], payload.mentionedFiles);
 
       const rawProjIdentifier = payload.project || payload.projectPath || null;
       const convId = payload.conversationId || null;
       const ctx = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: payload.skillId || null,
+        skillIds: payload.skillIds || payload.skillId || null,
         profileId: payload.profileId || null,
+        mentionedFiles,
         customSystemPrompt: payload.customSystemPrompt || null,
         modelOverridesPrompt: payload.modelSystemPrompt || null
       });
@@ -3156,7 +3678,6 @@ function createStudioServer(options = {}) {
       }
 
       const unifiedMessages = injectSystemMessage(flattenedMessages, combinedSysPrompt);
-      const target = detectEngineTarget(payload);
 
       if (target.engine === "directml") {
         try {
@@ -3439,10 +3960,14 @@ function createStudioServer(options = {}) {
         return sections.join("\n\n");
       }
 
+      const dualMentionedFiles = extractMentionedFilesFromMessages(payload.messages || [], payload.mentionedFiles);
+
       const ctxA = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: rawA.skillId || null,
+        skillIds: rawA.skillIds || rawA.skillId || payload.skillIds || null,
         profileId: rawA.profileId || null,
+        mentionedFiles: dualMentionedFiles,
         customSystemPrompt: composeAgentDirective("A", roleLabelA, rawA.customSystemPrompt),
         modelOverridesPrompt: rawA.modelSystemPrompt || null
       });
@@ -3450,7 +3975,9 @@ function createStudioServer(options = {}) {
       const ctxB = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: rawB.skillId || null,
+        skillIds: rawB.skillIds || rawB.skillId || payload.skillIds || null,
         profileId: rawB.profileId || null,
+        mentionedFiles: dualMentionedFiles,
         customSystemPrompt: composeAgentDirective("B", roleLabelB, rawB.customSystemPrompt),
         modelOverridesPrompt: rawB.modelSystemPrompt || null
       });

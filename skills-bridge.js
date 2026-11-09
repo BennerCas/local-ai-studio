@@ -2,6 +2,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const SKILLS_ROOT = "C:\\antigravityAS\\antigravity-awesome-skills";
+const DEFAULT_SKILLS_DIRS = [
+  "C:\\antigravityAS\\Modelos -ai-brains\\antigravity-awesome-skills",
+  "C:\\antigravityAS\\Modelos-ai-brains\\antigravity-awesome-skills",
+  "C:\\antigravityAS\\antigravity-awesome-skills"
+];
+const DEFAULT_SKILLS_BACKUP_DIR = "C:\\antigravityAS\\Skills_Backup";
 const DEFAULT_PROFILES_DIRS = [
   "C:\\antigravityAS\\Modelos-ai-brains\\agencia ai\\perfiles",
   "C:\\antigravityAS\\Modelos -ai-brains\\agencia ai\\perfiles"
@@ -17,19 +23,48 @@ let lastProfilesLoadTime = 0;
 
 function getSkillsRoot() {
   const override = process.env.LOCAL_AI_SKILLS_ROOT;
-  return (override && String(override).trim()) ? path.resolve(String(override).trim()) : SKILLS_ROOT;
+  if (override && String(override).trim()) {
+    return path.resolve(String(override).trim());
+  }
+  for (const dir of DEFAULT_SKILLS_DIRS) {
+    try {
+      if (fs.existsSync(path.join(dir, "skills_index.json"))) {
+        return dir;
+      }
+    } catch (_) {}
+  }
+  return SKILLS_ROOT;
+}
+
+function getSkillsBackupDir() {
+  const override = process.env.LOCAL_AI_SKILLS_BACKUP_DIR;
+  if (override && String(override).trim()) {
+    return path.resolve(String(override).trim());
+  }
+  return DEFAULT_SKILLS_BACKUP_DIR;
+}
+
+function getFusionsFallbackDir() {
+  const memOverride = process.env.LOCAL_AI_MEMORY_DIR;
+  const baseMem = (memOverride && String(memOverride).trim())
+    ? path.resolve(String(memOverride).trim())
+    : path.join(__dirname, "memory");
+  return path.join(baseMem, "fusions");
 }
 
 function getProfilesDirs() {
   const override = process.env.LOCAL_AI_PROFILES_DIRS;
+  const fallbackFusions = getFusionsFallbackDir();
   if (override && String(override).trim()) {
-    return String(override)
+    const custom = String(override)
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean)
       .map((s) => path.resolve(s));
+    if (!custom.includes(fallbackFusions)) custom.push(fallbackFusions);
+    return custom;
   }
-  return DEFAULT_PROFILES_DIRS;
+  return [...DEFAULT_PROFILES_DIRS, fallbackFusions];
 }
 
 function isPathInside(rootDir, targetPath) {
@@ -338,12 +373,51 @@ function getProfileContent(profileId) {
   return null;
 }
 
-function buildSkillSystemPrompt(skillId, profileId = null) {
+function parseSkillIdsList(skillIdOrList) {
+  if (!skillIdOrList) return [];
+  const rawItems = Array.isArray(skillIdOrList)
+    ? skillIdOrList
+    : String(skillIdOrList).split(",");
+  const seen = new Set();
+  const result = [];
+  for (const item of rawItems) {
+    const clean = String(item || "").trim();
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    result.push(clean);
+  }
+  return result;
+}
+
+function buildSkillSystemPrompt(skillIdOrList, profileId = null) {
   const blocks = [];
 
   const profileEntry = profileId ? findProfileEntry(profileId) : null;
   const profileContent = profileId ? getProfileContent(profileId) : null;
-  const skillContent = skillId ? getSkillContent(skillId) : null;
+  const skillIds = parseSkillIdsList(skillIdOrList);
+
+  const loadedSkills = [];
+  for (const sid of skillIds) {
+    const content = getSkillContent(sid);
+    if (content) {
+      loadedSkills.push({ id: sid, content });
+    }
+  }
+
+  if (profileContent || loadedSkills.length > 0) {
+    const contextLabels = [];
+    if (profileContent) {
+      contextLabels.push(`Perfil: ${profileEntry ? profileEntry.name : String(profileId)}`);
+    }
+    if (loadedSkills.length > 0) {
+      contextLabels.push(`Skills: ${loadedSkills.map((s) => s.id).join(" + ")}`);
+    }
+    blocks.push(
+      `TRANSPARENCIA DE CONTEXTO (SKILLS.md Regla 9): Al inicio de tu respuesta incluye la etiqueta: [Contexto Cargado: ${contextLabels.join(" | ")}]`
+    );
+  }
 
   if (profileContent) {
     const profileLabel = profileEntry ? `${profileEntry.name} (${profileEntry.id})` : String(profileId);
@@ -356,20 +430,159 @@ function buildSkillSystemPrompt(skillId, profileId = null) {
     );
   }
 
-  if (skillContent) {
+  if (loadedSkills.length === 1) {
+    const single = loadedSkills[0];
     const subordinationNote = profileContent
       ? " (subordinada a las directrices estratégicas del Perfil Cognitivo activo)"
       : "";
     blocks.push(
-      `--- [HABILIDAD TÉCNICA ACTIVA: ${String(skillId).toUpperCase()}] ---\n` +
+      `--- [HABILIDAD TÉCNICA ACTIVA: ${String(single.id).toUpperCase()}] ---\n` +
       `Debes aplicar de forma estricta los estándares, directrices y mejores prácticas definidos en esta habilidad${subordinationNote}:\n\n` +
-      `${skillContent}\n` +
+      `${single.content}\n` +
       `--- [FIN DE HABILIDAD] ---`
+    );
+  } else if (loadedSkills.length > 1) {
+    const fusionHeaderIds = loadedSkills.map((s) => String(s.id).toUpperCase()).join(" + ");
+    const subordinationNote = profileContent
+      ? " (subordinadas a las directrices estratégicas del Perfil Cognitivo activo)"
+      : "";
+    const subBlocks = loadedSkills.map(
+      (s, idx) =>
+        `### [SKILL FUSIONADA ${idx + 1}/${loadedSkills.length}: ${String(s.id).toUpperCase()}]\n` +
+        `--- [HABILIDAD TÉCNICA ACTIVA: ${String(s.id).toUpperCase()}] ---\n` +
+        `${s.content}\n` +
+        `--- [FIN DE HABILIDAD: ${String(s.id).toUpperCase()}] ---`
+    );
+    blocks.push(
+      `--- [FUSIÓN INFINITA DE HABILIDADES ACTIVAS (${loadedSkills.length}): ${fusionHeaderIds}] ---\n` +
+      `Combina sinérgicamente las capacidades, patrones y restricciones de todas las habilidades listadas a continuación${subordinationNote}:\n\n` +
+      `${subBlocks.join("\n\n")}\n` +
+      `--- [FIN DE FUSIÓN DE HABILIDADES] ---`
     );
   }
 
   if (blocks.length === 0) return "";
   return "\n\n" + blocks.join("\n\n") + "\n";
+}
+
+function saveSkillFusion(options = {}) {
+  const opts = (options && typeof options === "object") ? options : {};
+  const rawName = String(opts.name || "").trim();
+  if (!rawName) {
+    return { ok: false, error: "El nombre de la fusión es obligatorio" };
+  }
+
+  const slug = rawName
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || `fusion-${Date.now()}`;
+
+  const description = String(opts.description || `Fusión cognitiva ${rawName}`).trim();
+  const profileId = opts.profileId ? String(opts.profileId).trim() : "";
+  const skillIds = parseSkillIdsList(opts.skillIds || []);
+  const rules = String(opts.rules || "").trim();
+
+  const profileContent = profileId ? getProfileContent(profileId) : null;
+  const skillSections = [];
+  for (const sid of skillIds) {
+    const content = getSkillContent(sid);
+    if (content) {
+      skillSections.push(`## Habilidad Fusionada: ${sid}\n\n${content.trim()}`);
+    } else {
+      skillSections.push(`## Habilidad Fusionada: ${sid}\n\n*(Referencia a skill: ${sid})*`);
+    }
+  }
+
+  const markdownLines = [
+    "---",
+    `name: "${rawName.replace(/"/g, '\\"')}"`,
+    `description: "${description.replace(/"/g, '\\"')}"`,
+    `vibe: "Fusión Infinita (${[profileId, ...skillIds].filter(Boolean).join(" + ") || "Custom"})"`,
+    `emoji: "🧬"`,
+    `color: "cyan"`,
+    "---",
+    "",
+    `# ${rawName}`,
+    "",
+    `> **Fusión de Roles y Habilidades (SKILLS.md)** — Generado el ${new Date().toISOString()}`,
+    `> **Jerarquía:** Perfil Base (${profileId || "Ninguno"}) > Habilidades Técnicas (${skillIds.join(", ") || "Ninguna"})`,
+    ""
+  ];
+
+  if (rules) {
+    markdownLines.push("## Reglas Específicas de la Fusión", "", rules, "");
+  }
+  if (profileContent) {
+    markdownLines.push(`## Perfil Cognitivo Base: ${profileId}`, "", profileContent.trim(), "");
+  }
+  if (skillSections.length > 0) {
+    markdownLines.push(...skillSections, "");
+  }
+
+  const fullMarkdown = markdownLines.join("\n");
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+
+  // 1. Guardar en C:\antigravityAS\Skills_Backup (con versionado previo si ya existía, Regla 7 de SKILLS.md)
+  let backupPath = null;
+  try {
+    const backupDir = getSkillsBackupDir();
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    const primaryBackupFile = path.join(backupDir, `${slug}.md`);
+    if (fs.existsSync(primaryBackupFile)) {
+      const versionedBackupFile = path.join(backupDir, `${ts}_${slug}.md`);
+      fs.copyFileSync(primaryBackupFile, versionedBackupFile);
+    }
+    fs.writeFileSync(primaryBackupFile, fullMarkdown, "utf8");
+    backupPath = primaryBackupFile;
+  } catch (err) {
+    console.warn("[Skills Bridge] No se pudo escribir en Skills_Backup:", err.message);
+  }
+
+  // 2. Guardar también en directorio de perfiles para que sea seleccionable inmediatamente
+  let profilePath = null;
+  let savedId = `fusions/${slug}`;
+  const dirs = getProfilesDirs();
+  const preferredDir = dirs[0] ? path.join(dirs[0], "fusions") : null;
+  const fallbackDir = getFusionsFallbackDir();
+
+  for (const targetDir of [preferredDir, fallbackDir].filter(Boolean)) {
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      const targetFile = path.join(targetDir, `${slug}.md`);
+      if (fs.existsSync(targetFile) && backupPath === null) {
+        const versioned = path.join(targetDir, `${ts}_${slug}.bak`);
+        fs.copyFileSync(targetFile, versioned);
+      }
+      fs.writeFileSync(targetFile, fullMarkdown, "utf8");
+      profilePath = targetFile;
+      if (targetDir === fallbackDir) {
+        savedId = slug;
+      }
+      break;
+    } catch (_) {}
+  }
+
+  profilesCache = null;
+  lastProfilesLoadTime = 0;
+
+  return {
+    ok: true,
+    id: savedId,
+    slug,
+    name: rawName,
+    backupPath: backupPath || profilePath,
+    profilePath,
+    skillIds,
+    profileId
+  };
 }
 
 module.exports = {
@@ -379,6 +592,9 @@ module.exports = {
   getSkillContent,
   loadProfiles,
   getProfileContent,
+  parseSkillIdsList,
   buildSkillSystemPrompt,
-  SKILLS_ROOT
+  saveSkillFusion,
+  SKILLS_ROOT,
+  DEFAULT_SKILLS_DIRS
 };

@@ -2720,6 +2720,345 @@
         height: 38px;
       }
     }
+
+    /* =====================================================================
+       Vibe Coding Suite (Opción B - 7 Fases Integradas sin romper layout)
+       ===================================================================== */
+    .chat-preview-split-wrap {
+      flex: 1 1 200px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: row;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .chat-preview-split-wrap > #chat-container {
+      flex: 1 1 55%;
+      min-width: 0;
+      height: 100%;
+    }
+
+    #live-preview-panel {
+      flex: 0 0 45%;
+      max-width: 50%;
+      min-width: 280px;
+      background: #030306;
+      border-left: 1px solid var(--border-color);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #live-preview-panel.active {
+      display: flex !important;
+    }
+
+    .live-preview-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(8, 8, 12, 0.96);
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .live-preview-url-input {
+      flex: 1 1 120px;
+      min-width: 90px;
+      background: #000000;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+    }
+
+    .live-preview-stage {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      background: #08080c;
+      overflow: auto;
+      padding: 6px;
+    }
+
+    #live-preview-iframe {
+      width: 100%;
+      height: 100%;
+      border: 1px solid rgba(122, 162, 247, 0.25);
+      border-radius: 6px;
+      background: #ffffff;
+      transition: width 0.2s ease;
+    }
+
+    #live-preview-iframe.vp-tablet {
+      width: 768px;
+      max-width: 100%;
+    }
+
+    #live-preview-iframe.vp-mobile {
+      width: 375px;
+      max-width: 100%;
+    }
+
+    #preview-runtime-errors {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(247, 118, 142, 0.14);
+      border-top: 1px solid rgba(247, 118, 142, 0.5);
+      color: #ffd6de;
+      font-size: 11.5px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Runner Drawer (Fase 2 Self-Healing) */
+    #runner-drawer {
+      background: rgba(4, 4, 8, 0.98);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 14px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease, padding 0.25s ease;
+      font-size: var(--chrome-font-small);
+      flex-shrink: 0;
+    }
+
+    #runner-drawer.active {
+      max-height: 280px;
+      padding: 8px 14px;
+      overflow-y: auto;
+    }
+
+    .runner-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .runner-exit-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(122, 162, 247, 0.14);
+      border: 1px solid rgba(122, 162, 247, 0.35);
+      color: var(--accent-blue);
+    }
+
+    .runner-exit-badge.exit-ok {
+      background: rgba(158, 206, 106, 0.15);
+      border-color: rgba(158, 206, 106, 0.45);
+      color: var(--accent-green);
+    }
+
+    .runner-exit-badge.exit-fail {
+      background: rgba(247, 118, 142, 0.16);
+      border-color: rgba(247, 118, 142, 0.55);
+      color: var(--accent-red);
+    }
+
+    #runner-output-pre {
+      background: #010103;
+      border: 1px solid rgba(122, 162, 247, 0.22);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin: 0;
+      max-height: 150px;
+      overflow: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: #c0caf5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Diff Real y Rollback (Fase 1) */
+    .fac-real-diff-box {
+      margin: 0;
+      padding: 8px 12px;
+      background: #020306;
+      border-top: 1px solid rgba(122, 162, 247, 0.22);
+      border-bottom: 1px solid rgba(122, 162, 247, 0.22);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.45;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .diff-line-add {
+      display: block;
+      background: rgba(158, 206, 106, 0.14);
+      color: #b9f27c;
+      padding: 0 4px;
+    }
+
+    .diff-line-del {
+      display: block;
+      background: rgba(247, 118, 142, 0.16);
+      color: #ff9e9e;
+      padding: 0 4px;
+    }
+
+    .diff-line-hunk {
+      display: block;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      padding: 2px 4px;
+    }
+
+    /* Fusión de Skills Chips (Fase 7) */
+    .skill-fusion-chips {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      max-width: 100%;
+    }
+
+    .skill-fusion-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(187, 154, 247, 0.14);
+      border: 1px solid rgba(187, 154, 247, 0.4);
+      color: var(--accent-purple);
+      white-space: nowrap;
+    }
+
+    .skill-fusion-chip button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      padding: 0 2px;
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    /* Buscador Grep, @Menciones y Bandeja de Adjuntos (Fases 5 y 6) */
+    #grep-results-list {
+      max-height: 145px;
+      overflow-y: auto;
+      background: #020204;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11.5px;
+    }
+
+    .grep-hit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(122, 162, 247, 0.14);
+    }
+
+    #at-mention-menu {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 12px;
+      right: 12px;
+      max-width: 480px;
+      max-height: 190px;
+      overflow-y: auto;
+      background: #06060b;
+      border: 1px solid var(--accent-cyan);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+      z-index: 90;
+      padding: 4px;
+    }
+
+    .at-mention-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: var(--text-main);
+    }
+
+    .at-mention-item:hover,
+    .at-mention-item.active {
+      background: rgba(122, 162, 247, 0.2);
+      color: var(--accent-cyan);
+    }
+
+    #chat-attachments-strip {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 4px 8px;
+      background: rgba(10, 10, 16, 0.92);
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      max-width: 100%;
+    }
+
+    .chat-attachment-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(122, 162, 247, 0.12);
+      border: 1px solid rgba(122, 162, 247, 0.35);
+      font-size: 11px;
+      color: var(--text-strong);
+      max-width: 220px;
+    }
+
+    .chat-attachment-pill img {
+      width: 20px;
+      height: 20px;
+      object-fit: cover;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 720px) {
+      .chat-preview-split-wrap {
+        flex-direction: column;
+      }
+      #live-preview-panel {
+        flex: 0 0 45%;
+        max-width: 100%;
+        min-width: 0;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+      }
+    }
   </style>
 </head>
 <body>
@@ -2868,6 +3207,10 @@
         <button type="button" id="btn-inspect-skill" class="btn-inspect-badge" title="Ver contenido de la habilidad">👁️</button>
         <button type="button" id="btn-clear-skill" class="btn-clear-badge" title="Quitar habilidad">✖</button>
       </span>
+      <div id="active-skills-chips" class="skill-fusion-chips" style="display:none;"></div>
+      <button type="button" id="btn-save-skill-fusion" class="header-btn" style="padding:3px 8px; font-size:11px;" title="Fusionar y guardar combinación actual de Perfil Cognitivo + Skills (POST /api/skills/fuse)">
+        <span>🧬</span><span>Guardar Fusión</span>
+      </button>
     </div>
   </div>
 
@@ -2885,11 +3228,23 @@
       <button type="button" id="btn-load-folder" class="header-btn" title="Cargar y vincular carpeta de proyecto específica con inyección de código">
         <span>📂</span><span>Cargar Carpeta</span>
       </button>
+      <button type="button" id="btn-new-project-open" class="header-btn" title="Crear nuevo proyecto con arquitectura estándar ESTRUCTURA.md">
+        <span>✨</span><span>+ Nuevo Proyecto</span>
+      </button>
       <button type="button" id="project-dml-compat-badge" class="project-dml-badge compat-ok" title="Estado de compatibilidad de tokens DirectML (límite seguro 6,144 tokens / caché KV 8,192). Clic para inspeccionar contexto." style="display:none;">
         ⚡ DML OK
       </button>
     </div>
     <div class="project-right">
+      <button type="button" id="btn-verify-test" class="header-btn" title="Ejecutar tests del proyecto activo y abrir consola de verificación">
+        <span>🧪</span><span>Correr Tests</span>
+      </button>
+      <button type="button" id="btn-toggle-runner-drawer" class="header-btn" aria-expanded="false" title="Abrir u ocultar consola de ejecución y auto-reparación">
+        <span>🖥️</span><span>Consola / Runner</span>
+      </button>
+      <button type="button" id="btn-toggle-live-preview" class="header-btn" aria-expanded="false" title="Abrir u ocultar vista previa en vivo al lado del chat">
+        <span>🖼️</span><span>Vista Previa</span>
+      </button>
       <button type="button" id="btn-preview-context" class="header-btn" title="Previsualizar el código inyectado, System Prompt unificado y métricas exactas">
         <span>👁️</span><span>Código Inyectado</span>
       </button>
@@ -3150,12 +3505,57 @@
     <div class="ctx-files-box" id="ctx-files">Cargando árbol de archivos...</div>
   </div>
 
-  <!-- Área Principal de Chat -->
-  <main id="chat-container" aria-live="polite">
-    <div class="message info">
-      👋 ¡Hola Benner! Local AI Studio está <strong>sincronizado con memoria persistente en disco</strong>, perfiles cognitivos (<code style="color:var(--accent-purple);">Perfil &gt; Skill</code>), Prompt Maestro unificado e integraciones GitHub / Netlify / Hugging Face.
+  <!-- Cajón de Ejecución y Auto-Reparación (Fase 2 Self-Healing) -->
+  <div id="runner-drawer" aria-hidden="true">
+    <div class="runner-toolbar">
+      <strong style="color:var(--accent-cyan); font-size:12px;">🖥️ Runner / Verificación:</strong>
+      <select id="runner-cmd-select" class="project-select" style="max-width:210px;" aria-label="Comando de verificación del proyecto">
+        <option value="node_test">🧪 node --test (Tests Node)</option>
+        <option value="npm_script">📦 npm test (Script package.json)</option>
+        <option value="git_status">🌿 git status --short</option>
+        <option value="git_diff">🔍 git diff --stat</option>
+      </select>
+      <button type="button" id="btn-runner-exec" class="header-btn btn-primary" title="Ejecutar comando seleccionado en el proyecto activo">▶️ Ejecutar</button>
+      <button type="button" id="btn-auto-verify" class="header-btn" aria-pressed="false" title="Ejecutar verificación automáticamente tras aplicar o guardar un archivo">🔄 Auto-Fix al Guardar: OFF</button>
+      <span id="runner-exit-badge" class="runner-exit-badge">En espera</span>
+      <button type="button" id="btn-runner-autofix" class="header-btn" style="display:none; border-color:rgba(247,118,142,0.65); color:var(--accent-red);" title="Enviar salida de error al modelo activo para generar parche corrector automático">🔧 Auto-Reparar Error con IA</button>
+      <button type="button" id="btn-close-runner-drawer" class="header-btn" style="margin-left:auto;" title="Cerrar consola">✕</button>
     </div>
-  </main>
+    <pre id="runner-output-pre">Consola lista. Selecciona un comando o pulsa "🧪 Correr Tests" para verificar el proyecto.</pre>
+  </div>
+
+  <!-- Contenedor Split-Screen: Área Principal de Chat + Vista Previa en Vivo (Fase 4) -->
+  <div class="chat-preview-split-wrap" id="chat-preview-split-wrap">
+    <!-- Área Principal de Chat -->
+    <main id="chat-container" aria-live="polite">
+      <div class="message info">
+        👋 ¡Hola Benner! Local AI Studio está <strong>sincronizado con memoria persistente en disco</strong>, perfiles cognitivos (<code style="color:var(--accent-purple);">Perfil &gt; Skill</code>), Prompt Maestro unificado e integraciones GitHub / Netlify / Hugging Face.
+      </div>
+    </main>
+
+    <!-- Panel Lateral de Vista Previa en Vivo (Fase 4) -->
+    <aside id="live-preview-panel" style="display:none;" aria-label="Vista Previa en Vivo del Proyecto">
+      <div class="live-preview-toolbar">
+        <strong style="color:var(--accent-cyan); font-size:11.5px;">🖼️ Vista Previa</strong>
+        <button type="button" id="preview-vp-desktop" class="chip-btn active" title="Vista Escritorio (100%)">🖥️ Desktop</button>
+        <button type="button" id="preview-vp-tablet" class="chip-btn" title="Vista Tablet (768px)">📱 Tablet</button>
+        <button type="button" id="preview-vp-mobile" class="chip-btn" title="Vista Móvil (375px)">📲 Móvil</button>
+        <input type="text" id="preview-url-bar" class="live-preview-url-input" value="index.html" placeholder="index.html o src/index.html" aria-label="Archivo o ruta a previsualizar">
+        <button type="button" id="btn-preview-reload" class="header-btn" title="Recargar vista previa">↻</button>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted); cursor:pointer;" title="Recargar automáticamente tras guardar o parchear archivos">
+          <input type="checkbox" id="preview-auto-reload-check" checked> Auto
+        </label>
+        <button type="button" id="btn-close-live-preview" class="header-btn" title="Cerrar vista previa">✕</button>
+      </div>
+      <div class="live-preview-stage">
+        <iframe id="live-preview-iframe" title="Vista Previa en Vivo" sandbox="allow-scripts allow-forms allow-modals allow-same-origin"></iframe>
+      </div>
+      <div id="preview-runtime-errors" role="alert">
+        <span id="preview-runtime-error-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Error de ejecución detectado en la vista previa</span>
+        <button type="button" id="btn-fix-preview-error" class="header-btn" style="border-color:rgba(247,118,142,0.65); color:var(--accent-red); flex-shrink:0;">🔧 Corregir Error en Chat</button>
+      </div>
+    </aside>
+  </div>
 
   <!-- Barra Lateral de Historial Persistente y Cambios -->
   <aside id="history-drawer" aria-label="Historial persistente y cambios">
@@ -3258,10 +3658,63 @@
           <span>Archivos marcados se inyectan como código fuente real.</span>
           <span id="folder-selection-badge" style="color:var(--accent-green); font-weight:600;">0 archivos seleccionados</span>
         </div>
+        <div style="border-top:1px solid var(--border-color); padding-top:8px; margin-top:4px; display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:var(--font-ui-small); color:var(--accent-purple); font-weight:600;">🔎 Buscador de Código en el Proyecto (Grep):</div>
+          <div class="path-input-group">
+            <input type="search" id="grep-search-input" class="int-input" placeholder="Buscar función, variable o texto en el código del proyecto...">
+            <button type="button" id="btn-grep-search" class="header-btn btn-primary">🔎 Buscar en Código</button>
+          </div>
+          <div id="grep-results-list"></div>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" id="btn-folder-preview" class="header-btn">👁️ Previsualizar Contexto</button>
         <button type="button" id="btn-folder-apply" class="header-btn btn-primary">✅ Inyectar Carpeta al Modelo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Crear Nuevo Proyecto Estándar (Fase 3 Scaffolder ESTRUCTURA.md) -->
+  <div id="new-project-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="new-project-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="new-project-modal-title">
+          <span>✨</span>
+          <span>Crear Nuevo Proyecto Estándar (ESTRUCTURA.md)</span>
+        </div>
+        <button type="button" class="modal-close-btn" data-close-modal="new-project-modal" aria-label="Cerrar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:var(--font-ui-small); color:var(--text-muted);">
+          Crea un proyecto en <code>C:\antigravityAS\&lt;NombreApp&gt;</code> con estructura oficial (<code>src/</code>, <code>biblioteca/</code>, <code>tests/</code>, <code>docs/</code>, <code>models_link/</code>):
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <label style="font-size:var(--font-ui-small); color:var(--text-strong); font-weight:600;">
+            Nombre del Proyecto:
+            <input type="text" id="np-name-input" class="int-input" placeholder="Ej: MiAppVibe2026" style="margin-top:4px;">
+          </label>
+          <label style="font-size:var(--font-ui-small); color:var(--text-strong); font-weight:600;">
+            Plantilla de Arquitectura:
+            <select id="np-template-select" class="int-select" style="margin-top:4px;">
+              <option value="web-vanilla">🌐 Web Vanilla (HTML5 + CSS3 Glassmorphism + JS Modular)</option>
+              <option value="node-fullstack">🟢 Node.js Fullstack (HTTP Server + API + Tests)</option>
+              <option value="python-ai">🐍 Python AI Local (ONNX / DirectML / FastAPI Ready)</option>
+            </select>
+          </label>
+          <label style="font-size:var(--font-ui-small); color:var(--text-strong); font-weight:600;">
+            Descripción del Proyecto:
+            <input type="text" id="np-desc-input" class="int-input" placeholder="Breve descripción del propósito de la aplicación..." style="margin-top:4px;">
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:6px; font-size:var(--font-ui-small); color:var(--text-main); cursor:pointer;">
+            <input type="checkbox" id="np-init-git-check" checked>
+            <span>Inicializar repositorio Git + commit inicial preventivo</span>
+          </label>
+          <div id="np-create-status" style="display:none; padding:6px 10px; border-radius:6px; background:#020204; font-size:12px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="header-btn" data-close-modal="new-project-modal">Cancelar</button>
+        <button type="button" id="btn-np-create-submit" class="header-btn btn-primary">🚀 Crear Proyecto Estándar</button>
       </div>
     </div>
   </div>
@@ -3807,8 +4260,13 @@
       </div>
     </div>
 
-    <div class="input-box">
-      <textarea id="prompt-input" placeholder="Pregunta a tu modelo local sobre el proyecto activo..." aria-label="Mensaje para el modelo de IA"></textarea>
+    <div id="chat-attachments-strip" aria-label="Archivos e imágenes adjuntos"></div>
+
+    <div class="input-box" style="position:relative;">
+      <div id="at-mention-menu" role="listbox" aria-label="Autocompletar archivos del proyecto con @"></div>
+      <input type="file" id="chat-attach-file-input" multiple accept="image/*,.txt,.md,.json,.js,.ts,.py,.html,.css" style="display:none;">
+      <button type="button" id="btn-attach-media" class="header-btn" style="padding:0 10px; height:38px; flex-shrink:0;" title="Adjuntar imagen o archivo (también puedes pegar con Ctrl+V o arrastrar)">📎</button>
+      <textarea id="prompt-input" placeholder="Pregunta a tu modelo local sobre el proyecto activo... (Escribe @ para citar archivos o pega imágenes con Ctrl+V)" aria-label="Mensaje para el modelo de IA"></textarea>
       <button type="button" class="btn-stop-stream" id="btn-stop-stream" style="display:none;" title="Detener respuesta en curso">⏹️ Detener</button>
       <button type="button" class="send-btn" id="send-btn">Enviar</button>
     </div>
@@ -3904,6 +4362,25 @@
     let allProfiles = [];
     let activeProfileId = localStorage.getItem(STORAGE_KEYS.ACTIVE_PROFILE) || '';
     let activeSkillId = localStorage.getItem(STORAGE_KEYS.ACTIVE_SKILL) || '';
+    let activeSkillIds = (() => {
+      try {
+        const raw = localStorage.getItem('local_ai_active_skills_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        }
+      } catch (_e) {}
+      return activeSkillId ? [activeSkillId] : [];
+    })();
+
+    // Estado de las 7 Fases de Vibe Coding (Opción B)
+    let autoVerifyOnSave = false;
+    let lastRunnerResult = null;
+    let lastPreviewRuntimeError = null;
+    let pendingChatAttachments = [];
+    let pendingMentionedFiles = [];
+    let atMentionCandidates = [];
+    let atMentionSelectedIdx = 0;
 
     let customSystemPrompt = '';
     let modelfileCustomPrompt = '';
@@ -4329,10 +4806,13 @@
                   `<span class="fac-path">${escapeHtml(targetPath)}</span>` +
                 `</div>` +
                 `<div class="fac-actions">` +
+                  `<button type="button" class="btn-code-action" data-apply-act="diff-preview" data-block-id="${blockId}" title="Comparar contra el archivo real en disco antes de aplicar">🔍 Ver Diff Real</button>` +
+                  `<button type="button" class="btn-code-action" data-apply-act="rollback" data-block-id="${blockId}" style="display:none; color:var(--accent-yellow); border-color:rgba(224,175,104,0.45);" title="Deshacer este cambio y restaurar el archivo en 1 clic">↩️ Deshacer</button>` +
                   `<button type="button" class="btn-code-action" data-code-act="copy" data-block-id="${blockId}">📋 Copiar</button>` +
                   `<button type="button" class="btn-apply-action" data-apply-act="execute" data-block-id="${blockId}">⚡ Aplicar al Proyecto</button>` +
                 `</div>` +
               `</div>` +
+              `<pre class="fac-real-diff-box" data-diff-box="${blockId}" style="display:none;"></pre>` +
               `<pre><code>${escapeHtml(code)}</code></pre>` +
               `<div class="fac-sync-note" data-sync-note="${blockId}" style="display:none;"></div>` +
             `</div>`
@@ -4367,10 +4847,13 @@
                   `<span class="fac-path">${escapeHtml(targetPath)}</span>` +
                 `</div>` +
                 `<div class="fac-actions">` +
+                  `<button type="button" class="btn-code-action" data-apply-act="diff-preview" data-block-id="${blockId}" title="Comparar contra el archivo real en disco antes de aplicar">🔍 Ver Diff Real</button>` +
+                  `<button type="button" class="btn-code-action" data-apply-act="rollback" data-block-id="${blockId}" style="display:none; color:var(--accent-yellow); border-color:rgba(224,175,104,0.45);" title="Deshacer este cambio y restaurar el archivo en 1 clic">↩️ Deshacer</button>` +
                   `<button type="button" class="btn-code-action" data-code-act="copy" data-block-id="${blockId}">📋 Copiar</button>` +
                   `<button type="button" class="btn-apply-action patch-btn" data-apply-act="execute" data-block-id="${blockId}">🩹 Aplicar Parche</button>` +
                 `</div>` +
               `</div>` +
+              `<pre class="fac-real-diff-box" data-diff-box="${blockId}" style="display:none;"></pre>` +
               `${bodyHtml}` +
               `<div class="fac-sync-note" data-sync-note="${blockId}" style="display:none;"></div>` +
             `</div>`
@@ -5024,6 +5507,18 @@
         return;
       }
 
+      const diffPreviewBtn = event.target.closest('[data-apply-act="diff-preview"]');
+      if (diffPreviewBtn) {
+        await previewRealDiffForCard(diffPreviewBtn.dataset.blockId, diffPreviewBtn);
+        return;
+      }
+
+      const rollbackCardBtn = event.target.closest('[data-apply-act="rollback"]');
+      if (rollbackCardBtn) {
+        await rollbackCardAction(rollbackCardBtn.dataset.blockId, rollbackCardBtn);
+        return;
+      }
+
       const applyBtn = event.target.closest('[data-apply-act="execute"]');
       if (applyBtn) {
         const dualPane = applyBtn.closest('.dual-agent-pane');
@@ -5276,8 +5771,11 @@
             })
           });
           block.applied = true;
+          block.changeId = (res.change && res.change.id) || res.changeId || res.id || null;
+          block.backupPath = res.backupPath || (res.change && res.change.backupPath) || null;
           btnEl.classList.add('applied');
           btnEl.textContent = '✅ Aplicado en Disco';
+          revealCardRollbackButton(blockId, block.changeId);
           recordAppliedCardInSession('write', block.filePath, block.code, res.relPath || block.filePath);
           renderCardSyncNote(blockId, `Guardado: ${res.relPath || block.filePath}`, res.githubSync, res.netlifyDeploy);
           if (!batchMode) {
@@ -5286,8 +5784,9 @@
             showToast(msg, res.githubSync && !res.githubSync.ok ? 'warn' : 'success');
             await saveCurrentSessionToStorage();
             loadProjectContext({ preserveDualConfig: true });
+            onFileMutatedPostActions(res.relPath || block.filePath);
           }
-          return { ok: true, kind: 'write', relPath: res.relPath || block.filePath, content: block.code };
+          return { ok: true, kind: 'write', relPath: res.relPath || block.filePath, content: block.code, changeId: block.changeId };
         }
 
         if (block.kind === 'patch') {
@@ -5313,8 +5812,11 @@
             })
           });
           block.applied = true;
+          block.changeId = (res.change && res.change.id) || res.changeId || res.id || null;
+          block.backupPath = res.backupPath || (res.change && res.change.backupPath) || null;
           btnEl.classList.add('applied');
           btnEl.textContent = '✅ Aplicado en Disco';
+          revealCardRollbackButton(blockId, block.changeId);
           recordAppliedCardInSession('patch', block.filePath, block.code, res.relPath || block.filePath);
           renderCardSyncNote(blockId, `Parcheado: ${res.relPath || block.filePath}`, res.githubSync, res.netlifyDeploy);
           if (!batchMode) {
@@ -5323,8 +5825,9 @@
             showToast(msg, res.githubSync && !res.githubSync.ok ? 'warn' : 'success');
             await saveCurrentSessionToStorage();
             loadProjectContext({ preserveDualConfig: true });
+            onFileMutatedPostActions(res.relPath || block.filePath);
           }
-          return { ok: true, kind: 'patch', relPath: res.relPath || block.filePath };
+          return { ok: true, kind: 'patch', relPath: res.relPath || block.filePath, changeId: block.changeId };
         }
       } catch (err) {
         btnEl.disabled = false;
@@ -5972,13 +6475,93 @@
     }
 
     function updateActiveSkillBadge() {
-      if (!activeSkillId) {
+      const chipsWrap = document.getElementById('active-skills-chips');
+      if (!activeSkillId && activeSkillIds.length === 0) {
         activeSkillContainer.style.display = 'none';
+        if (chipsWrap) {
+          chipsWrap.style.display = 'none';
+          chipsWrap.innerHTML = '';
+        }
         return;
+      }
+      if (!activeSkillId && activeSkillIds.length > 0) {
+        activeSkillId = activeSkillIds[activeSkillIds.length - 1];
       }
       const s = allSkills.find((item) => item.id === activeSkillId);
       activeSkillName.textContent = `🎯 ${(s && s.name) || activeSkillId}`;
       activeSkillContainer.style.display = 'inline-flex';
+      renderSkillFusionChips();
+    }
+
+    function renderSkillFusionChips() {
+      const chipsWrap = document.getElementById('active-skills-chips');
+      if (!chipsWrap) return;
+      if (!Array.isArray(activeSkillIds) || activeSkillIds.length === 0) {
+        chipsWrap.style.display = 'none';
+        chipsWrap.innerHTML = '';
+        return;
+      }
+      chipsWrap.innerHTML = '';
+      activeSkillIds.forEach((sid) => {
+        const sObj = allSkills.find((item) => item.id === sid);
+        const chip = document.createElement('span');
+        chip.className = 'skill-fusion-chip';
+        chip.title = `Skill en fusión activa: ${sid}`;
+        const label = document.createElement('span');
+        label.textContent = `⚡ ${(sObj && sObj.name) || sid}`;
+        const rmBtn = document.createElement('button');
+        rmBtn.type = 'button';
+        rmBtn.dataset.removeSkillId = sid;
+        rmBtn.title = `Quitar ${sid} de la fusión`;
+        rmBtn.textContent = '✕';
+        chip.appendChild(label);
+        chip.appendChild(rmBtn);
+        chipsWrap.appendChild(chip);
+      });
+      chipsWrap.style.display = 'inline-flex';
+    }
+
+    function removeSkillFromFusion(skillIdToRemove) {
+      activeSkillIds = activeSkillIds.filter((id) => id !== skillIdToRemove);
+      if (activeSkillId === skillIdToRemove) {
+        activeSkillId = activeSkillIds.length > 0 ? activeSkillIds[activeSkillIds.length - 1] : '';
+      }
+      if (activeSkillId) localStorage.setItem(STORAGE_KEYS.ACTIVE_SKILL, activeSkillId);
+      else localStorage.removeItem(STORAGE_KEYS.ACTIVE_SKILL);
+      localStorage.setItem('local_ai_active_skills_v1', JSON.stringify(activeSkillIds));
+      skillSelect.value = activeSkillId;
+      updateActiveSkillBadge();
+      loadProjectContext({ preserveDualConfig: true });
+    }
+
+    async function saveSkillFusion() {
+      const effectiveSkills = activeSkillIds.length > 0
+        ? [...activeSkillIds]
+        : (activeSkillId ? [activeSkillId] : []);
+      if (!activeProfileId && effectiveSkills.length === 0) {
+        showToast('Selecciona al menos un Perfil o Skill para guardar una fusión.', 'warn');
+        return;
+      }
+      const fusionName = [
+        activeProfileId ? activeProfileId.split('/').pop() : 'libre',
+        ...effectiveSkills.slice(0, 3)
+      ].join('_');
+      try {
+        const data = await fetchJson('/api/skills/fuse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fusionName,
+            profileId: activeProfileId || null,
+            skillId: activeSkillId || null,
+            skillIds: effectiveSkills
+          })
+        });
+        showToast(`🧬 Fusión guardada: ${(data && (data.name || data.id)) || fusionName}`, 'success');
+        await loadSkills();
+      } catch (err) {
+        showToast(`Error guardando fusión: ${err.message}`, 'error');
+      }
     }
 
     function setActiveProfile(id) {
@@ -5992,8 +6575,16 @@
 
     function setActiveSkill(id) {
       activeSkillId = id || '';
-      if (activeSkillId) localStorage.setItem(STORAGE_KEYS.ACTIVE_SKILL, activeSkillId);
-      else localStorage.removeItem(STORAGE_KEYS.ACTIVE_SKILL);
+      if (activeSkillId) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_SKILL, activeSkillId);
+        if (!activeSkillIds.includes(activeSkillId)) {
+          activeSkillIds.push(activeSkillId);
+        }
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_SKILL);
+        activeSkillIds = [];
+      }
+      localStorage.setItem('local_ai_active_skills_v1', JSON.stringify(activeSkillIds));
       skillSelect.value = activeSkillId;
       updateActiveSkillBadge();
       loadProjectContext({ preserveDualConfig: true });
@@ -7135,6 +7726,7 @@
         if (proj.path) qs.set('projectPath', proj.path);
         if (currentConversationId) qs.set('conversationId', currentConversationId);
         if (activeSkillId) qs.set('skillId', activeSkillId);
+        if (activeSkillIds && activeSkillIds.length > 0) qs.set('skillIds', activeSkillIds.join(','));
         if (activeProfileId) qs.set('profileId', activeProfileId);
 
         const data = await fetchJson(`/api/context?${qs.toString()}`);
@@ -7385,6 +7977,7 @@
       if (proj.path) qs.set('projectPath', proj.path);
       if (currentConversationId) qs.set('conversationId', currentConversationId);
       if (activeSkillId) qs.set('skillId', activeSkillId);
+      if (activeSkillIds && activeSkillIds.length > 0) qs.set('skillIds', activeSkillIds.join(','));
       if (activeProfileId) qs.set('profileId', activeProfileId);
       const effectiveOverride = modelfileCustomPrompt || customSystemPrompt || '';
       if (effectiveOverride && effectiveOverride.length <= 1500) {
@@ -8056,6 +8649,27 @@
           const linkDiv = document.createElement('div');
           linkDiv.innerHTML = `🔗 ${renderSafeLink(ch.deployUrl, ch.deployUrl)}`;
           item.appendChild(linkDiv);
+        }
+
+        if (ch.reverted) {
+          const revBadge = document.createElement('div');
+          revBadge.style.color = 'var(--accent-yellow)';
+          revBadge.style.fontSize = '11px';
+          revBadge.textContent = `↩️ Revertido${ch.revertedAt ? ' (' + new Date(ch.revertedAt).toLocaleTimeString() + ')' : ''}`;
+          item.appendChild(revBadge);
+        } else if (ch.id && (ch.backupPath || ch.action === 'create' || ch.action === 'write' || ch.action === 'patch')) {
+          const actRow = document.createElement('div');
+          actRow.style.marginTop = '4px';
+          actRow.style.display = 'flex';
+          actRow.style.justifyContent = 'flex-end';
+          const revBtn = document.createElement('button');
+          revBtn.type = 'button';
+          revBtn.className = 'chip-btn';
+          revBtn.dataset.rollbackChangeId = ch.id;
+          revBtn.textContent = '↩️ Revertir';
+          revBtn.title = 'Restaurar archivo desde su backup previo en disco';
+          actRow.appendChild(revBtn);
+          item.appendChild(actRow);
         }
 
         frag.appendChild(item);
@@ -9081,6 +9695,7 @@
         } catch (_e) {}
 
         await loadProjectContext({ preserveDualConfig: true });
+        onFileMutatedPostActions(filesModified[0] && filesModified[0].relPath);
       }
     }
 
@@ -9337,11 +9952,15 @@
         } catch (_e) {}
 
         await loadProjectContext({ preserveDualConfig: true });
+        onFileMutatedPostActions(filesModified[0] && filesModified[0].relPath);
       }
     }
 
     async function sendDualMessage(prompt) {
       readDualFormIntoConfig({ evaluate: false, persist: false });
+      const activeAttachments = [...pendingChatAttachments];
+      const activeMentions = extractMentionedFilesFromPrompt(prompt);
+      clearPendingAttachmentsAndMentions();
       promptInput.value = '';
       appendMessage('user', prompt);
       chatHistory.push({ role: 'user', content: prompt });
@@ -9404,6 +10023,11 @@
             project: proj.name,
             projectPath: proj.path || undefined,
             conversationId: currentConversationId || undefined,
+            skillId: activeSkillId || undefined,
+            skillIds: activeSkillIds.length ? activeSkillIds : undefined,
+            profileId: activeProfileId || undefined,
+            mentionedFiles: activeMentions.length ? activeMentions : undefined,
+            attachments: activeAttachments.length ? activeAttachments : undefined,
             customSystemPrompt: effectiveCustomPrompt || undefined,
             webSearchEnabled: Boolean(webSearchEnabled),
             webSearchMode: webSearchMode || 'web',
@@ -9680,6 +10304,9 @@
         }
       }
 
+      const activeAttachments = [...pendingChatAttachments];
+      const activeMentions = extractMentionedFilesFromPrompt(prompt);
+      clearPendingAttachmentsAndMentions();
       promptInput.value = '';
       appendMessage('user', prompt);
       chatHistory.push({ role: 'user', content: prompt });
@@ -9722,7 +10349,10 @@
             projectPath: proj.path || undefined,
             conversationId: currentConversationId || undefined,
             skillId: activeSkillId || undefined,
+            skillIds: activeSkillIds.length ? activeSkillIds : undefined,
             profileId: activeProfileId || undefined,
+            mentionedFiles: activeMentions.length ? activeMentions : undefined,
+            attachments: activeAttachments.length ? activeAttachments : undefined,
             customSystemPrompt: effectiveCustomPrompt || undefined,
             source: currentSource,
             isDirectML: currentSource === 'directml',
@@ -10338,9 +10968,622 @@
     }
 
     // =========================================================================
+    // 11B. Suite Vibe Coding (Fases 1 a 7 - Integración Opción B)
+    // =========================================================================
+    function revealCardRollbackButton(blockId, changeId) {
+      if (!blockId || !changeId) return;
+      const btn = chatContainer.querySelector(`button[data-apply-act="rollback"][data-block-id="${blockId}"]`);
+      if (btn) {
+        btn.dataset.changeId = String(changeId);
+        btn.style.display = 'inline-flex';
+      }
+    }
+
+    async function previewRealDiffForCard(blockId, btnEl) {
+      const code = codeBlockStore.get(blockId) || '';
+      const card = btnEl.closest('.file-action-card');
+      const pathInp = card ? card.querySelector('.fac-path-input') : null;
+      const relPath = pathInp ? pathInp.value.trim() : '';
+      const diffBox = card ? card.querySelector('.fac-real-diff-box') : null;
+      const proj = getActiveProjectDescriptor();
+
+      if (proj.isGeneral) {
+        showToast('Selecciona un proyecto o carpeta activa para calcular el Diff real.', 'warn');
+        return;
+      }
+      if (!relPath) {
+        showToast('Especifica la ruta relativa del archivo para ver el Diff real.', 'warn');
+        return;
+      }
+      if (diffBox && diffBox.classList.contains('active')) {
+        diffBox.classList.remove('active');
+        return;
+      }
+
+      const isPatch = isSearchReplaceBlock(code);
+      try {
+        const res = await fetchJson('/api/project/diff-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.project,
+            customPath: proj.customPath,
+            relPath,
+            filePath: relPath,
+            kind: isPatch ? 'patch' : 'write',
+            mode: isPatch ? 'patch' : 'write',
+            content: code,
+            rawBlock: isPatch ? code : undefined,
+            patchText: isPatch ? code : ''
+          })
+        });
+        if (!diffBox) return;
+        const rawDiff = String(res.unifiedDiff || res.diffText || res.diff || '(Sin diferencias respecto al archivo en disco)');
+        const formatted = rawDiff
+          .split('\n')
+          .map((line) => {
+            const esc = escapeHtml(line);
+            if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+              return `<span class="diff-line-hunk">${esc}</span>`;
+            }
+            if (line.startsWith('+')) {
+              return `<span class="diff-line-add">${esc}</span>`;
+            }
+            if (line.startsWith('-')) {
+              return `<span class="diff-line-del">${esc}</span>`;
+            }
+            return esc;
+          })
+          .join('\n');
+        const statsLabel = res.stats
+          ? ` (+${res.stats.added || 0} / -${res.stats.removed || 0} líneas)`
+          : '';
+        diffBox.innerHTML = `<div style="color:var(--accent-cyan);font-weight:700;margin-bottom:4px;">🔍 Diff Real contra disco: ${escapeHtml(relPath)}${escapeHtml(statsLabel)}</div>${formatted}`;
+        diffBox.classList.add('active');
+      } catch (err) {
+        showToast(`❌ Error al previsualizar Diff: ${err.message}`, 'error');
+      }
+    }
+
+    async function rollbackCardAction(blockId, btnEl) {
+      const changeId = btnEl.dataset.changeId || appliedChangeByBlockId.get(blockId) || '';
+      if (!changeId) {
+        showToast('No se encontró un ID de cambio para revertir esta tarjeta.', 'warn');
+        return;
+      }
+      await rollbackChangeById(changeId);
+      btnEl.style.display = 'none';
+    }
+
+    async function rollbackChangeById(changeId) {
+      if (!changeId) return;
+      const proj = getActiveProjectDescriptor();
+      try {
+        const res = await fetchJson('/api/project/rollback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            changeId,
+            project: proj.project,
+            customPath: proj.customPath
+          })
+        });
+        showToast(`↩️ Cambio revertido: ${res.relPath || changeId}`, 'success');
+        await loadProjectContext({ preserveDualConfig: true });
+        if (historyDrawer.classList.contains('active') && historyActiveTab === 'changes') {
+          loadRecentChanges();
+        }
+        onFileMutatedPostActions(res.relPath || '');
+      } catch (err) {
+        showToast(`❌ No se pudo revertir el cambio: ${err.message}`, 'error');
+      }
+    }
+
+    function onFileMutatedPostActions(relPath) {
+      if (autoVerifyOnSave) {
+        runProjectVerification('test');
+      }
+      const previewPanel = document.getElementById('live-preview-panel');
+      const autoReloadChk = document.getElementById('preview-auto-reload-check');
+      if (previewPanel && previewPanel.style.display !== 'none' && (!autoReloadChk || autoReloadChk.checked)) {
+        reloadLivePreview(relPath);
+      }
+    }
+
+    // --- Fase 2: Consola / Runner & Self-Healing ---
+    function toggleRunnerDrawer(forceState) {
+      const drawer = document.getElementById('runner-drawer');
+      if (!drawer) return;
+      const next = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('active');
+      drawer.classList.toggle('active', next);
+      const btn = document.getElementById('btn-toggle-runner-drawer');
+      if (btn) btn.classList.toggle('active', next);
+      if (next) {
+        loadProjectRunnerScripts();
+      }
+    }
+
+    async function loadProjectRunnerScripts() {
+      const sel = document.getElementById('runner-cmd-select');
+      if (!sel) return;
+      const proj = getActiveProjectDescriptor();
+      if (proj.isGeneral) return;
+      try {
+        const q = new URLSearchParams();
+        if (proj.project) q.set('project', proj.project);
+        if (proj.customPath) q.set('customPath', proj.customPath);
+        const data = await fetchJson(`/api/project/scripts?${q.toString()}`);
+        const prevVal = sel.value;
+        let html = `
+          <option value="node_test">🧪 node --test (Tests Nativos)</option>
+          <option value="git_status">📊 git status --short</option>
+          <option value="git_diff">🔍 git diff (Cambios en disco)</option>
+        `;
+        if (Array.isArray(data.scripts)) {
+          data.scripts.forEach((s) => {
+            const name = typeof s === 'string' ? s : (s.name || s.id || '');
+            if (name && !['node_test', 'git_status', 'git_diff'].includes(name)) {
+              html += `<option value="npm:${escapeHtml(name)}">📦 npm run ${escapeHtml(name)}</option>`;
+            }
+          });
+        } else if (data.scripts && typeof data.scripts === 'object') {
+          Object.keys(data.scripts).forEach((name) => {
+            if (name && !['node_test', 'git_status', 'git_diff'].includes(name)) {
+              html += `<option value="npm:${escapeHtml(name)}">📦 npm run ${escapeHtml(name)}</option>`;
+            }
+          });
+        }
+        sel.innerHTML = html;
+        if (prevVal && Array.from(sel.options).some((o) => o.value === prevVal)) {
+          sel.value = prevVal;
+        }
+      } catch (_e) {}
+    }
+
+    async function runProjectVerification(cmdOverride) {
+      const proj = getActiveProjectDescriptor();
+      if (proj.isGeneral) {
+        showToast('Selecciona un proyecto o carpeta activa antes de ejecutar comandos.', 'warn');
+        return;
+      }
+      toggleRunnerDrawer(true);
+      const sel = document.getElementById('runner-cmd-select');
+      const rawChoice = cmdOverride || (sel ? sel.value : 'node_test');
+      let action = 'node_test';
+      let scriptName = '';
+      if (rawChoice === 'test' || rawChoice === 'node_test') {
+        action = 'node_test';
+      } else if (rawChoice === 'git_status' || rawChoice === 'git_diff') {
+        action = rawChoice;
+      } else if (rawChoice.startsWith('npm:')) {
+        action = 'npm_script';
+        scriptName = rawChoice.slice(4);
+      } else {
+        action = rawChoice;
+      }
+
+      const pre = document.getElementById('runner-output-pre');
+      const badge = document.getElementById('runner-exit-badge');
+      const autofixBtn = document.getElementById('btn-runner-autofix');
+      const execBtn = document.getElementById('btn-runner-exec');
+
+      if (pre) pre.textContent = `⏳ Ejecutando ${scriptName ? `npm run ${scriptName}` : action} en ${proj.name}...`;
+      if (badge) {
+        badge.className = 'runner-exit-badge run';
+        badge.textContent = '⏳ Ejecutando...';
+      }
+      if (autofixBtn) autofixBtn.style.display = 'none';
+      if (execBtn) execBtn.disabled = true;
+
+      try {
+        const res = await fetchJson('/api/project/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.project,
+            customPath: proj.customPath,
+            commandKey: action,
+            action,
+            scriptName: scriptName || 'test',
+            script: scriptName || 'test',
+            timeoutMs: 15000
+          })
+        });
+        lastRunnerResult = res;
+        const code = typeof res.exitCode === 'number' ? res.exitCode : (res.ok ? 0 : 1);
+        const combined = [res.stdout || '', res.stderr || ''].filter(Boolean).join('\n').trim() || '(Comando finalizado sin salida en consola)';
+        if (pre) pre.textContent = `$ ${res.command || action}\n\n${combined}`;
+        if (badge) {
+          badge.className = `runner-exit-badge ${code === 0 ? 'ok' : 'fail'}`;
+          badge.textContent = code === 0
+            ? `✅ EXIT 0 (${res.durationMs || 0}ms)`
+            : `❌ EXIT ${code} (${res.durationMs || 0}ms)`;
+        }
+        if (autofixBtn) {
+          autofixBtn.style.display = code !== 0 ? 'inline-flex' : 'none';
+        }
+        if (code === 0) {
+          showToast(`✅ Verificación exitosa (${res.command || action})`, 'success');
+        } else {
+          showToast(`⚠️ Comando terminó con código ${code}. Puedes usar "Auto-Reparar Error con IA".`, 'warn');
+        }
+      } catch (err) {
+        if (pre) pre.textContent = `❌ Error ejecutando comando: ${err.message}`;
+        if (badge) {
+          badge.className = 'runner-exit-badge fail';
+          badge.textContent = '❌ Error';
+        }
+      } finally {
+        if (execBtn) execBtn.disabled = false;
+      }
+    }
+
+    function toggleAutoVerifyOnSave() {
+      autoVerifyOnSave = !autoVerifyOnSave;
+      localStorage.setItem('local_ai_auto_verify_save_v1', autoVerifyOnSave ? '1' : '0');
+      updateAutoVerifyUi();
+      showToast(
+        autoVerifyOnSave
+          ? '🔄 Auto-Fix al Guardar ACTIVADO: correrá tests automáticamente tras aplicar cambios.'
+          : '🔄 Auto-Fix al Guardar DESACTIVADO.',
+        'info'
+      );
+    }
+
+    function updateAutoVerifyUi() {
+      const btn = document.getElementById('btn-auto-verify');
+      if (!btn) return;
+      btn.textContent = `🔄 Auto-Fix al Guardar: ${autoVerifyOnSave ? 'ON' : 'OFF'}`;
+      btn.style.borderColor = autoVerifyOnSave ? 'var(--accent-green)' : '';
+      btn.style.color = autoVerifyOnSave ? 'var(--accent-green)' : '';
+    }
+
+    function triggerRunnerAutoFixWithAi() {
+      if (!lastRunnerResult) return;
+      const out = [lastRunnerResult.stdout || '', lastRunnerResult.stderr || ''].filter(Boolean).join('\n').slice(0, 6000);
+      const fixPrompt =
+        `El comando \`${lastRunnerResult.command || 'verificación'}\` falló con código de salida ${lastRunnerResult.exitCode}.\n` +
+        `Analiza la traza de error y genera bloques \`<<<< SEARCH / ==== / >>>> REPLACE\` con ruta de archivo para corregir el bug de raíz:\n\n` +
+        `\`\`\`text\n${out}\n\`\`\``;
+      promptInput.value = fixPrompt;
+      sendMessage();
+    }
+
+    // --- Fase 3: Scaffolder Nuevo Proyecto Estándar (ESTRUCTURA.md) ---
+    function openNewProjectModal() {
+      const st = document.getElementById('np-create-status');
+      if (st) st.style.display = 'none';
+      openModal('new-project-modal');
+    }
+
+    async function createStandardProjectSubmit() {
+      const nameInp = document.getElementById('np-name-input');
+      const tplSel = document.getElementById('np-template-select');
+      const descInp = document.getElementById('np-desc-input');
+      const gitChk = document.getElementById('np-init-git-check');
+      const statusEl = document.getElementById('np-create-status');
+      const submitBtn = document.getElementById('btn-np-create-submit');
+
+      const name = (nameInp ? nameInp.value : '').trim();
+      if (!name) {
+        showToast('Ingresa el nombre del nuevo proyecto.', 'warn');
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = '⏳ Creando estructura estándar en C:\\antigravityAS\\...';
+      }
+
+      try {
+        const res = await fetchJson('/api/project/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            template: tplSel ? tplSel.value : 'web-vanilla',
+            description: descInp ? descInp.value.trim() : '',
+            initGit: gitChk ? gitChk.checked : true
+          })
+        });
+        showToast(`🚀 Proyecto creado: ${res.name || name}`, 'success');
+        closeModal('new-project-modal');
+        await loadProjects();
+        const createdName = res.name || name;
+        if (Array.from(projectSelect.options).some((o) => o.value === createdName)) {
+          projectSelect.value = createdName;
+          await onProjectChanged();
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.textContent = `❌ Error: ${err.message}`;
+        }
+        showToast(`❌ Error al crear proyecto: ${err.message}`, 'error');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    // --- Fase 4: Split-Screen Live Preview (<aside id="live-preview-panel">) ---
+    function toggleLivePreviewPanel(forceState) {
+      const panel = document.getElementById('live-preview-panel');
+      const btn = document.getElementById('btn-toggle-live-preview');
+      if (!panel) return;
+      const isHidden = panel.style.display === 'none' || !panel.style.display;
+      const next = typeof forceState === 'boolean' ? forceState : isHidden;
+      panel.style.display = next ? 'flex' : 'none';
+      if (btn) btn.classList.toggle('active', next);
+      if (next) {
+        reloadLivePreview();
+      }
+    }
+
+    function setLivePreviewViewport(vp) {
+      const iframe = document.getElementById('live-preview-iframe');
+      if (!iframe) return;
+      iframe.classList.remove('vp-tablet', 'vp-mobile');
+      if (vp === 'tablet') iframe.classList.add('vp-tablet');
+      if (vp === 'mobile') iframe.classList.add('vp-mobile');
+      ['desktop', 'tablet', 'mobile'].forEach((mode) => {
+        const b = document.getElementById(`preview-vp-${mode}`);
+        if (b) b.classList.toggle('active', mode === vp);
+      });
+    }
+
+    async function reloadLivePreview(preferredFile) {
+      const iframe = document.getElementById('live-preview-iframe');
+      const urlBar = document.getElementById('preview-url-bar');
+      const errBar = document.getElementById('preview-runtime-errors');
+      if (!iframe) return;
+      if (errBar) errBar.classList.remove('active');
+
+      const proj = getActiveProjectDescriptor();
+      if (proj.isGeneral) {
+        if (urlBar) urlBar.value = 'Selecciona un proyecto web activo para previsualizar';
+        return;
+      }
+
+      const q = new URLSearchParams();
+      if (proj.project) q.set('project', proj.project);
+      if (proj.customPath) q.set('customPath', proj.customPath);
+      if (preferredFile && /\.(html|htm)$/i.test(preferredFile)) {
+        q.set('entry', preferredFile);
+      }
+
+      try {
+        const st = await fetchJson(`/api/project/preview/status?${q.toString()}`);
+        const basePreviewUrl = st.previewUrl || `/api/project/preview?${q.toString()}`;
+        const sep = basePreviewUrl.includes('?') ? '&' : '?';
+        iframe.src = `${basePreviewUrl}${sep}_t=${Date.now()}`;
+        if (urlBar) {
+          urlBar.value = st.entryFile ? `${proj.name}/${st.entryFile}` : basePreviewUrl;
+        }
+      } catch (_e) {
+        const fallbackUrl = `/api/project/preview?${q.toString()}&_t=${Date.now()}`;
+        if (urlBar) urlBar.value = `${proj.name}/index.html`;
+        iframe.src = fallbackUrl;
+      }
+    }
+
+    function fixPreviewRuntimeErrorInChat() {
+      if (!lastPreviewRuntimeError) return;
+      promptInput.value =
+        `La Vista Previa en Vivo (Live Preview) arrojó este error de ejecución en el navegador:\n` +
+        `\`\`\`text\n${lastPreviewRuntimeError}\n\`\`\`\n` +
+        `Por favor corrígelo usando un bloque \`<<<< SEARCH / ==== / >>>> REPLACE\` sobre el archivo afectado.`;
+      sendMessage();
+    }
+
+    // --- Fase 5: Buscador Grep en Modal de Carpeta + Menciones @archivo ---
+    async function runGrepSearchInModal() {
+      const inp = document.getElementById('grep-search-input');
+      const listEl = document.getElementById('grep-results-list');
+      if (!inp || !listEl) return;
+      const query = inp.value.trim();
+      if (!query) {
+        showToast('Escribe un término o símbolo para buscar en el código.', 'warn');
+        return;
+      }
+      const folderInputVal = (document.getElementById('folder-path-input').value || '').trim();
+      const proj = getActiveProjectDescriptor();
+      const customPath = folderInputVal || proj.customPath;
+
+      listEl.style.display = 'block';
+      listEl.innerHTML = '<div style="padding:6px;color:var(--text-muted);">🔎 Buscando coincidencias en el código...</div>';
+      try {
+        const res = await fetchJson('/api/project/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.project,
+            customPath,
+            query,
+            maxResults: 40
+          })
+        });
+        const matches = Array.isArray(res.matches) ? res.matches : (Array.isArray(res.results) ? res.results : []);
+        if (!matches.length) {
+          listEl.innerHTML = '<div style="padding:6px;color:var(--text-muted);">Sin resultados para esa búsqueda.</div>';
+          return;
+        }
+        listEl.innerHTML = matches.map((m) => `
+          <div class="grep-result-item">
+            <div style="min-width:0;flex:1;">
+              <div class="grep-loc">${escapeHtml(m.relPath || m.file)}:${m.line || 1}</div>
+              <div class="grep-line">${escapeHtml(String(m.text || m.preview || '').trim())}</div>
+            </div>
+            <button type="button" class="btn-xs accent" data-grep-pin-file="${escapeHtml(m.relPath || m.file)}">📌 Fijar</button>
+          </div>
+        `).join('');
+      } catch (err) {
+        listEl.innerHTML = `<div style="padding:6px;color:var(--accent-red);">❌ Error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function pinFileFromGrep(relPath, btnEl) {
+      if (!relPath) return;
+      if (!selectedFolderFiles.includes(relPath)) {
+        selectedFolderFiles.push(relPath);
+        renderFolderFilesList();
+      }
+      const proj = getActiveProjectDescriptor();
+      try {
+        await fetchJson('/api/project/pin-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.project,
+            customPath: proj.customPath,
+            pinnedFiles: selectedFolderFiles.slice(),
+            files: [relPath],
+            mode: 'add'
+          })
+        });
+        if (btnEl) btnEl.textContent = '✅ Fijado';
+        showToast(`📌 Archivo fijado al contexto: ${relPath}`, 'success');
+        await loadProjectContext({ preserveDualConfig: true });
+      } catch (err) {
+        showToast(`❌ Error al fijar archivo: ${err.message}`, 'error');
+      }
+    }
+
+    function extractMentionedFilesFromPrompt(text) {
+      const set = new Set(pendingMentionedFiles);
+      const regex = /@([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+)/g;
+      let match;
+      while ((match = regex.exec(String(text || ''))) !== null) {
+        set.add(match[1].replace(/\\/g, '/'));
+      }
+      return Array.from(set);
+    }
+
+    function clearPendingAttachmentsAndMentions() {
+      pendingChatAttachments = [];
+      pendingMentionedFiles = [];
+      renderChatAttachmentsStrip();
+      const menu = document.getElementById('at-mention-menu');
+      if (menu) menu.classList.remove('active');
+    }
+
+    function getProjectCandidateFilesForMention() {
+      const files = new Set();
+      if (currentProjectState && Array.isArray(currentProjectState.keyFiles)) {
+        currentProjectState.keyFiles.forEach((f) => files.add(f));
+      }
+      if (Array.isArray(scannedFilesList)) {
+        scannedFilesList.forEach((f) => {
+          if (f && f.relPath) files.add(f.relPath);
+        });
+      }
+      if (Array.isArray(selectedFolderFiles)) {
+        selectedFolderFiles.forEach((f) => files.add(f));
+      }
+      return Array.from(files);
+    }
+
+    function handlePromptAtMentionInput() {
+      const menu = document.getElementById('at-mention-menu');
+      if (!menu || !promptInput) return;
+      const val = promptInput.value;
+      const caret = promptInput.selectionStart || val.length;
+      const beforeCaret = val.slice(0, caret);
+      const m = beforeCaret.match(/(?:^|\s)@([A-Za-z0-9_./\\-]*)$/);
+      if (!m) {
+        menu.classList.remove('active');
+        return;
+      }
+      const query = (m[1] || '').toLowerCase();
+      const allFiles = getProjectCandidateFilesForMention();
+      atMentionCandidates = allFiles
+        .filter((f) => f.toLowerCase().includes(query))
+        .slice(0, 8);
+      if (!atMentionCandidates.length) {
+        menu.classList.remove('active');
+        return;
+      }
+      atMentionSelectedIdx = 0;
+      menu.innerHTML = atMentionCandidates.map((f, idx) => `
+        <div class="at-mention-item ${idx === 0 ? 'active' : ''}" data-at-file="${escapeHtml(f)}">
+          <span>📄 ${escapeHtml(f)}</span>
+          <span style="font-size:0.66rem;color:var(--text-muted);">@archivo</span>
+        </div>
+      `).join('');
+      menu.classList.add('active');
+    }
+
+    function selectAtMentionCandidate(relPath) {
+      const menu = document.getElementById('at-mention-menu');
+      if (!relPath || !promptInput) return;
+      const val = promptInput.value;
+      const caret = promptInput.selectionStart || val.length;
+      const beforeCaret = val.slice(0, caret);
+      const afterCaret = val.slice(caret);
+      const replacedBefore = beforeCaret.replace(/(?:^|\s)@([A-Za-z0-9_./\\-]*)$/, (full) => {
+        const prefix = full.startsWith(' ') ? ' ' : '';
+        return `${prefix}@${relPath} `;
+      });
+      promptInput.value = replacedBefore + afterCaret;
+      if (!pendingMentionedFiles.includes(relPath)) {
+        pendingMentionedFiles.push(relPath);
+      }
+      if (menu) menu.classList.remove('active');
+      promptInput.focus();
+    }
+
+    // --- Fase 6: Adjuntos Multimodales (Ctrl+V, Drag & Drop, Clip 📎) ---
+    async function addChatAttachmentFile(file) {
+      if (!file) return;
+      const isImg = /^image\//i.test(file.type || '');
+      try {
+        if (isImg) {
+          const dataUrl = await readFileAsDataUrl(file);
+          pendingChatAttachments.push({
+            name: file.name || `captura_${Date.now()}.png`,
+            mimeType: file.type || 'image/png',
+            kind: 'image',
+            dataUrl
+          });
+        } else {
+          const text = await file.text();
+          pendingChatAttachments.push({
+            name: file.name || 'adjunto.txt',
+            mimeType: file.type || 'text/plain',
+            kind: 'text',
+            textContent: text.slice(0, 24000)
+          });
+        }
+        renderChatAttachmentsStrip();
+        showToast(`📎 Adjunto listo: ${file.name || 'imagen'}`, 'info');
+      } catch (err) {
+        showToast(`❌ No se pudo leer el archivo adjunto: ${err.message}`, 'error');
+      }
+    }
+
+    function renderChatAttachmentsStrip() {
+      const strip = document.getElementById('chat-attachments-strip');
+      if (!strip) return;
+      if (!pendingChatAttachments.length) {
+        strip.classList.remove('active');
+        strip.innerHTML = '';
+        return;
+      }
+      strip.classList.add('active');
+      strip.innerHTML = pendingChatAttachments.map((att, idx) => `
+        <span class="chat-attachment-pill">
+          ${att.kind === 'image' && att.dataUrl ? `<img src="${att.dataUrl}" alt="thumb" />` : '📄'}
+          <span>${escapeHtml(att.name)}</span>
+          <button type="button" data-remove-att-idx="${idx}" title="Quitar adjunto">✕</button>
+        </span>
+      `).join('');
+    }
+
+    // =========================================================================
     // 12. Bindings de Eventos UI, Atajo Escape, Live Reload e Inicialización
     // =========================================================================
     function bindEventListeners() {
+      updateAutoVerifyUi();
       // Header
       document.getElementById('btn-new-chat').addEventListener('click', () => newChat());
       document.getElementById('btn-auto-apply').addEventListener('click', toggleAutoApply);
@@ -10588,7 +11831,7 @@
         setTimeout(() => URL.revokeObjectURL(a.href), 1500);
       });
 
-      // Skills & Perfiles Cognitivos
+      // Skills & Perfiles Cognitivos + Fusión Infinita (Fase 7)
       profileSelect.addEventListener('change', () => setActiveProfile(profileSelect.value));
       skillCategorySelect.addEventListener('change', renderSkillsSelect);
       skillSearchInput.addEventListener('input', debounce(renderSkillsSelect, 160));
@@ -10597,10 +11840,52 @@
       document.getElementById('btn-clear-profile').addEventListener('click', () => setActiveProfile(''));
       document.getElementById('btn-inspect-skill').addEventListener('click', () => inspectActiveItem('skill'));
       document.getElementById('btn-clear-skill').addEventListener('click', () => setActiveSkill(''));
+      const fusionChipsEl = document.getElementById('active-skills-chips');
+      if (fusionChipsEl) {
+        fusionChipsEl.addEventListener('click', (e) => {
+          const rmBtn = e.target.closest('[data-remove-skill-id]');
+          if (rmBtn) removeSkillFromFusion(rmBtn.dataset.removeSkillId);
+        });
+      }
+      const saveFusionBtn = document.getElementById('btn-save-skill-fusion');
+      if (saveFusionBtn) saveFusionBtn.addEventListener('click', saveSkillFusion);
 
-      // Proyecto & Contexto
+      // Proyecto & Contexto + Suite Vibe Coding (Fases 2, 3, 4)
       projectSelect.addEventListener('change', onProjectChanged);
       document.getElementById('btn-load-folder').addEventListener('click', openFolderModal);
+      const btnNewProjOpen = document.getElementById('btn-new-project-open');
+      if (btnNewProjOpen) btnNewProjOpen.addEventListener('click', openNewProjectModal);
+      const btnNpSubmit = document.getElementById('btn-np-create-submit');
+      if (btnNpSubmit) btnNpSubmit.addEventListener('click', createStandardProjectSubmit);
+
+      const btnVerifyTest = document.getElementById('btn-verify-test');
+      if (btnVerifyTest) btnVerifyTest.addEventListener('click', () => runProjectVerification('test'));
+      const btnToggleRunner = document.getElementById('btn-toggle-runner-drawer');
+      if (btnToggleRunner) btnToggleRunner.addEventListener('click', () => toggleRunnerDrawer());
+      const btnCloseRunner = document.getElementById('btn-close-runner-drawer');
+      if (btnCloseRunner) btnCloseRunner.addEventListener('click', () => toggleRunnerDrawer(false));
+      const btnRunnerExec = document.getElementById('btn-runner-exec');
+      if (btnRunnerExec) btnRunnerExec.addEventListener('click', () => runProjectVerification());
+      const btnAutoVerify = document.getElementById('btn-auto-verify');
+      if (btnAutoVerify) btnAutoVerify.addEventListener('click', toggleAutoVerifyOnSave);
+      const btnRunnerAutofix = document.getElementById('btn-runner-autofix');
+      if (btnRunnerAutofix) btnRunnerAutofix.addEventListener('click', triggerRunnerAutoFixWithAi);
+
+      const btnTogglePreview = document.getElementById('btn-toggle-live-preview');
+      if (btnTogglePreview) btnTogglePreview.addEventListener('click', () => toggleLivePreviewPanel());
+      const btnClosePreview = document.getElementById('btn-close-live-preview');
+      if (btnClosePreview) btnClosePreview.addEventListener('click', () => toggleLivePreviewPanel(false));
+      const vpDesktop = document.getElementById('preview-vp-desktop');
+      if (vpDesktop) vpDesktop.addEventListener('click', () => setLivePreviewViewport('desktop'));
+      const vpTablet = document.getElementById('preview-vp-tablet');
+      if (vpTablet) vpTablet.addEventListener('click', () => setLivePreviewViewport('tablet'));
+      const vpMobile = document.getElementById('preview-vp-mobile');
+      if (vpMobile) vpMobile.addEventListener('click', () => setLivePreviewViewport('mobile'));
+      const btnPreviewReload = document.getElementById('btn-preview-reload');
+      if (btnPreviewReload) btnPreviewReload.addEventListener('click', () => reloadLivePreview());
+      const btnFixPreviewErr = document.getElementById('btn-fix-preview-error');
+      if (btnFixPreviewErr) btnFixPreviewErr.addEventListener('click', fixPreviewRuntimeErrorInChat);
+
       document.getElementById('btn-preview-context').addEventListener('click', previewCurrentContext);
       document.getElementById('btn-toggle-context-drawer').addEventListener('click', toggleContextDrawer);
 
@@ -10674,6 +11959,24 @@
       });
       document.getElementById('btn-folder-preview').addEventListener('click', previewCurrentContext);
       document.getElementById('btn-folder-apply').addEventListener('click', applyFolderSelectionToContext);
+      const btnGrepSearch = document.getElementById('btn-grep-search');
+      if (btnGrepSearch) btnGrepSearch.addEventListener('click', runGrepSearchInModal);
+      const grepInp = document.getElementById('grep-search-input');
+      if (grepInp) {
+        grepInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            runGrepSearchInModal();
+          }
+        });
+      }
+      const grepList = document.getElementById('grep-results-list');
+      if (grepList) {
+        grepList.addEventListener('click', (e) => {
+          const pinBtn = e.target.closest('[data-grep-pin-file]');
+          if (pinBtn) pinFileFromGrep(pinBtn.dataset.grepPinFile, pinBtn);
+        });
+      }
 
       // Preview Modal & Master Prompt Modal
       document.getElementById('preview-tab-system').addEventListener('click', () => setPreviewTab('system'));
@@ -10730,6 +12033,14 @@
           toggleHistoryDrawer(false);
         }
       });
+      if (changesList) {
+        changesList.addEventListener('click', (e) => {
+          const rbBtn = e.target.closest('[data-rollback-change-id]');
+          if (rbBtn) {
+            rollbackChangeById(rbBtn.dataset.rollbackChangeId);
+          }
+        });
+      }
 
       // Quick Pills + 5th Compound [Entrar en Contexto] [Gear]
       document.querySelectorAll('.pill[data-quick-prompt]').forEach((pill) => {
@@ -10820,14 +12131,89 @@
         if (cancelBtn) cancelHfDownloadById(cancelBtn.dataset.cancelHfJob);
       });
 
-      // Enviar Chat
+      // Enviar Chat + Autocompletado @archivo + Adjuntos Multimodales (Fases 5 y 6)
       sendBtn.addEventListener('click', sendMessage);
+      promptInput.addEventListener('input', handlePromptAtMentionInput);
       promptInput.addEventListener('keydown', (e) => {
+        const atMenu = document.getElementById('at-mention-menu');
+        if (atMenu && atMenu.classList.contains('active') && atMentionCandidates.length) {
+          if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+            e.preventDefault();
+            selectAtMentionCandidate(atMentionCandidates[atMentionSelectedIdx] || atMentionCandidates[0]);
+            return;
+          }
+          if (e.key === 'Escape') {
+            atMenu.classList.remove('active');
+            return;
+          }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
         }
       });
+
+      const atMenuEl = document.getElementById('at-mention-menu');
+      if (atMenuEl) {
+        atMenuEl.addEventListener('click', (e) => {
+          const item = e.target.closest('[data-at-file]');
+          if (item) selectAtMentionCandidate(item.dataset.atFile);
+        });
+      }
+
+      const btnAttachMedia = document.getElementById('btn-attach-media');
+      const attachFileInp = document.getElementById('chat-attach-file-input');
+      if (btnAttachMedia && attachFileInp) {
+        btnAttachMedia.addEventListener('click', () => attachFileInp.click());
+        attachFileInp.addEventListener('change', async (e) => {
+          const files = Array.from(e.target.files || []);
+          for (const f of files) {
+            await addChatAttachmentFile(f);
+          }
+          attachFileInp.value = '';
+        });
+      }
+
+      const attStrip = document.getElementById('chat-attachments-strip');
+      if (attStrip) {
+        attStrip.addEventListener('click', (e) => {
+          const rmBtn = e.target.closest('[data-remove-att-idx]');
+          if (!rmBtn) return;
+          const idx = parseInt(rmBtn.dataset.removeAttIdx, 10);
+          if (!Number.isNaN(idx)) {
+            pendingChatAttachments.splice(idx, 1);
+            renderChatAttachmentsStrip();
+          }
+        });
+      }
+
+      promptInput.addEventListener('paste', async (e) => {
+        const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+        for (const item of items) {
+          if (item.kind === 'file' && /^image\//i.test(item.type || '')) {
+            const blob = item.getAsFile();
+            if (blob) {
+              await addChatAttachmentFile(blob);
+            }
+          }
+        }
+      });
+
+      const footerEl = document.querySelector('footer');
+      if (footerEl) {
+        footerEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+        footerEl.addEventListener('drop', async (e) => {
+          const dt = e.dataTransfer;
+          if (dt && dt.files && dt.files.length) {
+            e.preventDefault();
+            for (const f of Array.from(dt.files)) {
+              await addChatAttachmentFile(f);
+            }
+          }
+        });
+      }
 
       // Cerrar Modales via botón [data-close-modal], clic en backdrop y tecla Escape
       document.querySelectorAll('[data-close-modal]').forEach((btn) => {
@@ -10851,7 +12237,7 @@
         }
       });
 
-      // Sincronización automática desde extensión Antigravity
+      // Sincronización automática desde extensión Antigravity + Captura de Errores Live Preview (Fase 4)
       window.addEventListener('message', (event) => {
         const msg = event.data;
         if (msg && msg.type === 'workspace-change' && msg.project) {
@@ -10861,6 +12247,13 @@
           } else {
             loadProjects();
           }
+        }
+        if (msg && msg.type === 'local-ai-preview-error') {
+          lastPreviewRuntimeError = `${msg.message || 'Error en ejecución'} (${msg.source || 'preview'}:${msg.lineno || 0})`;
+          const errBar = document.getElementById('preview-runtime-errors');
+          const errTxt = document.getElementById('preview-runtime-error-text');
+          if (errTxt) errTxt.textContent = `⚠️ Error en Vista Previa: ${lastPreviewRuntimeError}`;
+          if (errBar) errBar.classList.add('active');
         }
       });
     }

@@ -12,7 +12,10 @@ const DEFAULT_MASTER_PROMPT = [
   "2. Arquitectura Limpia y Modular (SOLID/DRY): Propón código cohesivo, desacoplado, tipado/validado de forma defensiva y libre de código muerto o dependencias innecesarias.",
   "3. Seguridad Zero-Trust: Valida rutas contra path traversal, evita interpolación de shell en subprocesos y jamás expongas secretos, tokens, claves API o archivos .env/.git.",
   "4. Verificación y Estabilidad: Acompaña cada cambio lógico con manejo explícito de errores, compatibilidad retroactiva y casos de prueba verificables.",
-  "5. Comunicación Técnica Concisa: Responde en español técnico directo, explicando el porqué de las decisiones críticas y usando bloques write: o patch: válidos cuando debas mutar código."
+  "5. Comunicación Técnica Concisa: Responde en español técnico directo, explicando el porqué de las decisiones críticas y usando bloques write: o patch: válidos cuando debas mutar código.",
+  "6. Estética y Diseño UI (DISENO.md): Usar paletas oscuras armoniosas/Glassmorphism, tipografías modernas (Outfit, Inter, JetBrains Mono), micro-animaciones, HTML5 semántico, diseño fluido sin scroll horizontal y Firma Oficial obligatoria en el footer de toda UI generada: HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®.",
+  "7. Estructura Estándar y Biblioteca (ESTRUCTURA.md): Respetar src/, biblioteca/, tests/, docs/, models_link/ y nomenclatura YYYYMMDD_HHMMSS_[Tipo]_[Nombre].[ext] con archivo .json de metadatos.",
+  "8. Meta-Prompting Estructurado (GEMINI.md Regla 24): Razonar en <thinking>...</thinking> antes de emitir bloques complejos o mutaciones críticas."
 ].join("\n");
 
 const DEFAULT_CONTEXT_ANALYZER_PROMPT = [
@@ -537,6 +540,11 @@ function recordChange(entry) {
     model: String(entry.model || "Local"),
     source: String(entry.source || "local-ai-studio"),
     backupPath: entry.backupPath || null,
+    batchId: entry.batchId ? String(entry.batchId) : null,
+    existedBefore: entry.existedBefore !== undefined ? Boolean(entry.existedBefore) : Boolean(entry.backupPath),
+    reverted: Boolean(entry.reverted),
+    revertedAt: entry.revertedAt || null,
+    revertedByChangeId: entry.revertedByChangeId || null,
     remoteRef: entry.remoteRef || null,
     deployUrl: entry.deployUrl || null,
     summary: String(entry.summary || "")
@@ -553,6 +561,40 @@ function recordChange(entry) {
   });
 
   return record;
+}
+
+function getChangeById(changeId) {
+  if (!changeId || typeof changeId !== "string") return null;
+  const target = changeId.trim();
+  if (!target) return null;
+  const items = readChangesRaw();
+  return items.find((c) => c && String(c.id) === target) || null;
+}
+
+function markChangeReverted(changeId, revertRecordId = null) {
+  if (!changeId || typeof changeId !== "string") return null;
+  const target = changeId.trim();
+  if (!target) return null;
+
+  const current = readChangesRaw();
+  const idx = current.findIndex((c) => c && String(c.id) === target);
+  if (idx === -1) return null;
+
+  const nowIso = new Date().toISOString();
+  current[idx] = {
+    ...current[idx],
+    reverted: true,
+    revertedAt: nowIso,
+    revertedByChangeId: revertRecordId ? String(revertRecordId) : null
+  };
+
+  writeJsonAtomic(getChangesPath(), {
+    version: 1,
+    updatedAt: nowIso,
+    changes: current
+  });
+
+  return current[idx];
 }
 
 function listChanges(project = null, limit = 100) {
@@ -574,6 +616,33 @@ function listChanges(project = null, limit = 100) {
     return items.slice(0, limit);
   }
   return items;
+}
+
+function listProjectBackups(projectName, relPath = null, limit = 50) {
+  const backupsBase = path.join(getMemoryDir(), "backups");
+  const normRel = relPath ? String(relPath).trim().replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase() : null;
+  const changes = listChanges(projectName, 500);
+
+  const valid = changes.filter((c) => {
+    if (!c) return false;
+    if (normRel && String(c.relPath || "").replace(/\\/g, "/").toLowerCase() !== normRel) {
+      return false;
+    }
+    if (c.backupPath && typeof c.backupPath === "string") {
+      try {
+        if (isContainedInDir(backupsBase, c.backupPath) && fs.existsSync(c.backupPath)) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    if (c.action === "create") {
+      return true;
+    }
+    return false;
+  });
+
+  const numericLimit = (typeof limit === "number" && limit > 0) ? limit : 50;
+  return valid.slice(0, numericLimit);
 }
 
 // ==========================================
@@ -707,6 +776,7 @@ function buildDefaultProjectState(meta) {
     netlifyPublishDir: "",
     lastSessionId: "",
     selectedFiles: [],
+    pinnedFiles: [],
     lastContextAnalysis: null,
     dualConfig: buildDefaultDualConfig(),
     updatedAt: null
@@ -755,6 +825,9 @@ function getProjectState(projectKeyOrPath) {
     project: stored.project || defaults.project,
     projectPath: stored.projectPath || defaults.projectPath,
     selectedFiles: Array.isArray(stored.selectedFiles) ? stored.selectedFiles : [],
+    pinnedFiles: Array.isArray(stored.pinnedFiles)
+      ? Array.from(new Set(stored.pinnedFiles.map((f) => String(f || "").trim()).filter(Boolean)))
+      : [],
     dualConfig: normalizeDualConfig(stored.dualConfig)
   };
 }
@@ -799,6 +872,13 @@ function updateProjectState(projectKeyOrPath, patch = {}) {
 
   if (!Array.isArray(nextState.selectedFiles)) {
     nextState.selectedFiles = [];
+  }
+  if (Array.isArray(nextState.pinnedFiles)) {
+    nextState.pinnedFiles = Array.from(
+      new Set(nextState.pinnedFiles.map((f) => String(f || "").trim()).filter(Boolean))
+    );
+  } else {
+    nextState.pinnedFiles = [];
   }
 
   const canonicalKey = (nextState.projectPath ? nextState.projectPath : nextState.project).toLowerCase();
@@ -1138,7 +1218,10 @@ module.exports = {
   upsertDownload,
   backupFileBeforeWrite,
   recordChange,
+  getChangeById,
+  markChangeReverted,
   listChanges,
+  listProjectBackups,
   getProjectState,
   updateProjectState,
   getAllProjectStates,
