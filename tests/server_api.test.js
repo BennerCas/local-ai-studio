@@ -228,7 +228,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     }
   });
 
-  it("responde /api/version 2.0.0, CORS OPTIONS y /api/projects con projectState", async () => {
+  it("responde /api/version 2.1.0 sin caché, CORS OPTIONS y /api/projects con projectState", async () => {
     const optRes = await httpReq("/api/version", { method: "OPTIONS" });
     assert.equal(optRes.status, 204);
     assert.equal(optRes.headers.get("access-control-allow-origin"), "*");
@@ -236,8 +236,9 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
 
     const verRes = await httpReq("/api/version");
     assert.equal(verRes.status, 200);
-    assert.equal(verRes.json.v, "2.0.0");
+    assert.equal(verRes.json.v, "2.1.0");
     assert.equal(typeof verRes.json.build, "number");
+    assert.match(verRes.headers.get("cache-control") || "", /no-store/);
 
     const projRes = await httpReq("/api/projects");
     assert.equal(projRes.status, 200);
@@ -812,6 +813,24 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     const uiRes = await httpReq("/");
     assert.equal(uiRes.status, 200);
     assert.match(uiRes.headers.get("content-type") || "", /text\/html/);
+    assert.match(uiRes.headers.get("cache-control") || "", /no-store/);
+
+    // Assets de marca sin fondo + validación 404 segura
+    for (const iconFile of ["github-icon.png", "netlify-icon.png", "ollama-icon.png"]) {
+      const iconRes = await fetch(`${studioBaseUrl}/assets/${iconFile}`);
+      assert.equal(iconRes.status, 200, `Asset ${iconFile} debe responder 200`);
+      assert.equal(iconRes.headers.get("content-type"), "image/png");
+      const buf = Buffer.from(await iconRes.arrayBuffer());
+      assert.ok(buf.length > 500, `Asset ${iconFile} no debe estar vacío`);
+      assert.deepEqual([...buf.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], `${iconFile} debe ser PNG válido`);
+
+      const headIcon = await fetch(`${studioBaseUrl}/assets/${iconFile}`, { method: "HEAD" });
+      assert.equal(headIcon.status, 200);
+    }
+    const missingAsset = await fetch(`${studioBaseUrl}/assets/no-existe.png`);
+    assert.equal(missingAsset.status, 404);
+    const traversalAsset = await fetch(`${studioBaseUrl}/assets/..%2Fserver.js`);
+    assert.equal(traversalAsset.status, 404);
 
     const preloadRes = await httpReq("/preload.js");
     assert.equal(preloadRes.status, 200);

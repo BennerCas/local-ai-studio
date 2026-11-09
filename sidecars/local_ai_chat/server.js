@@ -22,6 +22,15 @@ const DEFAULT_DIRECTML_PORT = 8002;
 const DIRECTML_SCRIPT = "C:\\antigravityAS\\Modelos -ai-brains\\api_openai.py";
 const PRELOAD_PATH = "C:\\Users\\Benner\\.gemini\\antigravity\\lib\\node_modules\\sidecar_sdk\\preload.js";
 const HTML_FILE_PATH = path.join(__dirname, "ui.html");
+const ASSETS_DIR = path.join(__dirname, "assets");
+const ASSET_MIME_TYPES = {
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg"
+};
 
 let directMlProcess = null;
 
@@ -805,14 +814,52 @@ function createStudioServer(options = {}) {
     const query = Object.fromEntries(parsedUrl.searchParams.entries());
 
     // ---------------------------------------------------------
-    // Versión, Preload & UI Estática
+    // Versión, Preload, Assets Estáticos & UI
     // ---------------------------------------------------------
     if (pathname === "/api/version" && req.method === "GET") {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       try {
         const st = fs.statSync(HTML_FILE_PATH);
-        sendJson(res, 200, { build: st.mtimeMs, v: "2.0.0" });
+        sendJson(res, 200, { build: st.mtimeMs, v: "2.1.0" });
       } catch (_e) {
-        sendJson(res, 200, { build: 1, v: "2.0.0" });
+        sendJson(res, 200, { build: 1, v: "2.1.0" });
+      }
+      return;
+    }
+
+    if (pathname.startsWith("/assets/") && (req.method === "GET" || req.method === "HEAD")) {
+      const relAsset = pathname.slice("/assets/".length);
+      if (!/^[a-zA-Z0-9._-]+$/.test(relAsset) || relAsset.includes("..")) {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Asset not found");
+        return;
+      }
+      const ext = path.extname(relAsset).toLowerCase();
+      const mime = ASSET_MIME_TYPES[ext];
+      const fullAssetPath = path.resolve(ASSETS_DIR, relAsset);
+      const resolvedAssetsBase = path.resolve(ASSETS_DIR) + path.sep;
+      if (!mime || !fullAssetPath.startsWith(resolvedAssetsBase) || !fs.existsSync(fullAssetPath)) {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Asset not found");
+        return;
+      }
+      const stat = fs.statSync(fullAssetPath);
+      if (!stat.isFile()) {
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Asset not found");
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": mime,
+        "Content-Length": stat.size,
+        "Cache-Control": "no-cache, must-revalidate"
+      });
+      if (req.method === "HEAD") {
+        res.end();
+      } else {
+        fs.createReadStream(fullAssetPath).pipe(res);
       }
       return;
     }
@@ -2111,12 +2158,17 @@ function createStudioServer(options = {}) {
     }
 
     // ---------------------------------------------------------
-    // Fallback UI HTML (solo rutas GET no-API)
+    // Fallback UI HTML (solo rutas GET no-API, sin caché WebView)
     // ---------------------------------------------------------
     if (req.method === "GET" && !pathname.startsWith("/api/")) {
       try {
         const html = fs.readFileSync(HTML_FILE_PATH, "utf-8");
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        });
         res.end(html);
       } catch (e) {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });

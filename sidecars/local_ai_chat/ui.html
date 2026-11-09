@@ -10,21 +10,21 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #0f111a;
-      --bg-surface: #141724;
-      --bg-card: rgba(26, 29, 45, 0.80);
-      --bg-panel: rgba(20, 23, 36, 0.96);
-      --border-color: rgba(122, 162, 247, 0.24);
-      --border-strong: rgba(125, 207, 255, 0.45);
+      --bg-dark: #000000;
+      --bg-surface: #060609;
+      --bg-card: rgba(8, 8, 12, 0.96);
+      --bg-panel: rgba(5, 5, 8, 0.98);
+      --border-color: rgba(130, 165, 255, 0.22);
+      --border-strong: rgba(125, 207, 255, 0.48);
       --accent-blue: #7aa2f7;
       --accent-cyan: #7dcfff;
       --accent-purple: #bb9af7;
       --accent-green: #9ece6a;
       --accent-yellow: #e0af68;
       --accent-red: #f7768e;
-      --text-main: #c8d3f5;
-      --text-strong: #f2f5ff;
-      --text-muted: #9aa5ce;
+      --text-main: #dbe3fa;
+      --text-strong: #ffffff;
+      --text-muted: #98a4c8;
       --chat-font-size: 16px;
       --font-title: 17px;
       --font-ui: 14px;
@@ -42,14 +42,14 @@
       height: 100%;
       width: 100%;
       overflow: hidden;
-      background-color: var(--bg-dark);
+      background-color: #000000;
     }
 
     body {
       background:
-        radial-gradient(circle at 12% 8%, rgba(122, 162, 247, 0.10), transparent 36%),
-        radial-gradient(circle at 88% 92%, rgba(187, 154, 247, 0.08), transparent 40%),
-        var(--bg-dark);
+        radial-gradient(circle at 12% 4%, rgba(122, 162, 247, 0.045), transparent 34%),
+        radial-gradient(circle at 88% 96%, rgba(187, 154, 247, 0.035), transparent 36%),
+        #000000;
       color: var(--text-main);
       font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: var(--font-ui);
@@ -58,6 +58,37 @@
       height: 100vh;
       max-height: 100vh;
       overflow-x: hidden;
+    }
+
+    .brand-img-icon {
+      width: 15px;
+      height: 15px;
+      object-fit: contain;
+      flex-shrink: 0;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .brand-img-icon.icon-xs {
+      width: 13px;
+      height: 13px;
+    }
+
+    .brand-img-icon.modal-brand-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .brand-img-icon.icon-amoled-light {
+      filter: brightness(0) invert(1);
+    }
+
+    .btn-primary .brand-img-icon {
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+    }
+
+    .btn-primary .brand-img-icon.icon-amoled-light {
+      filter: none;
     }
 
     button, input, select, textarea {
@@ -106,7 +137,7 @@
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      color: #0f111a;
+      color: #000000;
       font-size: 14px;
       box-shadow: 0 2px 10px rgba(122, 162, 247, 0.35);
       flex-shrink: 0;
@@ -158,14 +189,14 @@
 
     .header-btn.btn-primary {
       background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-      color: #0f111a;
+      color: #000000;
       border: none;
       font-weight: 600;
     }
 
     .header-btn.btn-primary:hover {
       filter: brightness(1.08);
-      color: #0f111a;
+      color: #000000;
     }
 
     .header-btn.btn-accent-cyan {
@@ -208,7 +239,7 @@
     .font-size-control {
       display: inline-flex;
       align-items: center;
-      background: rgba(15, 17, 26, 0.85);
+      background: #040406;
       border: 1px solid var(--border-color);
       border-radius: 7px;
       padding: 2px 3px;
@@ -244,13 +275,13 @@
     }
 
     .font-size-select option {
-      background: #161928;
+      background: #07070b;
       color: #fff;
     }
 
     /* Barras de Control Superiores Compactas */
     .model-control-bar, .skills-bar, .project-bar {
-      background: rgba(20, 23, 36, 0.9);
+      background: rgba(5, 5, 8, 0.96);
       padding: 5px 14px;
       border-bottom: 1px solid var(--border-color);
       display: flex;
@@ -262,16 +293,16 @@
     }
 
     .skills-bar {
-      background: rgba(18, 21, 34, 0.94);
+      background: rgba(3, 3, 5, 0.98);
     }
 
     .project-bar {
-      background: rgba(22, 26, 42, 0.88);
+      background: rgba(6, 6, 10, 0.96);
     }
 
     .ai-source-toggle {
       display: flex;
-      background: #10121c;
+      background: #000000;
       border: 1px solid var(--border-color);
       border-radius: 7px;
       padding: 2px;
@@ -304,7 +335,7 @@
     select.skill-category-select,
     select.skill-select,
     select.profile-select {
-      background: #141724;
+      background: #060609;
       color: var(--text-main);
       border: 1px solid var(--border-color);
       border-radius: 6px;
@@ -343,7 +374,7 @@
     }
 
     .skill-search-input {
-      background: #10121c;
+      background: #040407;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       color: var(--text-strong);
@@ -442,7 +473,7 @@
 
     /* Cajón de Contexto Desplegable */
     #context-drawer {
-      background: rgba(16, 19, 30, 0.98);
+      background: rgba(5, 5, 8, 0.98);
       border-bottom: 1px solid var(--border-color);
       padding: 0 14px;
       max-height: 0;
@@ -475,8 +506,8 @@
     .ctx-meta-item strong { color: var(--accent-cyan); }
 
     .ctx-files-box {
-      background: #0d0f17;
-      border: 1px solid rgba(122, 162, 247, 0.16);
+      background: #020204;
+      border: 1px solid rgba(122, 162, 247, 0.20);
       border-radius: 6px;
       padding: 6px 8px;
       max-height: 95px;
@@ -553,8 +584,8 @@
 
     /* Bloque Thinking & Telemetría */
     details.thinking-block {
-      background: rgba(12, 14, 23, 0.85);
-      border: 1px solid rgba(187, 154, 247, 0.28);
+      background: #030305;
+      border: 1px solid rgba(187, 154, 247, 0.30);
       border-radius: 8px;
       margin: 6px 0 10px 0;
       padding: 6px 10px;
@@ -571,7 +602,7 @@
     details.thinking-block .thinking-body {
       margin-top: 8px;
       padding-top: 8px;
-      border-top: 1px solid rgba(187, 154, 247, 0.16);
+      border-top: 1px solid rgba(187, 154, 247, 0.18);
       font-family: 'JetBrains Mono', monospace;
       font-size: var(--font-ui-small);
       color: var(--text-muted);
@@ -579,8 +610,8 @@
     }
 
     .telemetry-summary-card {
-      background: rgba(15, 19, 32, 0.92);
-      border: 1px solid rgba(125, 207, 255, 0.35);
+      background: #040509;
+      border: 1px solid rgba(125, 207, 255, 0.38);
       border-left: 3px solid var(--accent-cyan);
       border-radius: 8px;
       padding: 8px 12px;
@@ -678,7 +709,7 @@
     .code-wrapper, .file-action-card {
       position: relative;
       margin: 10px 0;
-      background: #0b0d14;
+      background: #020204;
       border: 1px solid var(--border-color);
       border-radius: 8px;
       overflow: hidden;
@@ -696,14 +727,14 @@
     }
 
     .code-header, .fac-header {
-      background: rgba(26, 29, 45, 0.96);
+      background: #09090e;
       padding: 6px 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 12px;
       color: var(--text-muted);
-      border-bottom: 1px solid rgba(122, 162, 247, 0.18);
+      border-bottom: 1px solid rgba(122, 162, 247, 0.20);
       gap: 8px;
       flex-wrap: wrap;
     }
@@ -768,7 +799,7 @@
 
     .btn-apply-action:hover {
       background: var(--accent-green);
-      color: #0f111a;
+      color: #000000;
     }
 
     .btn-apply-action.patch-btn {
@@ -779,7 +810,7 @@
 
     .btn-apply-action.patch-btn:hover {
       background: var(--accent-yellow);
-      color: #0f111a;
+      color: #000000;
     }
 
     .btn-apply-action.applied {
@@ -792,12 +823,18 @@
     .fac-sync-note {
       padding: 5px 10px;
       font-size: 11.5px;
-      border-top: 1px solid rgba(122, 162, 247, 0.14);
-      background: rgba(18, 21, 34, 0.9);
+      border-top: 1px solid rgba(122, 162, 247, 0.16);
+      background: #06060a;
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
       align-items: center;
+    }
+
+    .fac-sync-note > span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .diff-section {
@@ -860,14 +897,14 @@
       width: 360px;
       max-width: 92vw;
       height: 100vh;
-      background: rgba(16, 19, 30, 0.98);
+      background: rgba(4, 4, 7, 0.99);
       backdrop-filter: blur(18px);
       border-left: 1px solid var(--border-color);
       z-index: 1500;
       transition: right 0.28s cubic-bezier(0.16, 1, 0.3, 1);
       display: flex;
       flex-direction: column;
-      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.55);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.85);
     }
 
     #history-drawer.active { right: 0; }
@@ -924,7 +961,7 @@
     }
 
     .history-search-input {
-      background: #0d0f17;
+      background: #020204;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 6px 9px;
@@ -953,7 +990,7 @@
     }
 
     .history-item {
-      background: rgba(26, 29, 45, 0.65);
+      background: rgba(10, 10, 14, 0.92);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 9px 10px;
@@ -1012,7 +1049,7 @@
     .btn-del-session:hover { opacity: 1; background: rgba(247, 118, 142, 0.16); }
 
     .change-item {
-      background: rgba(22, 26, 40, 0.78);
+      background: rgba(9, 9, 13, 0.95);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 8px 10px;
@@ -1131,11 +1168,11 @@
       align-items: center;
       justify-content: space-between;
       gap: 6px;
-      padding: 3px 6px;
-      background: rgba(14, 17, 26, 0.72);
-      border: 1px solid rgba(122, 162, 247, 0.18);
+      padding: 4px 6px;
+      background: #020204;
+      border: 1px solid rgba(130, 165, 255, 0.22);
       border-radius: 8px;
-      overflow-x: auto;
+      overflow: hidden;
       flex-wrap: nowrap;
       max-width: 100%;
     }
@@ -1145,13 +1182,20 @@
       align-items: center;
       gap: 5px;
       flex-wrap: nowrap;
+      flex: 1 1 auto;
       min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .int-bar-group::-webkit-scrollbar {
+      height: 0;
     }
 
     .int-chip-pair {
       display: inline-flex;
       align-items: center;
-      background: rgba(26, 29, 45, 0.85);
+      background: #09090d;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       overflow: hidden;
@@ -1240,6 +1284,8 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      padding-left: 6px;
+      border-left: 1px solid rgba(130, 165, 255, 0.16);
       font-size: 11px;
       color: var(--text-muted);
       white-space: nowrap;
@@ -1270,11 +1316,11 @@
       bottom: calc(100% + 6px);
       left: 14px;
       right: 14px;
-      background: rgba(18, 21, 34, 0.98);
+      background: rgba(4, 4, 7, 0.99);
       backdrop-filter: blur(18px);
       border: 1px solid var(--border-strong);
       border-radius: 12px;
-      box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.72);
+      box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.9);
       display: none;
       flex-direction: column;
       max-height: min(52vh, 430px);
@@ -1289,7 +1335,7 @@
 
     .int-drawer-header {
       padding: 8px 12px;
-      background: rgba(26, 29, 45, 0.95);
+      background: #09090d;
       border-bottom: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
@@ -1344,7 +1390,7 @@
     }
 
     .int-input, .int-select {
-      background: #0d0f17;
+      background: #020204;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 6px 9px;
@@ -1360,7 +1406,7 @@
     .int-status-box {
       padding: 7px 10px;
       border-radius: 7px;
-      background: rgba(12, 15, 24, 0.85);
+      background: #050508;
       border: 1px solid var(--border-color);
       font-size: 12px;
       display: flex;
@@ -1371,7 +1417,7 @@
     }
 
     .int-subcard {
-      background: rgba(12, 15, 24, 0.9);
+      background: #050508;
       border: 1px solid rgba(122, 162, 247, 0.24);
       border-radius: 8px;
       padding: 9px 11px;
@@ -1389,8 +1435,8 @@
     }
 
     .hf-item-row {
-      background: rgba(24, 28, 44, 0.8);
-      border: 1px solid rgba(122, 162, 247, 0.2);
+      background: #09090e;
+      border: 1px solid rgba(122, 162, 247, 0.22);
       border-radius: 7px;
       padding: 7px 9px;
       display: flex;
@@ -1441,7 +1487,7 @@
 
     button.send-btn {
       background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-      color: #0f111a;
+      color: #000000;
       border: none;
       border-radius: 10px;
       padding: 0 18px;
@@ -1476,7 +1522,7 @@
       right: 16px;
       left: auto;
       transform: none;
-      background: #1a1e32;
+      background: #08080c;
       border: 1px solid var(--accent-blue);
       color: #fff;
       padding: 8px 14px;
@@ -1484,7 +1530,7 @@
       font-size: 12.5px;
       display: none;
       z-index: 4000;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
       max-width: min(440px, calc(100vw - 32px));
       text-align: left;
       word-wrap: break-word;
@@ -1501,7 +1547,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(10, 12, 20, 0.84);
+      background: rgba(0, 0, 0, 0.88);
       backdrop-filter: blur(8px);
       z-index: 3000;
       display: none;
@@ -1513,9 +1559,9 @@
     .modal-backdrop.active { display: flex; }
 
     .modal-card {
-      background: #161928;
+      background: #060609;
       border: 1px solid var(--border-color);
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.78);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.92);
       border-radius: 12px;
       width: 100%;
       max-width: 780px;
@@ -1533,7 +1579,7 @@
 
     .modal-header {
       padding: 11px 16px;
-      background: rgba(26, 29, 45, 0.96);
+      background: #0a0a0f;
       border-bottom: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
@@ -1576,7 +1622,7 @@
 
     .modal-footer {
       padding: 10px 16px;
-      background: rgba(20, 23, 36, 0.96);
+      background: #060609;
       border-top: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
@@ -1600,7 +1646,7 @@
     .chip-btn:hover { background: rgba(122, 162, 247, 0.25); color: #fff; border-color: var(--accent-blue); }
 
     .file-tree-container {
-      background: #0f111a;
+      background: #020204;
       border: 1px solid rgba(122, 162, 247, 0.22);
       border-radius: 8px;
       max-height: 230px;
@@ -1628,7 +1674,7 @@
       width: 100%;
       min-height: 150px;
       height: 220px;
-      background: #0f111a;
+      background: #020204;
       border: 1px solid var(--border-color);
       border-radius: 8px;
       color: var(--accent-cyan);
@@ -1650,7 +1696,7 @@
     .path-input-group input {
       flex: 1;
       min-width: 180px;
-      background: #0f111a;
+      background: #020204;
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 7px 11px;
@@ -1666,6 +1712,27 @@
       gap: 6px;
       flex-wrap: wrap;
       font-size: 11.5px;
+    }
+
+    @media (max-width: 680px) {
+      .integrations-bar {
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .int-bar-group {
+        flex-wrap: wrap;
+        overflow-x: visible;
+      }
+      .int-env-status {
+        border-left: none;
+        padding-left: 2px;
+      }
+      textarea#prompt-input {
+        min-height: 48px;
+        height: 48px;
+        font-size: 14px;
+        line-height: 1.35;
+      }
     }
 
     @media (max-height: 680px) {
@@ -1696,7 +1763,7 @@
       <button type="button" id="btn-new-chat" class="header-btn btn-primary" title="Iniciar nuevo chat limpio">
         <span>+ Nuevo Chat</span>
       </button>
-      <button type="button" id="btn-auto-apply" class="header-btn btn-auto-apply active" title="Si está activo, guarda o edita automáticamente en disco los archivos creados o modificados por los modelos">
+      <button type="button" id="btn-auto-apply" class="header-btn btn-auto-apply active" aria-pressed="true" title="Si está activo, guarda o edita automáticamente en disco los archivos creados o modificados por los modelos">
         <span id="auto-apply-icon">⚡</span>
         <span id="auto-apply-label">Autoguardado: ON</span>
       </button>
@@ -1733,7 +1800,7 @@
   <div class="model-control-bar">
     <div class="ai-source-toggle" role="group" aria-label="Motor de Inteligencia Artificial">
       <button type="button" id="src-local-btn" class="source-btn active source-local" data-source="local" title="Agente Ollama Local (GGUF | Port 11434)">
-        <span>🤖</span><span>Agente Ollama</span>
+        <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon icon-amoled-light"><span>Agente Ollama</span>
       </button>
       <button type="button" id="src-directml-btn" class="source-btn source-directml" data-source="directml" title="Agente DirectML Nativo (ONNX GPU AMD DirectX 12 | Port 8002)">
         <span>⚡</span><span>Agente DirectML</span>
@@ -1861,7 +1928,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title" id="mf-modal-title">
-          <span>📄</span>
+          <img src="/assets/ollama-icon.png" alt="Ollama" class="brand-img-icon modal-brand-icon icon-amoled-light">
           <span>Gestor de Modelfile - Ollama (<span id="mf-model-name" style="color:var(--accent-cyan);">modelo</span>)</span>
         </div>
         <button type="button" class="modal-close-btn" data-close-modal="modelfile-modal" aria-label="Cerrar modal">✕</button>
@@ -1878,7 +1945,7 @@
             🔨 Compilar Modelo
           </button>
         </div>
-        <div id="mf-compile-status" style="display:none; padding:8px 12px; border-radius:6px; background:#0e1017; font-size:var(--font-ui-small); color:var(--accent-green); font-family:'JetBrains Mono',monospace;"></div>
+        <div id="mf-compile-status" style="display:none; padding:8px 12px; border-radius:6px; background:#020204; font-size:var(--font-ui-small); color:var(--accent-green); font-family:'JetBrains Mono',monospace;"></div>
       </div>
       <div class="modal-footer">
         <div style="display:flex; gap:6px;">
@@ -1956,7 +2023,7 @@
           <button type="button" id="preview-tab-system" class="tab-btn active">System Prompt Completo</button>
           <button type="button" id="preview-tab-summary" class="tab-btn">Resumen Markdown</button>
         </div>
-        <pre id="preview-content" style="background:#0e1017; border:1px solid var(--border-color); border-radius:8px; padding:12px; max-height:400px; overflow:auto; color:var(--accent-cyan); font-family:'JetBrains Mono',monospace; font-size:var(--code-font-size); white-space:pre-wrap;"></pre>
+        <pre id="preview-content" style="background:#020204; border:1px solid var(--border-color); border-radius:8px; padding:12px; max-height:400px; overflow:auto; color:var(--accent-cyan); font-family:'JetBrains Mono',monospace; font-size:var(--code-font-size); white-space:pre-wrap;"></pre>
       </div>
       <div class="modal-footer">
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1992,7 +2059,7 @@
           <summary>👁️ Vista previa de effectivePrompt resultante</summary>
           <pre id="mp-effective-preview" style="margin-top:6px; max-height:140px; overflow:auto; font-size:12px; color:var(--accent-cyan); white-space:pre-wrap;"></pre>
         </details>
-        <div id="mp-status" style="display:none; font-size:12px; padding:6px 10px; border-radius:6px; background:#0e1017; color:var(--accent-green);"></div>
+        <div id="mp-status" style="display:none; font-size:12px; padding:6px 10px; border-radius:6px; background:#020204; color:var(--accent-green);"></div>
       </div>
       <div class="modal-footer">
         <button type="button" id="btn-mp-reset" class="header-btn" style="color:var(--accent-yellow); border-color:rgba(224,175,104,0.4);">🔄 Restaurar Defecto</button>
@@ -2009,7 +2076,7 @@
     <div class="modal-card" style="max-width:520px;">
       <div class="modal-header">
         <div class="modal-title" id="gh-repo-modal-title">
-          <span>🐙</span><span>Crear Nuevo Repositorio en GitHub</span>
+          <img src="/assets/github-icon.png" alt="GitHub" class="brand-img-icon modal-brand-icon icon-amoled-light"><span>Crear Nuevo Repositorio en GitHub</span>
         </div>
         <button type="button" class="modal-close-btn" data-close-modal="github-repo-modal" aria-label="Cerrar modal">✕</button>
       </div>
@@ -2028,7 +2095,9 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="header-btn" data-close-modal="github-repo-modal">Cancelar</button>
-        <button type="button" id="btn-gh-create-submit" class="header-btn btn-primary">🐙 Crear Repositorio</button>
+        <button type="button" id="btn-gh-create-submit" class="header-btn btn-primary">
+          <img src="/assets/github-icon.png" alt="GitHub" class="brand-img-icon icon-amoled-light"><span id="gh-create-btn-label">Crear Repositorio</span>
+        </button>
       </div>
     </div>
   </div>
@@ -2038,7 +2107,7 @@
     <div class="modal-card" style="max-width:490px;">
       <div class="modal-header">
         <div class="modal-title" id="nf-site-modal-title">
-          <span>▲</span><span>Crear Nuevo Sitio en Netlify</span>
+          <img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon modal-brand-icon"><span>Crear Nuevo Sitio en Netlify</span>
         </div>
         <button type="button" class="modal-close-btn" data-close-modal="netlify-site-modal" aria-label="Cerrar modal">✕</button>
       </div>
@@ -2052,7 +2121,9 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="header-btn" data-close-modal="netlify-site-modal">Cancelar</button>
-        <button type="button" id="btn-nf-create-submit" class="header-btn btn-primary">▲ Crear Sitio</button>
+        <button type="button" id="btn-nf-create-submit" class="header-btn btn-primary">
+          <img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon"><span id="nf-create-btn-label">Crear Sitio</span>
+        </button>
       </div>
     </div>
   </div>
@@ -2125,8 +2196,8 @@
     <section id="integrations-drawer" aria-label="Panel de integraciones Cloud y Hugging Face">
       <div class="int-drawer-header">
         <div class="int-tabs" role="tablist">
-          <button type="button" id="int-tab-github" class="int-tab-btn active" data-int-tab="github" role="tab" aria-selected="true">🐙 GitHub</button>
-          <button type="button" id="int-tab-netlify" class="int-tab-btn" data-int-tab="netlify" role="tab" aria-selected="false">▲ Netlify</button>
+          <button type="button" id="int-tab-github" class="int-tab-btn active" data-int-tab="github" role="tab" aria-selected="true"><img src="/assets/github-icon.png" alt="GitHub" class="brand-img-icon icon-amoled-light"><span>GitHub</span></button>
+          <button type="button" id="int-tab-netlify" class="int-tab-btn" data-int-tab="netlify" role="tab" aria-selected="false"><img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon"><span>Netlify</span></button>
           <button type="button" id="int-tab-hf" class="int-tab-btn" data-int-tab="hf" role="tab" aria-selected="false">🤗 Hugging Face</button>
         </div>
         <button type="button" id="btn-close-integrations" class="header-btn" aria-label="Cerrar panel de integraciones">✕</button>
@@ -2225,7 +2296,7 @@
       <button type="button" class="pill" data-quick-prompt="Examina el proyecto en busca de optimizaciones de código y rendimiento.">🔍 Optimizar Código</button>
       <div class="pill-compound">
         <button type="button" id="btn-enter-context" class="pill pill-context" title="Recolectar telemetría forense Git/checklists/avances y diagnosticar el punto exacto para continuar">🧠 Entrar en Contexto</button>
-        <button type="button" id="btn-master-prompt-gear" class="pill pill-gear" title="Configurar Prompt Maestro (Ollama, DirectML, Free.ai y Analizador)">⚙️</button>
+        <button type="button" id="btn-master-prompt-gear" class="pill pill-gear" aria-label="Configurar Prompt Maestro" title="Configurar Prompt Maestro (Ollama, DirectML, Free.ai y Analizador)">⚙️</button>
       </div>
     </div>
 
@@ -2233,8 +2304,8 @@
     <div class="integrations-bar" role="region" aria-label="Integraciones GitHub, Netlify y Hugging Face">
       <div class="int-bar-group">
         <div class="int-chip-pair">
-          <button type="button" id="btn-gh-toggle-pill" class="int-toggle-btn" title="Activar/desactivar sincronización automática con GitHub al guardar o parchear">
-            <span>🐙</span><span id="gh-pill-state">GitHub: OFF</span>
+          <button type="button" id="btn-gh-toggle-pill" class="int-toggle-btn" aria-pressed="false" title="Activar/desactivar sincronización automática con GitHub al guardar o parchear">
+            <img src="/assets/github-icon.png" alt="GitHub" class="brand-img-icon icon-amoled-light"><span id="gh-pill-state">GitHub: OFF</span>
           </button>
           <button type="button" id="btn-gh-open-panel" class="int-panel-btn" title="Configurar repositorio y sync de GitHub">
             <span id="gh-pill-repo">Vincular Repo</span>
@@ -2245,8 +2316,8 @@
         <span id="dual-sync-badge" class="dual-sync-badge" style="display:none;" title="Autoguardado local y GitHub activos">Sync Dual: Local + GitHub</span>
 
         <div class="int-chip-pair">
-          <button type="button" id="btn-nf-toggle-pill" class="int-toggle-btn" title="Activar/desactivar despliegue automático en Netlify al guardar o parchear">
-            <span>▲</span><span id="nf-pill-state">Netlify: OFF</span>
+          <button type="button" id="btn-nf-toggle-pill" class="int-toggle-btn" aria-pressed="false" title="Activar/desactivar despliegue automático en Netlify al guardar o parchear">
+            <img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon"><span id="nf-pill-state">Netlify: OFF</span>
           </button>
           <button type="button" id="btn-nf-open-panel" class="int-panel-btn" title="Configurar sitio y deploy de Netlify">
             <span id="nf-pill-site">Elegir Sitio</span>
@@ -2634,6 +2705,7 @@
       const icon = document.getElementById('auto-apply-icon');
       const label = document.getElementById('auto-apply-label');
       if (!btn || !icon || !label) return;
+      btn.setAttribute('aria-pressed', String(Boolean(autoApplyEnabled)));
       if (autoApplyEnabled) {
         btn.classList.add('active');
         icon.textContent = '⚡';
@@ -3116,7 +3188,7 @@
       if (ghSync) {
         if (ghSync.ok) {
           const shaShort = ghSync.commitSha ? ` (${String(ghSync.commitSha).slice(0, 7)})` : '';
-          parts.push(`<span style="color:var(--accent-cyan);">🐙 Sync GitHub OK${escapeHtml(shaShort)}</span>`);
+          parts.push(`<span style="color:var(--accent-cyan);"><img src="/assets/github-icon.png" alt="GitHub" class="brand-img-icon icon-xs icon-amoled-light"> Sync GitHub OK${escapeHtml(shaShort)}</span>`);
         } else {
           parts.push(`<span style="color:var(--accent-yellow);">⚠️ GitHub: ${escapeHtml(ghSync.error || 'error')}</span>`);
         }
@@ -3126,8 +3198,8 @@
           const url = nfDeploy.sslUrl || nfDeploy.deployUrl || '';
           parts.push(
             url && isSafeHttpUrl(url)
-              ? `<span style="color:var(--accent-green);">▲ Netlify: ${renderSafeLink(url, 'Ver Deploy')}</span>`
-              : `<span style="color:var(--accent-green);">▲ Netlify OK</span>`
+              ? `<span style="color:var(--accent-green);"><img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon icon-xs"> Netlify: ${renderSafeLink(url, 'Ver Deploy')}</span>`
+              : `<span style="color:var(--accent-green);"><img src="/assets/netlify-icon.png" alt="Netlify" class="brand-img-icon icon-xs"> Netlify OK</span>`
           );
         } else {
           parts.push(`<span style="color:var(--accent-yellow);">⚠️ Netlify: ${escapeHtml(nfDeploy.error || 'error')}</span>`);
@@ -4820,6 +4892,7 @@
 
       if (ghToggleBtn && ghStateSpan && ghRepoSpan && ghQuickBtn) {
         ghToggleBtn.classList.toggle('active', githubToggle);
+        ghToggleBtn.setAttribute('aria-pressed', String(Boolean(githubToggle)));
         ghStateSpan.textContent = githubToggle ? 'GitHub: ON' : 'GitHub: OFF';
         ghRepoSpan.textContent = selectedGithubRepo || 'Vincular Repo';
         ghQuickBtn.style.display = (githubToggle || selectedGithubRepo) ? 'inline-block' : 'none';
@@ -4832,6 +4905,7 @@
 
       if (nfToggleBtn && nfStateSpan && nfSiteSpan && nfQuickBtn) {
         nfToggleBtn.classList.toggle('active', netlifyToggle);
+        nfToggleBtn.setAttribute('aria-pressed', String(Boolean(netlifyToggle)));
         nfStateSpan.textContent = netlifyToggle ? 'Netlify: ON' : 'Netlify: OFF';
         const matchedSite = nfSites.find((s) => s.id === selectedNetlifySite);
         nfSiteSpan.textContent = matchedSite ? matchedSite.name : (selectedNetlifySite || 'Elegir Sitio');
@@ -4951,6 +5025,7 @@
       const linkAndPush = document.getElementById('gh-new-link-push').checked;
       const statusEl = document.getElementById('gh-create-status');
       const btn = document.getElementById('btn-gh-create-submit');
+      const btnLabel = document.getElementById('gh-create-btn-label');
 
       if (!name) {
         statusEl.textContent = 'Escribe un nombre válido para el repositorio.';
@@ -4960,7 +5035,7 @@
 
       statusEl.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = '⏳ Creando...';
+      if (btnLabel) btnLabel.textContent = '⏳ Creando...';
 
       try {
         const proj = getActiveProjectDescriptor();
@@ -5001,7 +5076,7 @@
         statusEl.style.display = 'block';
       } finally {
         btn.disabled = false;
-        btn.textContent = '🐙 Crear Repositorio';
+        if (btnLabel) btnLabel.textContent = 'Crear Repositorio';
       }
     }
 
@@ -5143,10 +5218,11 @@
       const linkLocal = document.getElementById('nf-new-link-local').checked;
       const statusEl = document.getElementById('nf-create-status');
       const btn = document.getElementById('btn-nf-create-submit');
+      const btnLabel = document.getElementById('nf-create-btn-label');
 
       statusEl.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = '⏳ Creando...';
+      if (btnLabel) btnLabel.textContent = '⏳ Creando...';
 
       try {
         const proj = getActiveProjectDescriptor();
@@ -5184,7 +5260,7 @@
         statusEl.style.display = 'block';
       } finally {
         btn.disabled = false;
-        btn.textContent = '▲ Crear Sitio';
+        if (btnLabel) btnLabel.textContent = 'Crear Sitio';
       }
     }
 

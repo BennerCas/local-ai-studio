@@ -390,13 +390,24 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
       const footerSig = document.querySelector(".legal-signature")?.textContent?.trim();
       const autoBtn = document.getElementById("btn-auto-apply");
       const autoLabel = document.getElementById("auto-apply-label")?.textContent?.trim();
+      const brandIcons = Array.from(document.querySelectorAll("img.brand-img-icon")).map((img) => ({
+        src: img.getAttribute("src"),
+        alt: img.getAttribute("alt") || "",
+        complete: img.complete,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight
+      }));
       return {
         h1Count: h1s.length,
         h1Text: h1s[0]?.textContent?.trim(),
         hasMain: Boolean(document.querySelector("main#chat-container")),
         hasMetaDesc: Boolean(document.querySelector('meta[name="description"]')?.getAttribute("content")),
         footerSig,
+        htmlBg: getComputedStyle(document.documentElement).backgroundColor,
+        bodyBg: getComputedStyle(document.body).backgroundColor,
+        brandIcons,
         autoActive: autoBtn?.classList.contains("active"),
+        autoPressed: autoBtn?.getAttribute("aria-pressed"),
         autoLabel,
         profileCount: document.getElementById("profile-select").options.length,
         skillCount: document.getElementById("skill-select").options.length,
@@ -409,7 +420,20 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
     assert.equal(seoMetrics.hasMain, true);
     assert.equal(seoMetrics.hasMetaDesc, true);
     assert.equal(seoMetrics.footerSig, "HUMAN AI SYNERGY BY BENNER CASTILLO - 2026®");
+    assert.equal(seoMetrics.htmlBg, "rgb(0, 0, 0)", "El tema debe ser Negro AMOLED (#000000) en html");
+    assert.equal(seoMetrics.bodyBg, "rgb(0, 0, 0)", "El tema debe ser Negro AMOLED (#000000) en body");
+    assert.ok(seoMetrics.brandIcons.length >= 6, "Deben existir los iconos de marca PNG en botones y modales");
+    for (const ic of seoMetrics.brandIcons) {
+      assert.ok(ic.alt.length > 0, `Icono ${ic.src} debe tener alt`);
+      assert.equal(ic.complete, true, `Icono ${ic.src} debe cargar completo`);
+      assert.equal(ic.naturalWidth, 128, `Icono ${ic.src} debe tener naturalWidth=128`);
+      assert.equal(ic.naturalHeight, 128, `Icono ${ic.src} debe tener naturalHeight=128`);
+    }
+    assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("ollama-icon.png")));
+    assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("github-icon.png")));
+    assert.ok(seoMetrics.brandIcons.some((i) => i.src.includes("netlify-icon.png")));
     assert.equal(seoMetrics.autoActive, true, "Autoguardado debe iniciar activo (ON)");
+    assert.equal(seoMetrics.autoPressed, "true");
     assert.equal(seoMetrics.autoLabel, "Autoguardado: ON");
     assert.ok(seoMetrics.profileCount > 50, `Perfiles insuficientes: ${seoMetrics.profileCount}`);
     assert.ok(seoMetrics.skillCount > 500, `Skills insuficientes: ${seoMetrics.skillCount}`);
