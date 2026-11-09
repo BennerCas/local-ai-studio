@@ -2,99 +2,374 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const SKILLS_ROOT = "C:\\antigravityAS\\antigravity-awesome-skills";
-const INDEX_PATH = path.join(SKILLS_ROOT, "skills_index.json");
-const SKILLS_DIR = path.join(SKILLS_ROOT, "skills");
+const DEFAULT_PROFILES_DIRS = [
+  "C:\\antigravityAS\\Modelos-ai-brains\\agencia ai\\perfiles",
+  "C:\\antigravityAS\\Modelos -ai-brains\\agencia ai\\perfiles"
+];
 
 let skillsCache = null;
+let skillsCacheRoot = null;
 let lastLoadTime = 0;
 
-function loadSkillsIndex() {
+let profilesCache = null;
+let profilesCacheKey = null;
+let lastProfilesLoadTime = 0;
+
+function getSkillsRoot() {
+  const override = process.env.LOCAL_AI_SKILLS_ROOT;
+  return (override && String(override).trim()) ? path.resolve(String(override).trim()) : SKILLS_ROOT;
+}
+
+function getProfilesDirs() {
+  const override = process.env.LOCAL_AI_PROFILES_DIRS;
+  if (override && String(override).trim()) {
+    return String(override)
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => path.resolve(s));
+  }
+  return DEFAULT_PROFILES_DIRS;
+}
+
+function isPathInside(rootDir, targetPath) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedTarget = path.resolve(targetPath);
+  const cmpRoot = process.platform === "win32" ? resolvedRoot.toLowerCase() : resolvedRoot;
+  const cmpTarget = process.platform === "win32" ? resolvedTarget.toLowerCase() : resolvedTarget;
+  const rel = path.relative(cmpRoot, cmpTarget);
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+function loadSkillsIndex(forceRefresh = false) {
+  const root = getSkillsRoot();
   const now = Date.now();
-  if (skillsCache && (now - lastLoadTime < 60000)) {
+  if (!forceRefresh && skillsCache && skillsCacheRoot === root && (now - lastLoadTime < 60000)) {
     return skillsCache;
   }
 
+  const indexPath = path.join(root, "skills_index.json");
   try {
-    if (!fs.existsSync(INDEX_PATH)) {
-      console.warn("[Skills Bridge] Index file not found:", INDEX_PATH);
+    if (!fs.existsSync(indexPath)) {
+      console.warn("[Skills Bridge] Index file not found:", indexPath);
       return [];
     }
-    const raw = fs.readFileSync(INDEX_PATH, "utf8");
-    skillsCache = JSON.parse(raw);
+    const raw = fs.readFileSync(indexPath, "utf8");
+    const parsed = JSON.parse(raw);
+    skillsCache = Array.isArray(parsed) ? parsed : [];
+    skillsCacheRoot = root;
     lastLoadTime = now;
     return skillsCache;
   } catch (err) {
     console.error("[Skills Bridge] Error reading skills_index.json:", err.message);
-    return skillsCache || [];
+    return (skillsCacheRoot === root && skillsCache) ? skillsCache : [];
   }
 }
 
 function getCategories() {
   const all = loadSkillsIndex();
   const cats = new Set();
-  all.forEach(s => {
-    if (s.category) cats.add(s.category);
-  });
+  for (const s of all) {
+    if (s && s.category) cats.add(s.category);
+  }
   return Array.from(cats).sort();
 }
 
-function searchSkills(query = "", category = "", limit = 100) {
+function searchSkills(query = "", category = "", limit = 2000) {
   const all = loadSkillsIndex();
   let filtered = all;
 
   if (category && category !== "all") {
-    filtered = filtered.filter(s => s.category === category);
+    filtered = filtered.filter((s) => s && s.category === category);
   }
 
-  if (query && query.trim()) {
-    const q = query.toLowerCase().trim();
-    filtered = filtered.filter(s => 
-      (s.name && s.name.toLowerCase().includes(q)) ||
-      (s.id && s.id.toLowerCase().includes(q)) ||
-      (s.description && s.description.toLowerCase().includes(q))
+  if (query && String(query).trim()) {
+    const q = String(query).toLowerCase().trim();
+    filtered = filtered.filter((s) =>
+      s && (
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.id && s.id.toLowerCase().includes(q)) ||
+        (s.description && s.description.toLowerCase().includes(q)) ||
+        (s.category && s.category.toLowerCase().includes(q))
+      )
     );
   }
 
-  return filtered.slice(0, limit).map(s => ({
+  const totalCount = filtered.length;
+  const numericLimit = (limit === 0 || limit === null || limit === Infinity || limit < 0)
+    ? totalCount
+    : (Number.isFinite(Number(limit)) ? Math.max(0, Number(limit)) : 2000);
+
+  const sliced = filtered.slice(0, numericLimit).map((s) => ({
     id: s.id,
     name: s.name || s.id,
     category: s.category || "general",
     description: s.description || "",
+    path: s.path || "",
     risk: s.risk || "safe"
   }));
+
+  Object.defineProperty(sliced, "totalCount", {
+    value: totalCount,
+    enumerable: false,
+    configurable: true
+  });
+
+  return sliced;
 }
 
 function getSkillContent(skillId) {
-  if (!skillId) return null;
-  const safeId = path.basename(skillId);
-  const skillFile = path.join(SKILLS_DIR, safeId, "SKILL.md");
+  if (!skillId || typeof skillId !== "string") return null;
+  const trimmedId = skillId.trim();
+  if (!trimmedId) return null;
+
+  const root = getSkillsRoot();
+  const skillsDir = path.join(root, "skills");
+  const all = loadSkillsIndex();
+  const entry = all.find((s) =>
+    s && (s.id === trimmedId || (s.id && s.id.toLowerCase() === trimmedId.toLowerCase()))
+  );
+
+  const candidates = [];
+
+  // 1. Resolver ruta declarada en skills_index.json (soporta rutas anidadas como skills/security/...)
+  if (entry && entry.path && typeof entry.path === "string") {
+    const relEntryPath = entry.path.replace(/^[\/\\]+/, "");
+    const candidateFromIndex = path.resolve(root, relEntryPath, "SKILL.md");
+    if (isPathInside(root, candidateFromIndex)) {
+      candidates.push(candidateFromIndex);
+    }
+    if (entry.path.toLowerCase().endsWith(".md")) {
+      const directMd = path.resolve(root, relEntryPath);
+      if (isPathInside(root, directMd)) {
+        candidates.push(directMd);
+      }
+    }
+  }
+
+  // 2. Fallback a skills/<safeId>/SKILL.md validando containment en SKILLS_ROOT
+  const safeId = path.basename(trimmedId);
+  if (safeId && safeId !== "." && safeId !== ".." && !safeId.includes("..")) {
+    const candidateFallback = path.resolve(skillsDir, safeId, "SKILL.md");
+    if (isPathInside(root, candidateFallback)) {
+      candidates.push(candidateFallback);
+    }
+  }
+
+  for (const skillFile of candidates) {
+    try {
+      if (fs.existsSync(skillFile) && fs.statSync(skillFile).isFile()) {
+        return fs.readFileSync(skillFile, "utf8");
+      }
+    } catch (err) {
+      console.warn(`[Skills Bridge] Error reading skill ${skillId}:`, err.message);
+    }
+  }
+
+  return null;
+}
+
+function parseProfileFrontmatter(rawContent, fallbackName) {
+  const result = {
+    name: fallbackName,
+    description: "",
+    vibe: "",
+    emoji: "",
+    color: ""
+  };
+
+  if (!rawContent) return result;
+  const normalized = rawContent.replace(/\r\n/g, "\n");
+
+  if (normalized.startsWith("---\n")) {
+    const endIdx = normalized.indexOf("\n---", 4);
+    if (endIdx !== -1) {
+      const fmBlock = normalized.slice(4, endIdx);
+      for (const line of fmBlock.split("\n")) {
+        const colonIdx = line.indexOf(":");
+        if (colonIdx <= 0) continue;
+        const key = line.slice(0, colonIdx).trim().toLowerCase();
+        let val = line.slice(colonIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (key === "name" && val) result.name = val;
+        else if (key === "description") result.description = val;
+        else if (key === "vibe") result.vibe = val;
+        else if (key === "emoji") result.emoji = val;
+        else if (key === "color") result.color = val;
+      }
+      return result;
+    }
+  }
+
+  const h1Match = normalized.match(/^#\s+(.+)$/m);
+  if (h1Match && h1Match[1]) {
+    result.name = h1Match[1].trim();
+  }
+  const bodyLines = normalized
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"));
+  if (bodyLines.length > 0 && !result.description) {
+    result.description = bodyLines[0].slice(0, 220);
+  }
+
+  return result;
+}
+
+function walkProfileMarkdownFiles(rootDir, currentDir, depth = 0, maxDepth = 4) {
+  const results = [];
+  if (depth > maxDepth || !fs.existsSync(currentDir)) return results;
 
   try {
-    if (fs.existsSync(skillFile)) {
-      return fs.readFileSync(skillFile, "utf8");
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "scripts" || entry.name === "node_modules") {
+        continue;
+      }
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...walkProfileMarkdownFiles(rootDir, fullPath, depth + 1, maxDepth));
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+        const upper = entry.name.toUpperCase();
+        if (upper === "README.MD" || upper === "CONTRIBUTING.MD") continue;
+        const relPath = path.relative(rootDir, fullPath).replace(/\\/g, "/");
+        results.push({ fullPath, relPath, fileName: entry.name });
+      }
     }
   } catch (err) {
-    console.warn(`[Skills Bridge] Error reading skill ${skillId}:`, err.message);
+    console.warn(`[Skills Bridge] Error escaneando perfiles en ${currentDir}:`, err.message);
+  }
+
+  return results;
+}
+
+function loadProfiles(forceRefresh = false) {
+  const dirs = getProfilesDirs();
+  const cacheKey = dirs.join("|");
+  const now = Date.now();
+
+  if (!forceRefresh && profilesCache && profilesCacheKey === cacheKey && (now - lastProfilesLoadTime < 60000)) {
+    return profilesCache;
+  }
+
+  const seenIds = new Set();
+  const profiles = [];
+
+  for (const baseDir of dirs) {
+    if (!fs.existsSync(baseDir)) continue;
+    const files = walkProfileMarkdownFiles(baseDir, baseDir);
+    for (const f of files) {
+      const id = f.relPath.replace(/\.md$/i, "");
+      const normKey = id.toLowerCase();
+      if (seenIds.has(normKey)) continue;
+      seenIds.add(normKey);
+
+      const parts = id.split("/");
+      const category = parts.length > 1 ? parts[0] : "general";
+      const slug = parts[parts.length - 1];
+
+      let raw = "";
+      try {
+        raw = fs.readFileSync(f.fullPath, "utf8");
+      } catch (e) {
+        continue;
+      }
+
+      const meta = parseProfileFrontmatter(raw, slug);
+      profiles.push({
+        id,
+        slug,
+        name: meta.name || slug,
+        category,
+        description: meta.description || "",
+        vibe: meta.vibe || "",
+        emoji: meta.emoji || "",
+        color: meta.color || "",
+        relPath: f.relPath,
+        fullPath: f.fullPath
+      });
+    }
+  }
+
+  profiles.sort((a, b) => {
+    const catCmp = a.category.localeCompare(b.category);
+    if (catCmp !== 0) return catCmp;
+    return a.name.localeCompare(b.name);
+  });
+
+  profilesCache = profiles;
+  profilesCacheKey = cacheKey;
+  lastProfilesLoadTime = now;
+  return profiles;
+}
+
+function findProfileEntry(profileId) {
+  if (!profileId || typeof profileId !== "string") return null;
+  const clean = profileId.trim().replace(/\\/g, "/").replace(/\.md$/i, "");
+  if (!clean) return null;
+  const cleanLower = clean.toLowerCase();
+
+  const profiles = loadProfiles();
+  return (
+    profiles.find((p) => p.id.toLowerCase() === cleanLower) ||
+    profiles.find((p) => p.slug.toLowerCase() === cleanLower) ||
+    profiles.find((p) => p.name.toLowerCase() === cleanLower) ||
+    null
+  );
+}
+
+function getProfileContent(profileId) {
+  const entry = findProfileEntry(profileId);
+  if (!entry || !entry.fullPath) return null;
+
+  const dirs = getProfilesDirs();
+  const isContained = dirs.some((dir) => isPathInside(dir, entry.fullPath));
+  if (!isContained) return null;
+
+  try {
+    if (fs.existsSync(entry.fullPath) && fs.statSync(entry.fullPath).isFile()) {
+      return fs.readFileSync(entry.fullPath, "utf8");
+    }
+  } catch (err) {
+    console.warn(`[Skills Bridge] Error reading profile ${profileId}:`, err.message);
   }
   return null;
 }
 
-function buildSkillSystemPrompt(skillId) {
-  if (!skillId) return "";
-  const content = getSkillContent(skillId);
-  if (!content) return "";
+function buildSkillSystemPrompt(skillId, profileId = null) {
+  const blocks = [];
 
-  // Limitar longitud en un corte seguro de línea para no cortar pares de surrogados unicode
-  let safeContent = content;
-  if (safeContent.length > 6000) {
-    const cutIdx = safeContent.lastIndexOf("\n", 6000);
-    safeContent = safeContent.slice(0, cutIdx > 0 ? cutIdx : 6000);
+  const profileEntry = profileId ? findProfileEntry(profileId) : null;
+  const profileContent = profileId ? getProfileContent(profileId) : null;
+  const skillContent = skillId ? getSkillContent(skillId) : null;
+
+  if (profileContent) {
+    const profileLabel = profileEntry ? `${profileEntry.name} (${profileEntry.id})` : String(profileId);
+    blocks.push(
+      `--- [PERFIL COGNITIVO ACTIVO (JERARQUÍA SUPERIOR): ${profileLabel.toUpperCase()}] ---\n` +
+      `JERARQUÍA DE MANDO (Perfil > Skill): Debes adoptar la mentalidad, arquitectura y criterio estratégico de este Perfil Cognitivo.\n` +
+      `En caso de discrepancia estructural entre la visión del Perfil y la táctica de cualquier Skill, prevalece el Perfil.\n\n` +
+      `${profileContent}\n` +
+      `--- [FIN DE PERFIL COGNITIVO] ---`
+    );
   }
 
-  return `\n\n--- [HABILIDAD ACTIVA: ${skillId.toUpperCase()}] ---\n` +
-         `Debes asumir de forma estricta el rol, estándares, directrices y mejores prácticas definidos en esta habilidad:\n\n` +
-         `${safeContent}\n` +
-         `--- [FIN DE HABILIDAD] ---\n`;
+  if (skillContent) {
+    const subordinationNote = profileContent
+      ? " (subordinada a las directrices estratégicas del Perfil Cognitivo activo)"
+      : "";
+    blocks.push(
+      `--- [HABILIDAD TÉCNICA ACTIVA: ${String(skillId).toUpperCase()}] ---\n` +
+      `Debes aplicar de forma estricta los estándares, directrices y mejores prácticas definidos en esta habilidad${subordinationNote}:\n\n` +
+      `${skillContent}\n` +
+      `--- [FIN DE HABILIDAD] ---`
+    );
+  }
+
+  if (blocks.length === 0) return "";
+  return "\n\n" + blocks.join("\n\n") + "\n";
 }
 
 module.exports = {
@@ -102,6 +377,8 @@ module.exports = {
   getCategories,
   searchSkills,
   getSkillContent,
+  loadProfiles,
+  getProfileContent,
   buildSkillSystemPrompt,
   SKILLS_ROOT
 };

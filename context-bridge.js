@@ -1,6 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const memoryStore = require("./memory-store.js");
+const skillsBridge = require("./skills-bridge.js");
 
 const BASE_PROJECTS_DIR = "C:\\antigravityAS";
 const BRAIN_DIR = "C:\\Users\\Benner\\.gemini\\antigravity\\brain";
@@ -8,17 +10,160 @@ const RESOLVER_PY = path.join(__dirname, "resolver.py");
 const CONFIG_FILE = path.join(__dirname, "active_project.json");
 
 const IGNORED_DIRS = new Set([
-  "Modelos -ai-brains", 
-  "Modelos-ai-brains", 
-  "OpenWebUI", 
-  "Instalaciones", 
-  "restore-points", 
-  ".vibecheck", 
-  "ComfyUI", 
+  "Modelos -ai-brains",
+  "Modelos-ai-brains",
+  "OpenWebUI",
+  "Instalaciones",
+  "restore-points",
+  ".vibecheck",
+  "ComfyUI",
   "llama.cpp_backup",
   "node_modules",
   ".git"
 ]);
+
+const PRIORITY_CODE_DIRS = new Set([
+  "src",
+  "server",
+  "app",
+  "api",
+  "sidecars",
+  "core",
+  "lib",
+  "services",
+  "routes",
+  "components",
+  "models",
+  "tests",
+  "scripts"
+]);
+
+const LOW_PRIORITY_DIRS = new Set([
+  "docs",
+  "public",
+  "assets",
+  "static",
+  "media",
+  "uploads",
+  "logs"
+]);
+
+const LOWEST_PRIORITY_DIRS = new Set([
+  "biblioteca",
+  "backups"
+]);
+
+const PRIORITY_ROOT_FILES = new Set([
+  "package.json",
+  "requirements.txt",
+  "pyproject.toml",
+  "cargo.toml",
+  "go.mod",
+  "readme.md",
+  "tsconfig.json",
+  "vite.config.js",
+  "vite.config.ts",
+  "server.js",
+  "index.js",
+  "index.ts",
+  "main.py",
+  "app.py"
+]);
+
+function getBaseProjectsDir() {
+  const override = process.env.LOCAL_AI_PROJECTS_DIR;
+  return (override && String(override).trim()) ? path.resolve(String(override).trim()) : BASE_PROJECTS_DIR;
+}
+
+function getBrainDir() {
+  const override = process.env.LOCAL_AI_BRAIN_DIR;
+  return (override && String(override).trim()) ? path.resolve(String(override).trim()) : BRAIN_DIR;
+}
+
+function getConfigFile() {
+  const override = process.env.LOCAL_AI_CONFIG_FILE;
+  return (override && String(override).trim()) ? path.resolve(String(override).trim()) : CONFIG_FILE;
+}
+
+function resolveSafeProjectPath(projectRoot, relPath) {
+  if (!projectRoot || typeof projectRoot !== "string" || !relPath || typeof relPath !== "string") {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+  if (relPath.includes("\0") || projectRoot.includes("\0")) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  const trimmedRel = relPath.trim();
+  if (!trimmedRel) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  const rootResolved = path.resolve(projectRoot);
+  const candidateResolved = path.resolve(rootResolved, trimmedRel);
+
+  const cmpRoot = process.platform === "win32" ? rootResolved.toLowerCase() : rootResolved;
+  const cmpCandidate = process.platform === "win32" ? candidateResolved.toLowerCase() : candidateResolved;
+  const relativePath = path.relative(cmpRoot, cmpCandidate);
+
+  if (!relativePath || relativePath === "." || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  // Verificar symlinks/junctions reales en el ancestro existente más cercano
+  try {
+    if (fs.existsSync(rootResolved)) {
+      const rootReal = fs.realpathSync(rootResolved);
+      let probe = candidateResolved;
+      while (probe && !fs.existsSync(probe)) {
+        const parent = path.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+      if (probe && fs.existsSync(probe)) {
+        const probeReal = fs.realpathSync(probe);
+        const cmpRootReal = process.platform === "win32" ? rootReal.toLowerCase() : rootReal;
+        const cmpProbeReal = process.platform === "win32" ? probeReal.toLowerCase() : probeReal;
+        const realRel = path.relative(cmpRootReal, cmpProbeReal);
+        if (realRel.startsWith("..") || path.isAbsolute(realRel)) {
+          return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+        }
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  const cleanRelPath = path.relative(rootResolved, candidateResolved).replace(/\\/g, "/");
+  const segments = cleanRelPath.toLowerCase().split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  // Bloquear mutación o lectura dentro de .git/
+  if (segments.includes(".git")) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  // Bloquear acceso directo a .env y secretos .env.* (permitiendo plantillas .env.example / .sample / .template)
+  const baseName = segments[segments.length - 1];
+  const isEnvSecret =
+    segments[0] === ".env" ||
+    baseName === ".env" ||
+    (baseName.startsWith(".env.") &&
+      !baseName.endsWith(".example") &&
+      !baseName.endsWith(".sample") &&
+      !baseName.endsWith(".template"));
+
+  if (isEnvSecret) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
+  return {
+    ok: true,
+    fullPath: candidateResolved,
+    cleanRelPath
+  };
+}
 
 function getSidebarHierarchy() {
   try {
@@ -64,13 +209,14 @@ function resolveConversationProject(convId = null, token = null) {
 }
 
 function listProjects() {
+  const baseDir = getBaseProjectsDir();
   try {
-    if (!fs.existsSync(BASE_PROJECTS_DIR)) return [];
-    const entries = fs.readdirSync(BASE_PROJECTS_DIR, { withFileTypes: true });
+    if (!fs.existsSync(baseDir)) return [];
+    const entries = fs.readdirSync(baseDir, { withFileTypes: true });
     return entries
-      .filter(d => d.isDirectory() && !d.name.startsWith(".") && !IGNORED_DIRS.has(d.name))
-      .map(d => {
-        const fullPath = path.join(BASE_PROJECTS_DIR, d.name);
+      .filter((d) => d.isDirectory() && !d.name.startsWith(".") && !IGNORED_DIRS.has(d.name))
+      .map((d) => {
+        const fullPath = path.join(baseDir, d.name);
         try {
           const stat = fs.statSync(fullPath);
           let desc = "";
@@ -85,7 +231,7 @@ function listProjects() {
             name: d.name,
             path: fullPath,
             mtime: stat.mtime,
-            desc: desc
+            desc
           };
         } catch (e) {
           return null;
@@ -100,17 +246,23 @@ function listProjects() {
 }
 
 function getStoredConfig() {
+  const configFile = getConfigFile();
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8")) || {};
+    if (fs.existsSync(configFile)) {
+      return JSON.parse(fs.readFileSync(configFile, "utf-8")) || {};
     }
   } catch (e) {}
   return {};
 }
 
 function saveStoredConfig(cfg) {
+  const configFile = getConfigFile();
   try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ ...cfg, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+    const dir = path.dirname(configFile);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(configFile, JSON.stringify({ ...cfg, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
     return true;
   } catch (e) {
     console.error("[ContextBridge] Error guardando config:", e);
@@ -126,6 +278,19 @@ function getStoredActiveProjectName() {
 function setActiveProjectName(name) {
   const cfg = getStoredConfig();
   cfg.activeProject = name;
+
+  let cleanName = typeof name === "string" ? name.trim() : "";
+  if (cleanName.startsWith("proj:")) {
+    cleanName = cleanName.slice(5).trim();
+  }
+
+  if (cfg.explicitFolder) {
+    const explicitBase = path.basename(path.resolve(cfg.explicitFolder)).toLowerCase();
+    if (!cleanName || cleanName.toLowerCase() !== explicitBase) {
+      delete cfg.explicitFolder;
+    }
+  }
+
   return saveStoredConfig(cfg);
 }
 
@@ -150,43 +315,72 @@ function setExplicitFolder(folderPath) {
 }
 
 function getSelectedFiles(folderPath) {
+  if (!folderPath) return [];
   const cfg = getStoredConfig();
-  const key = folderPath ? path.resolve(folderPath).toLowerCase() : "";
-  if (cfg.selectedFilesMap && cfg.selectedFilesMap[key]) {
+  const key = path.resolve(folderPath).toLowerCase();
+  if (cfg.selectedFilesMap && Array.isArray(cfg.selectedFilesMap[key])) {
     return cfg.selectedFilesMap[key];
   }
-  return cfg.selectedFiles || [];
+  return [];
 }
 
 function setSelectedFiles(folderPath, files) {
+  if (!folderPath) return false;
   const cfg = getStoredConfig();
   if (!cfg.selectedFilesMap) cfg.selectedFilesMap = {};
-  const key = folderPath ? path.resolve(folderPath).toLowerCase() : "";
+  const key = path.resolve(folderPath).toLowerCase();
   cfg.selectedFilesMap[key] = Array.isArray(files) ? files : [];
   cfg.selectedFiles = cfg.selectedFilesMap[key];
   return saveStoredConfig(cfg);
 }
 
 const CODE_EXTENSIONS = new Set([
-  ".py", ".js", ".jsx", ".ts", ".tsx", ".html", ".css", ".json", 
-  ".md", ".yaml", ".yml", ".sql", ".rs", ".go", ".c", ".cpp", ".h", 
+  ".py", ".js", ".jsx", ".ts", ".tsx", ".html", ".css", ".json",
+  ".md", ".yaml", ".yml", ".sql", ".rs", ".go", ".c", ".cpp", ".h",
   ".sh", ".ps1", ".env.example", ".toml"
 ]);
 
+function getScanEntryPriority(entry, depth) {
+  const lower = entry.name.toLowerCase();
+  if (entry.isDirectory()) {
+    if (LOWEST_PRIORITY_DIRS.has(lower)) return 4;
+    if (PRIORITY_CODE_DIRS.has(lower)) return 0;
+    if (LOW_PRIORITY_DIRS.has(lower)) return 3;
+    return 1;
+  }
+  if (depth === 0 && PRIORITY_ROOT_FILES.has(lower)) return 0;
+  const ext = path.extname(lower);
+  if (CODE_EXTENSIONS.has(ext) || lower === "dockerfile" || lower === "makefile") return 1;
+  return 2;
+}
+
+function sortDirEntriesByCodePriority(entries, depth) {
+  return [...entries].sort((a, b) => {
+    const pa = getScanEntryPriority(a, depth);
+    const pb = getScanEntryPriority(b, depth);
+    if (pa !== pb) return pa - pb;
+    if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function scanProjectFolderDeep(dir, base = "", depth = 0, maxDepth = 4, maxFiles = 80) {
   const results = [];
-  if (depth > maxDepth || !fs.existsSync(dir)) return results;
+  if (depth > maxDepth || !dir || !fs.existsSync(dir)) return results;
 
   try {
-    const items = fs.readdirSync(dir, { withFileTypes: true });
+    const rawItems = fs.readdirSync(dir, { withFileTypes: true });
+    const items = sortDirEntriesByCodePriority(rawItems, depth);
     for (const item of items) {
       if (results.length >= maxFiles) break;
-      if (item.name.startsWith(".") || 
-          item.name === "node_modules" || 
-          item.name === "dist" || 
-          item.name === ".venv" || 
-          item.name === "__pycache__" ||
-          item.name === "build") {
+      if (
+        item.name.startsWith(".") ||
+        item.name === "node_modules" ||
+        item.name === "dist" ||
+        item.name === ".venv" ||
+        item.name === "__pycache__" ||
+        item.name === "build"
+      ) {
         continue;
       }
 
@@ -203,10 +397,10 @@ function scanProjectFolderDeep(dir, base = "", depth = 0, maxDepth = 4, maxFiles
             const st = fs.statSync(fullPath);
             results.push({
               name: item.name,
-              relPath: relPath,
-              fullPath: fullPath,
+              relPath,
+              fullPath,
               size: st.size,
-              ext: ext
+              ext
             });
           } catch (e) {}
         }
@@ -219,23 +413,24 @@ function scanProjectFolderDeep(dir, base = "", depth = 0, maxDepth = 4, maxFiles
 
 function readCodeFilesContext(dirPath, selectedFiles = [], maxChars = 24000) {
   if (!dirPath || !fs.existsSync(dirPath)) return "";
-  
+
   let targetFiles = Array.isArray(selectedFiles) && selectedFiles.length > 0 ? selectedFiles : [];
 
-  // Si no se pasaron archivos específicos, seleccionar automáticamente los más representativos
   if (targetFiles.length === 0) {
     const scanned = scanProjectFolderDeep(dirPath, "", 0, 3, 40);
-    // Priorizar package.json, main.py, server.js, index.ts/js, README.md, etc.
-    const priorityKeywords = ["main.py", "app.py", "server.js", "index.ts", "index.js", "package.json", "requirements.txt", "README.md", "vite.config", "tsconfig.json"];
+    const priorityKeywords = [
+      "main.py", "app.py", "server.js", "index.ts", "index.js",
+      "package.json", "requirements.txt", "README.md", "vite.config", "tsconfig.json"
+    ];
     const prioritized = [];
-    
+
     for (const kw of priorityKeywords) {
-      const match = scanned.find(f => f.relPath.toLowerCase().endsWith(kw.toLowerCase()));
+      const match = scanned.find((f) => f.relPath.toLowerCase().endsWith(kw.toLowerCase()));
       if (match && !prioritized.includes(match.relPath)) {
         prioritized.push(match.relPath);
       }
     }
-    
+
     for (const f of scanned) {
       if (prioritized.length >= 6) break;
       if (!prioritized.includes(f.relPath) && f.size < 50000) {
@@ -254,21 +449,26 @@ function readCodeFilesContext(dirPath, selectedFiles = [], maxChars = 24000) {
       break;
     }
 
-    const fullPath = path.isAbsolute(rel) ? rel : path.join(dirPath, rel);
+    const safe = resolveSafeProjectPath(dirPath, rel);
+    if (!safe.ok) continue;
+    const fullPath = safe.fullPath;
     if (!fs.existsSync(fullPath)) continue;
 
     try {
       const stat = fs.statSync(fullPath);
+      if (!stat.isFile()) continue;
       if (stat.size > 200000) {
-        codeContext += `\n=== Archivo: ${rel} (${(stat.size / 1024).toFixed(1)} KB) ===\n[Archivo demasiado grande para inyectar completo]\n`;
+        codeContext += `\n=== Archivo: ${safe.cleanRelPath} (${(stat.size / 1024).toFixed(1)} KB) ===\n[Archivo demasiado grande para inyectar completo]\n`;
         continue;
       }
 
       const content = fs.readFileSync(fullPath, "utf-8");
       const budgetRemaining = maxChars - totalChars;
-      const snippet = content.length > budgetRemaining ? content.slice(0, budgetRemaining) + "\n[... Contenido truncado por límite de contexto ...]" : content;
+      const snippet = content.length > budgetRemaining
+        ? content.slice(0, budgetRemaining) + "\n[... Contenido truncado por límite de contexto ...]"
+        : content;
 
-      codeContext += `\n=== Archivo: ${rel} ===\n\`\`\`\n${snippet}\n\`\`\`\n`;
+      codeContext += `\n=== Archivo: ${safe.cleanRelPath} ===\n\`\`\`\n${snippet}\n\`\`\`\n`;
       totalChars += snippet.length;
     } catch (e) {}
   }
@@ -277,17 +477,41 @@ function readCodeFilesContext(dirPath, selectedFiles = [], maxChars = 24000) {
 }
 
 function getActiveProject(preferredName = null, convId = null, token = null) {
-  // 0. Si el usuario configuró o cargó explícitamente una carpeta de proyecto
+  const baseDir = getBaseProjectsDir();
+
+  const looksLikeExplicitPath =
+    preferredName &&
+    typeof preferredName === "string" &&
+    (preferredName.includes("\\") || preferredName.includes("/") || /^[a-zA-Z]:/.test(preferredName));
+
   const explicit = getExplicitFolder();
-  if (explicit && fs.existsSync(explicit) && (!preferredName || preferredName === "explicit" || preferredName === path.basename(explicit))) {
-    const projName = path.basename(explicit);
-    return {
-      name: projName,
-      path: explicit,
-      isGeneral: false,
-      isExplicit: true,
-      mtime: fs.statSync(explicit).mtime
-    };
+  if (explicit && fs.existsSync(explicit)) {
+    const matchesExplicitPath = looksLikeExplicitPath && path.resolve(preferredName).toLowerCase() === path.resolve(explicit).toLowerCase();
+    if (!preferredName || preferredName === "explicit" || preferredName === path.basename(explicit) || matchesExplicitPath) {
+      const projName = path.basename(explicit);
+      return {
+        name: projName,
+        path: explicit,
+        isGeneral: false,
+        isExplicit: true,
+        mtime: fs.statSync(explicit).mtime
+      };
+    }
+  }
+
+  if (looksLikeExplicitPath && preferredName.toLowerCase() !== "general") {
+    try {
+      const resolvedPref = path.resolve(preferredName);
+      if (fs.existsSync(resolvedPref) && fs.statSync(resolvedPref).isDirectory()) {
+        return {
+          name: path.basename(resolvedPref),
+          path: resolvedPref,
+          isGeneral: false,
+          isExplicit: true,
+          mtime: fs.statSync(resolvedPref).mtime
+        };
+      }
+    } catch (e) {}
   }
 
   const projects = listProjects();
@@ -304,20 +528,33 @@ function getActiveProject(preferredName = null, convId = null, token = null) {
     }
   }
 
-  // 1. Si viene un ID de conversación específica o token
+  // 1. Si se pasa un nombre de proyecto preferido explícito (prioridad sobre convId)
+  if (targetProjName) {
+    if (targetProjName.toLowerCase() === "general") {
+      return { name: "General", path: baseDir, convId: targetConvId || undefined, isGeneral: true, mtime: new Date() };
+    }
+    const found = projects.find((p) => p.name.toLowerCase() === targetProjName.toLowerCase());
+    if (found) return { ...found, convId: targetConvId || undefined, isGeneral: false };
+    const customPath = path.join(baseDir, targetProjName);
+    if (fs.existsSync(customPath)) {
+      return { name: targetProjName, path: customPath, convId: targetConvId || undefined, isGeneral: false, mtime: new Date() };
+    }
+  }
+
+  // 2. Si viene un ID de conversación específica o token (cuando no se forzó proyecto explícito)
   if (targetConvId || token) {
     const resolved = resolveConversationProject(targetConvId, token);
     if (resolved && resolved.projectName) {
       if (resolved.isGeneral || resolved.projectName === "General") {
         return {
           name: resolved.title || "General",
-          path: BASE_PROJECTS_DIR,
+          path: baseDir,
           convId: resolved.convId || targetConvId,
           isGeneral: true,
           mtime: new Date()
         };
       }
-      const found = projects.find(p => p.name.toLowerCase() === resolved.projectName.toLowerCase());
+      const found = projects.find((p) => p.name.toLowerCase() === resolved.projectName.toLowerCase());
       if (found) return { ...found, convId: resolved.convId, isGeneral: false };
       if (resolved.projectPath && fs.existsSync(resolved.projectPath)) {
         return { name: resolved.projectName, path: resolved.projectPath, convId: resolved.convId, isGeneral: false, mtime: new Date() };
@@ -325,46 +562,41 @@ function getActiveProject(preferredName = null, convId = null, token = null) {
     }
   }
 
-  // 2. Si se pasa un nombre de proyecto preferido
-  if (targetProjName) {
-    if (targetProjName.toLowerCase() === "general") {
-      return { name: "General", path: BASE_PROJECTS_DIR, isGeneral: true, mtime: new Date() };
-    }
-    const found = projects.find(p => p.name.toLowerCase() === targetProjName.toLowerCase());
-    if (found) return { ...found, isGeneral: false };
-    const customPath = path.join(BASE_PROJECTS_DIR, targetProjName);
-    if (fs.existsSync(customPath)) {
-      return { name: targetProjName, path: customPath, isGeneral: false, mtime: new Date() };
-    }
-  }
-
-  // 3. Revisar selección persistida previa
   const stored = getStoredActiveProjectName();
   if (stored) {
     if (stored.toLowerCase() === "general") {
-      return { name: "General", path: BASE_PROJECTS_DIR, isGeneral: true, mtime: new Date() };
+      return { name: "General", path: baseDir, isGeneral: true, mtime: new Date() };
     }
-    const found = projects.find(p => p.name.toLowerCase() === stored.toLowerCase());
+    const found = projects.find((p) => p.name.toLowerCase() === stored.toLowerCase());
     if (found) return { ...found, isGeneral: false };
   }
 
-  // 4. Default: Entorno General (Cero hardcoding de SynthIA)
-  return { name: "General", path: BASE_PROJECTS_DIR, isGeneral: true, mtime: new Date() };
+  return { name: "General", path: baseDir, isGeneral: true, mtime: new Date() };
 }
 
 function scanProjectFiles(dir, base = "", depth = 0, maxDepth = 2, maxFiles = 45) {
   const results = [];
-  if (depth > maxDepth) return results;
+  if (depth > maxDepth || !dir || !fs.existsSync(dir)) return results;
 
   try {
-    const items = fs.readdirSync(dir, { withFileTypes: true });
+    const rawItems = fs.readdirSync(dir, { withFileTypes: true });
+    const items = sortDirEntriesByCodePriority(rawItems, depth);
     for (const item of items) {
       if (results.length >= maxFiles) break;
-      if (item.name.startsWith(".") || item.name === "node_modules" || item.name === "dist" || item.name === ".venv") continue;
-      
+      if (
+        item.name.startsWith(".") ||
+        item.name === "node_modules" ||
+        item.name === "dist" ||
+        item.name === ".venv" ||
+        item.name === "__pycache__"
+      ) {
+        continue;
+      }
+
       const relPath = base ? `${base}/${item.name}` : item.name;
       if (item.isDirectory()) {
         results.push(relPath + "/");
+        if (results.length >= maxFiles) break;
         const sub = scanProjectFiles(path.join(dir, item.name), relPath, depth + 1, maxDepth, maxFiles - results.length);
         results.push(...sub);
       } else {
@@ -377,19 +609,20 @@ function scanProjectFiles(dir, base = "", depth = 0, maxDepth = 2, maxFiles = 45
 }
 
 function getConversationHistory(convId = null) {
+  const brainDir = getBrainDir();
   try {
     let transcriptFile = null;
 
     if (convId) {
-      const p = path.join(BRAIN_DIR, convId, ".system_generated", "logs", "transcript.jsonl");
+      const p = path.join(brainDir, convId, ".system_generated", "logs", "transcript.jsonl");
       if (fs.existsSync(p)) transcriptFile = p;
     }
 
-    if (!transcriptFile && fs.existsSync(BRAIN_DIR)) {
-      const convs = fs.readdirSync(BRAIN_DIR, { withFileTypes: true })
-        .filter(d => d.isDirectory() && !d.name.startsWith(".") && d.name !== "tempmediaStorage")
-        .map(d => {
-          const t = path.join(BRAIN_DIR, d.name, ".system_generated", "logs", "transcript.jsonl");
+    if (!transcriptFile && fs.existsSync(brainDir)) {
+      const convs = fs.readdirSync(brainDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "tempmediaStorage")
+        .map((d) => {
+          const t = path.join(brainDir, d.name, ".system_generated", "logs", "transcript.jsonl");
           if (fs.existsSync(t)) {
             return { id: d.name, mtime: fs.statSync(t).mtime, path: t };
           }
@@ -409,7 +642,7 @@ function getConversationHistory(convId = null) {
       try {
         const item = JSON.parse(l);
         if (item.type === "USER_INPUT" && item.content) {
-          let clean = item.content.replace(/<USER_REQUEST>|<\/USER_REQUEST>|<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/g, "").trim();
+          const clean = item.content.replace(/<USER_REQUEST>|<\/USER_REQUEST>|<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/g, "").trim();
           if (clean && clean.length > 5) userPrompts.push(clean);
         }
       } catch (e) {}
@@ -420,7 +653,102 @@ function getConversationHistory(convId = null) {
   }
 }
 
-function buildProjectContext(projectName = null, convId = null, token = null) {
+function readCleanProgressTail(progressFile, maxChars = 1200) {
+  if (!fs.existsSync(progressFile)) return "";
+  try {
+    const raw = fs.readFileSync(progressFile, "utf-8");
+    if (raw.length <= maxChars) return raw.trim();
+    const tail = raw.slice(raw.length - maxChars);
+    const marker = tail.indexOf("\n## [");
+    if (marker !== -1) {
+      return tail.slice(marker + 1).trim();
+    }
+    if (tail.startsWith("## [")) return tail.trim();
+    const nextNl = tail.indexOf("\n");
+    return (nextNl !== -1 ? tail.slice(nextNl + 1) : tail).trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+function buildStateSummarySection(proj, projectState, recentChanges) {
+  const parts = [];
+  if (projectState) {
+    const syncParts = [];
+    if (projectState.githubToggle || projectState.githubRepo) {
+      syncParts.push(`GitHub=${projectState.githubToggle ? "ON" : "OFF"}${projectState.githubRepo ? ` (${projectState.githubRepo})` : ""}`);
+    }
+    if (projectState.netlifyToggle || projectState.netlifySite) {
+      syncParts.push(`Netlify=${projectState.netlifyToggle ? "ON" : "OFF"}${projectState.netlifySite ? ` (${projectState.netlifySite})` : ""}`);
+    }
+    if (projectState.lastSessionId) {
+      syncParts.push(`Última Sesión=${projectState.lastSessionId}`);
+    }
+    if (syncParts.length > 0) {
+      parts.push(`- Integraciones y Sesión: ${syncParts.join(" | ")}`);
+    }
+    if (projectState.lastContextAnalysis && typeof projectState.lastContextAnalysis === "object") {
+      const summary = projectState.lastContextAnalysis.summary || projectState.lastContextAnalysis.digest || "";
+      if (summary) {
+        parts.push(`- Último Análisis Profundo (${projectState.lastContextAnalysis.timestamp || "reciente"}):\n${String(summary).slice(0, 600)}`);
+      }
+    }
+  }
+
+  if (Array.isArray(recentChanges) && recentChanges.length > 0) {
+    const changeLines = recentChanges.map((c) =>
+      `  • [${c.action}] ${c.relPath || c.summary} (${c.model || "Local"}, ${c.timestamp || ""})`
+    );
+    parts.push(`- Últimos Cambios Persistidos:\n${changeLines.join("\n")}`);
+  }
+
+  if (parts.length === 0) return "";
+  return `<estado_continuacion_proyecto proyecto="${proj.name}">\n${parts.join("\n")}\n</estado_continuacion_proyecto>`;
+}
+
+function buildMutationDirectivesSection() {
+  return `DIRECTIVAS Y CAPACIDADES DE MUTACIÓN DE CÓDIGO (CREAR Y EDITAR ARCHIVOS):
+Tienes permisos activos de lectura y escritura en el proyecto para crear nuevos archivos o modificar archivos existentes según la etapa o punto de avance actual.
+
+1. CREAR NUEVO ARCHIVO O REESCRIBIR COMPLETO:
+Usa estrictamente el formato de bloque con 'write:ruta/relativa' o 'create:ruta/relativa'.
+Ejemplo:
+\`\`\`write:src/services/api_client.py
+# Código completo del archivo nuevo o actualizado
+import requests
+
+def fetch_data():
+    return {}
+\`\`\`
+
+2. MODIFICAR/EDITAR QUIRÚRGICAMENTE UN ARCHIVO EXISTENTE (PATCH):
+Para modificar únicamente una sección o función específica sin reescribir todo el archivo, usa 'patch:ruta/relativa' con bloques SEARCH y REPLACE:
+\`\`\`patch:src/services/api_client.py
+<<< SEARCH
+def fetch_data():
+    return {}
+===
+def fetch_data():
+    response = requests.get("https://api.example.com")
+    return response.json()
+>>> REPLACE
+\`\`\`
+
+3. REGLAS DE EJECUCIÓN:
+- Utiliza la arquitectura y código provisto en <codigo_fuente_del_proyecto> para adaptar tus cambios al avance exacto.
+- La interfaz de Local AI Studio procesará estos bloques automáticamente para que el usuario pueda aplicarlos al disco con un clic o en modo auto-aplicación directa.
+- Siempre responde con explicaciones técnicas concisas en español.`;
+}
+
+function buildProjectContext(projectName = null, convId = null, token = null, options = {}) {
+  const opts = (options && typeof options === "object") ? options : {};
+  const writeToDisk = opts.writeToDisk === true;
+  const skillId = opts.skillId || null;
+  const profileId = opts.profileId || null;
+  const customSystemPrompt = opts.customSystemPrompt || null;
+  const includeMasterPrompt = opts.includeMasterPrompt !== false;
+  const modelOverridesPrompt = opts.modelOverridesPrompt || null;
+
   let targetConvId = convId;
   let targetProjName = projectName;
 
@@ -462,22 +790,46 @@ function buildProjectContext(projectName = null, convId = null, token = null) {
     } catch (e) {}
   }
 
-  let pastProgress = "";
   const progressFile = path.join(projectPath, "AVANCES_LOCAL_AI.md");
-  if (fs.existsSync(progressFile)) {
-    try {
-      pastProgress = fs.readFileSync(progressFile, "utf-8").slice(-600);
-    } catch (e) {}
-  }
+  const pastProgress = readCleanProgressTail(progressFile, 1200);
 
-  const convInfo = resolveConversationProject(targetConvId, token);
+  const convInfo = (targetConvId || token) ? resolveConversationProject(targetConvId, token) : null;
   const recentPrompts = getConversationHistory(targetConvId);
 
-  const selectedFiles = getSelectedFiles(projectPath);
+  const selectedFiles = Array.isArray(opts.selectedFiles) ? opts.selectedFiles : getSelectedFiles(projectPath);
   const codeSnippets = readCodeFilesContext(projectPath, selectedFiles, 24000);
 
   const isGen = proj.isGeneral || proj.name.toLowerCase() === "general";
-  const systemPrompt = `Eres el asistente de IA local y extensión de Antigravity para ${isGen ? "el Entorno General de Trabajo" : `el proyecto "${proj.name}"`}.
+
+  // 1. Master Prompt (+ overrides de modelo y sesión)
+  const masterParts = [];
+  if (includeMasterPrompt) {
+    const masterCfg = memoryStore.getMasterPromptConfig(proj.name);
+    if (masterCfg && masterCfg.effectivePrompt) {
+      masterParts.push(masterCfg.effectivePrompt.trim());
+    }
+  }
+  if (modelOverridesPrompt && String(modelOverridesPrompt).trim()) {
+    masterParts.push(`### Directivas del Modelo Activo:\n${String(modelOverridesPrompt).trim()}`);
+  }
+  if (customSystemPrompt && String(customSystemPrompt).trim()) {
+    masterParts.push(`### Override de Sesión:\n${String(customSystemPrompt).trim()}`);
+  }
+  const masterPromptSection = masterParts.join("\n\n");
+
+  // 2. Perfil / Skill (Perfil > Skill)
+  const skillPromptSection = (skillId || profileId)
+    ? skillsBridge.buildSkillSystemPrompt(skillId, profileId).trim()
+    : "";
+
+  // 3. Estado persistido de continuación
+  const stateKey = isGen ? "General" : (projectPath || proj.name);
+  const projectState = memoryStore.getProjectState(stateKey);
+  const recentChanges = memoryStore.listChanges(proj.name, 5);
+  const stateSummarySection = buildStateSummarySection(proj, projectState, recentChanges);
+
+  // 4. Contexto del Proyecto XML
+  const projectContextXml = `Eres el asistente de IA local y extensión de Antigravity para ${isGen ? "el Entorno General de Trabajo" : `el proyecto "${proj.name}"`}.
 
 <contexto_del_proyecto>
 - Entorno: ${proj.name}
@@ -486,47 +838,55 @@ ${convInfo && convInfo.title ? `- Sesión de Antigravity: "${convInfo.title}"` :
 ${packageInfo ? `- Scripts disponibles: ${packageInfo.scripts.join(", ")}
 - Dependencias clave: ${packageInfo.dependencies.slice(0, 10).join(", ")}` : ""}
 - Archivos en el Espacio de Trabajo:
-${files.slice(0, 35).map(f => `  • ${f}`).join("\n")}
+${files.slice(0, 35).map((f) => `  • ${f}`).join("\n")}
 ${readmeSnippet ? `\n- Descripción / README:\n${readmeSnippet.slice(0, 300)}...` : ""}
-${recentPrompts.length ? `\n- Tareas recientes abordadas en Antigravity:\n${recentPrompts.map(p => `  > "${p.slice(0, 120)}"`).join("\n")}` : ""}
+${recentPrompts.length ? `\n- Tareas recientes abordadas en Antigravity:\n${recentPrompts.map((p) => `  > "${p.slice(0, 120)}"`).join("\n")}` : ""}
 ${pastProgress ? `\n- Últimos avances registrados por IA local:\n${pastProgress}` : ""}
-</contexto_del_proyecto>
+</contexto_del_proyecto>`;
 
-<codigo_fuente_del_proyecto>
+  // 5. Código Fuente XML
+  const codeContextXml = `<codigo_fuente_del_proyecto>
 ${codeSnippets || "No se han seleccionado archivos de código fuente específicos aún."}
-</codigo_fuente_del_proyecto>
+</codigo_fuente_del_proyecto>`;
 
-DIRECTIVAS Y CAPACIDADES DE MUTACIÓN DE CÓDIGO (CREAR Y EDITAR ARCHIVOS):
-Tienes permisos activos de lectura y escritura en el proyecto para crear nuevos archivos o modificar archivos existentes según la etapa o punto de avance actual.
+  // 6. Directivas de Mutación
+  const mutationDirectives = buildMutationDirectivesSection();
 
-1. CREAR NUEVO ARCHIVO O REESCRIBIR COMPLETO:
-Usa estrictamente el formato de bloque con 'write:ruta/relativa' o 'create:ruta/relativa'.
-Ejemplo:
-\`\`\`write:src/services/api_client.py
-# Código completo del archivo nuevo o actualizado
-import requests
+  const sections = {
+    masterPrompt: masterPromptSection,
+    skillPrompt: skillPromptSection,
+    stateSummary: stateSummarySection,
+    projectContextXml,
+    codeContextXml,
+    mutationDirectives
+  };
 
-def fetch_data():
-    return {}
-\`\`\`
+  // Orden estricto: Master Prompt (+ override sesión) -> Perfil/Skill -> Estado persistido -> Contexto -> Código -> Directivas Mutación
+  const orderedBlocks = [
+    sections.masterPrompt,
+    sections.skillPrompt,
+    sections.stateSummary,
+    sections.projectContextXml,
+    sections.codeContextXml,
+    sections.mutationDirectives
+  ].filter((s) => typeof s === "string" && s.trim().length > 0);
 
-2. MODIFICAR/EDITAR QUIRÚRGICAMENTE UN ARCHIVO EXISTENTE (PATCH):
-Para modificar únicamente una sección o función específica sin reescribir todo el archivo, usa 'patch:ruta/relativa' con bloques SEARCH y REPLACE:
-\`\`\`patch:src/services/api_client.py
-<<<<<<< SEARCH
-def fetch_data():
-    return {}
-=======
-def fetch_data():
-    response = requests.get("https://api.example.com")
-    return response.json()
->>>>>>>
-\`\`\`
+  const systemPrompt = orderedBlocks.join("\n\n");
 
-3. REGLAS DE EJECUCIÓN:
-- Utiliza la arquitectura y código provisto en <codigo_fuente_del_proyecto> para adaptar tus cambios al avance exacto.
-- La interfaz de Local AI Studio procesará estos bloques automáticamente para que el usuario pueda aplicarlos al disco con un clic o en modo auto-aplicación directa.
-- Siempre responde con explicaciones técnicas concisas en español.`;
+  const bySection = {
+    masterPrompt: sections.masterPrompt.length,
+    skillPrompt: sections.skillPrompt.length,
+    stateSummary: sections.stateSummary.length,
+    projectContextXml: sections.projectContextXml.length,
+    codeContextXml: sections.codeContextXml.length,
+    mutationDirectives: sections.mutationDirectives.length
+  };
+  const totalChars = systemPrompt.length;
+  const metrics = {
+    totalChars,
+    approxTokens: Math.ceil(totalChars / 4),
+    bySection
+  };
 
   const summaryMarkdown = `# Contexto del Proyecto: ${proj.name}
 > Sincronizado automáticamente desde Antigravity
@@ -546,25 +906,30 @@ ${files.slice(0, 30).join("\n")}
 Este agente tiene visibilidad completa del código y la sesión activa en Antigravity para continuar el avance sin interrupciones.
 `;
 
-  try {
-    const ctxOut = path.join(projectPath, "PROJECT_CONTEXT.md");
-    fs.writeFileSync(ctxOut, summaryMarkdown, "utf-8");
+  if (writeToDisk) {
+    try {
+      const ctxOut = path.join(projectPath, "PROJECT_CONTEXT.md");
+      fs.writeFileSync(ctxOut, summaryMarkdown, "utf-8");
 
-    const owuDir = "C:\\antigravityAS\\OpenWebUI\\data";
-    if (fs.existsSync(owuDir)) {
-      fs.writeFileSync(path.join(owuDir, "PROJECT_CONTEXT_CURRENT.md"), summaryMarkdown, "utf-8");
-    }
-  } catch (e) {}
+      const owuDir = "C:\\antigravityAS\\OpenWebUI\\data";
+      if (fs.existsSync(owuDir)) {
+        fs.writeFileSync(path.join(owuDir, "PROJECT_CONTEXT_CURRENT.md"), summaryMarkdown, "utf-8");
+      }
+    } catch (e) {}
+  }
 
   return {
     project: proj,
-    files: files,
-    selectedFiles: selectedFiles,
-    codeSnippets: codeSnippets,
-    packageInfo: packageInfo,
-    recentPrompts: recentPrompts,
-    systemPrompt: systemPrompt,
-    summaryMarkdown: summaryMarkdown,
+    files,
+    selectedFiles,
+    codeSnippets,
+    packageInfo,
+    recentPrompts,
+    sections,
+    metrics,
+    projectState,
+    systemPrompt,
+    summaryMarkdown,
     conversationTitle: convInfo ? convInfo.title : ""
   };
 }
@@ -591,29 +956,53 @@ ${entry.filesModified && entry.filesModified.length ? `- **Archivos Modificados:
   }
 }
 
-function saveProjectFile(projectName, relPath, content) {
+function saveProjectFile(projectName, relPath, content, meta = {}) {
   try {
     const proj = getActiveProject(projectName);
     if (!proj) return { ok: false, error: "Proyecto no encontrado" };
 
-    const cleanRelPath = relPath.replace(/^[\/\\]+/, "");
-    const fullPath = path.join(proj.path, cleanRelPath);
-    const parentDir = path.dirname(fullPath);
+    const safe = resolveSafeProjectPath(proj.path, relPath);
+    if (!safe.ok) return safe;
 
+    const existed = fs.existsSync(safe.fullPath);
+    const backupPath = memoryStore.backupFileBeforeWrite(proj.name, safe.cleanRelPath, safe.fullPath);
+
+    const parentDir = path.dirname(safe.fullPath);
     if (!fs.existsSync(parentDir)) {
       fs.mkdirSync(parentDir, { recursive: true });
     }
 
-    fs.writeFileSync(fullPath, content, "utf-8");
+    const textContent = typeof content === "string" ? content : String(content ?? "");
+    fs.writeFileSync(safe.fullPath, textContent, "utf-8");
+    const sizeBytes = Buffer.byteLength(textContent, "utf-8");
 
-    recordProjectProgress(proj.name, {
-      tool: "Guardado Directo de Archivo",
-      task: `Actualización de ${cleanRelPath}`,
-      summary: `Archivo ${cleanRelPath} guardado desde Local AI (${content.length} bytes)`,
-      filesModified: [cleanRelPath]
+    memoryStore.recordChange({
+      project: proj.name,
+      projectPath: proj.path,
+      relPath: safe.cleanRelPath,
+      action: existed ? "write" : "create",
+      sizeBytes,
+      model: meta.model || "Local",
+      source: meta.source || "local-ai-studio",
+      backupPath,
+      summary: meta.summary || `Archivo ${safe.cleanRelPath} guardado desde Local AI (${sizeBytes} bytes)`
     });
 
-    return { ok: true, path: fullPath, size: content.length };
+    recordProjectProgress(proj.name, {
+      tool: meta.tool || "Guardado Directo de Archivo",
+      model: meta.model || "Local",
+      task: `Actualización de ${safe.cleanRelPath}`,
+      summary: `Archivo ${safe.cleanRelPath} guardado desde Local AI (${sizeBytes} bytes)`,
+      filesModified: [safe.cleanRelPath]
+    });
+
+    return {
+      ok: true,
+      path: safe.fullPath,
+      relPath: safe.cleanRelPath,
+      size: sizeBytes,
+      backupPath
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -623,88 +1012,176 @@ function readProjectFile(projectName, relPath) {
   try {
     const proj = getActiveProject(projectName);
     if (!proj) return { ok: false, error: "Proyecto no encontrado" };
-    const cleanRelPath = relPath.replace(/^[\/\\]+/, "");
-    const fullPath = path.join(proj.path, cleanRelPath);
-    if (!fs.existsSync(fullPath)) return { ok: false, error: `El archivo ${cleanRelPath} no existe en el proyecto.` };
-    const content = fs.readFileSync(fullPath, "utf-8");
-    const st = fs.statSync(fullPath);
-    return { ok: true, path: fullPath, content: content, size: st.size, mtime: st.mtime };
+
+    const safe = resolveSafeProjectPath(proj.path, relPath);
+    if (!safe.ok) return safe;
+
+    if (!fs.existsSync(safe.fullPath)) {
+      return { ok: false, error: `El archivo ${safe.cleanRelPath} no existe en el proyecto.` };
+    }
+    const content = fs.readFileSync(safe.fullPath, "utf-8");
+    const st = fs.statSync(safe.fullPath);
+    return {
+      ok: true,
+      path: safe.fullPath,
+      relPath: safe.cleanRelPath,
+      content,
+      size: st.size,
+      mtime: st.mtime
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 }
 
-function applyProjectPatch(projectName, relPath, searchBlock, replaceBlock) {
+function findLineSpanMatch(fileLines, normSearch) {
+  const searchLinesRaw = normSearch.split("\n").map((l) => l.trim());
+  while (searchLinesRaw.length > 0 && searchLinesRaw[0] === "") searchLinesRaw.shift();
+  while (searchLinesRaw.length > 0 && searchLinesRaw[searchLinesRaw.length - 1] === "") searchLinesRaw.pop();
+  if (searchLinesRaw.length === 0) return null;
+
+  // Paso 1: coincidencia exacta línea-a-línea (conservando líneas en blanco internas del bloque SEARCH)
+  for (let i = 0; i <= fileLines.length - searchLinesRaw.length; i++) {
+    let allMatch = true;
+    for (let j = 0; j < searchLinesRaw.length; j++) {
+      if (fileLines[i + j].trim() !== searchLinesRaw[j]) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) {
+      return { start: i, end: i + searchLinesRaw.length - 1 };
+    }
+  }
+
+  // Paso 2: coincidencia tolerante a líneas en blanco, preservando exactamente el índice final real en fileLines
+  const searchNonEmpty = searchLinesRaw.filter(Boolean);
+  if (searchNonEmpty.length === 0) return null;
+
+  for (let i = 0; i < fileLines.length; i++) {
+    if (fileLines[i].trim() !== searchNonEmpty[0]) continue;
+    let fi = i;
+    let si = 0;
+    let endIdx = i;
+
+    while (fi < fileLines.length && si < searchNonEmpty.length) {
+      const fTrim = fileLines[fi].trim();
+      if (si > 0 && fTrim === "") {
+        fi++;
+        continue;
+      }
+      if (fTrim === searchNonEmpty[si]) {
+        endIdx = fi;
+        si++;
+        fi++;
+      } else {
+        break;
+      }
+    }
+
+    if (si === searchNonEmpty.length) {
+      return { start: i, end: endIdx };
+    }
+  }
+
+  return null;
+}
+
+function applyProjectPatch(projectName, relPath, searchBlock, replaceBlock, meta = {}) {
   try {
     const proj = getActiveProject(projectName);
     if (!proj) return { ok: false, error: "Proyecto no encontrado" };
 
-    const cleanRelPath = relPath.replace(/^[\/\\]+/, "");
-    const fullPath = path.join(proj.path, cleanRelPath);
+    const safe = resolveSafeProjectPath(proj.path, relPath);
+    if (!safe.ok) return safe;
 
-    if (!fs.existsSync(fullPath)) {
-      return { ok: false, error: `El archivo ${cleanRelPath} no existe para aplicar parche. Considera usar write:${cleanRelPath} para crearlo.` };
+    if (!fs.existsSync(safe.fullPath)) {
+      return {
+        ok: false,
+        error: `El archivo ${safe.cleanRelPath} no existe para aplicar parche. Considera usar write:${safe.cleanRelPath} para crearlo.`
+      };
     }
 
-    let fileContent = fs.readFileSync(fullPath, "utf-8");
-    const normFile = fileContent.replace(/\r\n/g, "\n");
-    const normSearch = searchBlock.replace(/\r\n/g, "\n").trim();
-    const normReplace = replaceBlock.replace(/\r\n/g, "\n");
+    const rawFile = fs.readFileSync(safe.fullPath, "utf-8");
+    const hadCRLF = /\r\n/.test(rawFile);
+    const normFile = rawFile.replace(/\r\n/g, "\n");
+    const normSearchRaw = String(searchBlock ?? "").replace(/\r\n/g, "\n");
+    const normSearchTrimmed = normSearchRaw.trim();
+    const normReplace = String(replaceBlock ?? "").replace(/\r\n/g, "\n");
 
-    let matchIndex = normFile.indexOf(normSearch);
+    if (!normSearchTrimmed) {
+      return { ok: false, error: "El bloque SEARCH está vacío." };
+    }
 
-    if (matchIndex === -1) {
-      // Búsqueda flexible por líneas ignorando espacios en blanco perimétricos
-      const fileLines = normFile.split("\n");
-      const searchLines = normSearch.split("\n").map(l => l.trim()).filter(Boolean);
+    let updatedNorm = null;
 
-      let foundStart = -1;
-      for (let i = 0; i <= fileLines.length - searchLines.length; i++) {
-        let allMatch = true;
-        for (let j = 0; j < searchLines.length; j++) {
-          if (fileLines[i + j].trim() !== searchLines[j]) {
-            allMatch = false;
-            break;
-          }
-        }
-        if (allMatch) {
-          foundStart = i;
-          break;
-        }
-      }
-
-      if (foundStart !== -1) {
-        fileLines.splice(foundStart, searchLines.length, normReplace);
-        fileContent = fileLines.join("\n");
-      } else {
-        return { ok: false, error: `No se encontró el bloque a reemplazar (SEARCH) en ${cleanRelPath}.` };
-      }
+    const exactRawIdx = normFile.indexOf(normSearchRaw);
+    if (exactRawIdx !== -1) {
+      updatedNorm = normFile.slice(0, exactRawIdx) + normReplace + normFile.slice(exactRawIdx + normSearchRaw.length);
     } else {
-      fileContent = normFile.replace(normSearch, normReplace);
+      const exactTrimIdx = normFile.indexOf(normSearchTrimmed);
+      if (exactTrimIdx !== -1) {
+        updatedNorm = normFile.slice(0, exactTrimIdx) + normReplace + normFile.slice(exactTrimIdx + normSearchTrimmed.length);
+      } else {
+        const fileLines = normFile.split("\n");
+        const span = findLineSpanMatch(fileLines, normSearchTrimmed);
+        if (!span) {
+          return { ok: false, error: `No se encontró el bloque a reemplazar (SEARCH) en ${safe.cleanRelPath}.` };
+        }
+        const spanLength = span.end - span.start + 1;
+        const replacementLines = normReplace.split("\n");
+        fileLines.splice(span.start, spanLength, ...replacementLines);
+        updatedNorm = fileLines.join("\n");
+      }
     }
 
-    fs.writeFileSync(fullPath, fileContent, "utf-8");
+    const finalContent = hadCRLF ? updatedNorm.replace(/\n/g, "\r\n") : updatedNorm;
 
-    recordProjectProgress(proj.name, {
-      tool: "Edición Quirúrgica (Patch)",
-      task: `Modificación de ${cleanRelPath}`,
-      summary: `Bloque de código modificado exitosamente en ${cleanRelPath} (${fileContent.length} bytes)`,
-      filesModified: [cleanRelPath]
+    const backupPath = memoryStore.backupFileBeforeWrite(proj.name, safe.cleanRelPath, safe.fullPath);
+    fs.writeFileSync(safe.fullPath, finalContent, "utf-8");
+    const sizeBytes = Buffer.byteLength(finalContent, "utf-8");
+
+    memoryStore.recordChange({
+      project: proj.name,
+      projectPath: proj.path,
+      relPath: safe.cleanRelPath,
+      action: "patch",
+      sizeBytes,
+      model: meta.model || "Local",
+      source: meta.source || "local-ai-studio",
+      backupPath,
+      summary: meta.summary || `Parche quirúrgico aplicado en ${safe.cleanRelPath} (${sizeBytes} bytes)`
     });
 
-    return { ok: true, path: fullPath, size: fileContent.length };
+    recordProjectProgress(proj.name, {
+      tool: meta.tool || "Edición Quirúrgica (Patch)",
+      model: meta.model || "Local",
+      task: `Modificación de ${safe.cleanRelPath}`,
+      summary: `Bloque de código modificado exitosamente en ${safe.cleanRelPath} (${sizeBytes} bytes)`,
+      filesModified: [safe.cleanRelPath]
+    });
+
+    return {
+      ok: true,
+      path: safe.fullPath,
+      relPath: safe.cleanRelPath,
+      size: sizeBytes,
+      backupPath
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 }
 
 module.exports = {
+  resolveSafeProjectPath,
   getSidebarHierarchy,
   listProjects,
   getActiveProject,
   setActiveProjectName,
   getExplicitFolder,
   setExplicitFolder,
+  scanProjectFiles,
   scanProjectFolderDeep,
   getSelectedFiles,
   setSelectedFiles,
