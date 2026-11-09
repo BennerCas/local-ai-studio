@@ -1710,6 +1710,34 @@ describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
         dualW && getComputedStyle(dualW).display === "none";
     });
 
+    // 8. Verificar controles Ollama UI y Modal Free.ai Image Studio ($0.00 Self-Hosted)
+    await page.click("#btn-dual-mode"); // salir de modo dual a modo single
+    await page.click("#src-local-btn");
+    await page.waitForSelector("#btn-ollama-control", { state: "visible" });
+    await page.waitForSelector("#btn-open-image-studio", { state: "visible" });
+    await page.click("#btn-open-image-studio");
+    await page.waitForSelector("#freeai-image-modal.active", { state: "visible" });
+
+    // Verificar que ningún modelo de pago figure en el selector de imagen (generate, sketch, edit)
+    const genSelectOptions = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("#img-model-select option")).map((o) => o.value + " " + o.textContent).join(" | ")
+    );
+    assert.ok(!/nano-banana|gpt-5-image/i.test(genSelectOptions), "No deben existir modelos pagos en el modal de imagen");
+    assert.match(genSelectOptions, /flux2-klein/);
+
+    // Cambiar al tab Editar y verificar qwen-image-edit
+    await page.click('#img-tab-edit');
+    const editSelectOptions = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("#img-model-select option")).map((o) => o.value + " " + o.textContent).join(" | ")
+    );
+    assert.match(editSelectOptions, /qwen-image-edit/);
+    assert.ok(!/nano-banana|gpt-5-image/i.test(editSelectOptions));
+
+    // Cambiar al tab Sketch -> Render (ControlNet Union ProMax) y verificar canvas interactivo
+    await page.click('#img-tab-sketch');
+    await page.waitForSelector("#img-sketch-canvas", { state: "visible" });
+    await page.click('[data-close-modal="freeai-image-modal"]');
+
     assert.deepEqual(consoleErrors, [], `Errores de consola detectados: ${consoleErrors.join(" | ")}`);
     assert.deepEqual(pageErrors, [], `Errores de página no capturados: ${pageErrors.join(" | ")}`);
 

@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFile } = require("node:child_process");
+const { execFile, execFileSync } = require("node:child_process");
 
 const CANONICAL_PAIRS = Object.freeze([
   "freeai+directml",
@@ -10,6 +10,20 @@ const CANONICAL_PAIRS = Object.freeze([
 ]);
 
 const CANONICAL_WORKFLOWS = Object.freeze(["pipeline", "parallel", "debate"]);
+
+/**
+ * Variables recomendadas por defecto para garantizar aceleración ROCm iGPU (Radeon 860M) y DirectML.
+ */
+const RECOMMENDED_ENV_VARS = Object.freeze({
+  OLLAMA_IGPU_ENABLE: "1",
+  HSA_OVERRIDE_GFX_VERSION: "11.0.0",
+  OLLAMA_FLASH_ATTENTION: "1",
+  OLLAMA_KV_CACHE_TYPE: "q8_0",
+  OLLAMA_MAX_LOADED_MODELS: "1",
+  OLLAMA_NUM_PARALLEL: "1",
+  OLIVE_GPU_MEMORY_LIMIT: "25GB",
+  OLIVE_CPU_THREADS: "12"
+});
 
 /**
  * Lista blanca estricta de variables de entorno de rendimiento AI permitidas.
@@ -271,14 +285,18 @@ async function queryWindowsCimSnapshot(forceRefresh = false) {
   const keysLiteral = SAFE_AI_ENV_KEYS.map((k) => `'${k}'`).join(",");
   const psScript = [
     "$ErrorActionPreference = 'SilentlyContinue'",
+    "$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)",
     "$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1 Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed",
     "$gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'Radeon|AMD|NVIDIA|Intel|Arc' } | Select-Object -First 1 Name,DriverVersion,AdapterRAM",
     "$npu = Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'NPU Compute' } | Select-Object -First 1 Name,Status",
     `$keys = @(${keysLiteral})`,
     "$userEnv = @{}",
-    "foreach ($k in $keys) { $val = [Environment]::GetEnvironmentVariable($k, 'User'); $userEnv[$k] = if ($null -eq $val) { '' } else { [string]$val } }",
-    "$procs = @(Get-CimInstance Win32_Process -Filter \"Name = 'ollama.exe' OR Name = 'ollama app.exe' OR Name LIKE 'python%'\" | ForEach-Object { $n = [string]$_.Name; $isDml = ($n -like 'python*') -and ([string]$_.CommandLine -match 'api_openai\\.py'); if ($n -eq 'ollama.exe' -or $n -eq 'ollama app.exe' -or $isDml) { $cDate = ''; try { if ($_.CreationDate) { $cDate = ([DateTime]$_.CreationDate).ToUniversalTime().ToString('o') } } catch {}; @{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = $n; startedAt = $cDate; kind = $(if ($isDml) { 'directml' } else { 'ollama' }) } } })",
-    "@{ cpu = $cpu; gpu = $gpu; npu = $npu; userEnv = $userEnv; processes = $procs } | ConvertTo-Json -Depth 4 -Compress"
+    "$machineEnv = @{}",
+    "$machineEnvHasProp = @{}",
+    "$hklmProps = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment' -ErrorAction SilentlyContinue).PSObject.Properties",
+    "foreach ($k in $keys) { $val = [Environment]::GetEnvironmentVariable($k, 'User'); $userEnv[$k] = if ($null -eq $val) { '' } else { [string]$val }; $mProp = if ($null -ne $hklmProps) { $hklmProps[$k] } else { $null }; if ($null -ne $mProp) { $machineEnvHasProp[$k] = $true; $machineEnv[$k] = if ($null -eq $mProp.Value) { '' } else { [string]$mProp.Value } } else { $machineEnvHasProp[$k] = $false; $mVal = [Environment]::GetEnvironmentVariable($k, 'Machine'); $machineEnv[$k] = if ($null -eq $mVal) { '' } else { [string]$mVal } } }",
+    "$procs = @(Get-CimInstance Win32_Process -Filter \"Name = 'ollama.exe' OR Name = 'ollama app.exe' OR Name LIKE 'python%'\" | ForEach-Object { $n = [string]$_.Name; $cmd = [string]$_.CommandLine; $isDml = ($n -like 'python*') -and ($cmd -match 'api_openai\\.py'); if ($n -eq 'ollama.exe' -or $n -eq 'ollama app.exe' -or $isDml) { $cDate = ''; try { if ($_.CreationDate) { $cDate = ([DateTime]$_.CreationDate).ToUniversalTime().ToString('o') } } catch {}; $role = if ($isDml) { 'directml' } elseif ($n -eq 'ollama app.exe') { 'app' } elseif ($cmd -match '\\brunner\\b') { 'runner' } elseif ($cmd -match '\\bserve\\b') { 'serve' } else { 'other' }; @{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = $n; CommandLine = $cmd; role = $role; startedAt = $cDate; kind = $(if ($isDml) { 'directml' } else { 'ollama' }) } } })",
+    "@{ isAdmin = [bool]$isAdmin; cpu = $cpu; gpu = $gpu; npu = $npu; userEnv = $userEnv; machineEnv = $machineEnv; machineEnvHasProp = $machineEnvHasProp; processes = $procs } | ConvertTo-Json -Depth 4 -Compress"
   ].join("; ");
 
   const data = await runPowerShellJson(psScript, {}, 5000);
@@ -298,6 +316,145 @@ function sanitizeEnvSubset(rawMap = {}) {
     out[key] = raw;
   }
   return out;
+}
+
+function sanitizeEnvBoolMap(rawMap = {}) {
+  const out = {};
+  for (const key of SAFE_AI_ENV_KEYS) {
+    out[key] = Boolean(rawMap && rawMap[key] === true);
+  }
+  return out;
+}
+
+function buildMachineCleanupCommand(machineShadowKeys = []) {
+  const keys = Array.isArray(machineShadowKeys)
+    ? machineShadowKeys.map((k) => String(k || "").trim()).filter((k) => SAFE_AI_ENV_KEYS.includes(k))
+    : [];
+  if (keys.length === 0) return "";
+  return keys
+    .map((k) => `Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" -Name "${k}" -ErrorAction SilentlyContinue`)
+    .join("; ");
+}
+
+function computeMachineShadowAudit({
+  snap = null,
+  userEnv = {},
+  machineEnv = {},
+  machineEnvHasProp = {},
+  explicitShadowKeys = null
+} = {}) {
+  const isAdmin = Boolean(snap && snap.isAdmin);
+  const uEnv = sanitizeEnvSubset(userEnv || (snap && snap.userEnv) || {});
+  const mEnv = sanitizeEnvSubset(machineEnv || (snap && snap.machineEnv) || {});
+  const mHasProp = sanitizeEnvBoolMap(machineEnvHasProp || (snap && snap.machineEnvHasProp) || {});
+
+  let machineShadowKeys = [];
+  if (Array.isArray(explicitShadowKeys)) {
+    machineShadowKeys = explicitShadowKeys
+      .map((k) => String(k || "").trim())
+      .filter((k) => SAFE_AI_ENV_KEYS.includes(k));
+  } else {
+    const checkKeys = Array.from(new Set([...Object.keys(RECOMMENDED_ENV_VARS), ...SAFE_AI_ENV_KEYS]));
+    for (const key of checkKeys) {
+      if (mHasProp[key] !== true) continue;
+      const mVal = String(mEnv[key] ?? "").trim();
+      const uVal = String(uEnv[key] ?? "").trim();
+      const recRaw = String(RECOMMENDED_ENV_VARS[key] ?? SAFE_AI_ENV_SCHEMA[key]?.recommended ?? "").trim();
+      const recNorm = key === "OLIVE_GPU_MEMORY_LIMIT" ? recRaw.replace(/gb$/i, "").trim() : recRaw;
+      const mNorm = key === "OLIVE_GPU_MEMORY_LIMIT" ? mVal.replace(/gb$/i, "").trim() : mVal;
+      const uNorm = key === "OLIVE_GPU_MEMORY_LIMIT" ? uVal.replace(/gb$/i, "").trim() : uVal;
+
+      const userHasCorrectOrSet = uNorm !== "" && (recNorm === "" || uNorm === recNorm || uVal === recRaw);
+      if (mVal === "" || (recNorm !== "" && mNorm !== recNorm && userHasCorrectOrSet)) {
+        machineShadowKeys.push(key);
+      }
+    }
+  }
+
+  const machineCleanupCommand = buildMachineCleanupCommand(machineShadowKeys);
+  return {
+    isAdmin,
+    machineShadowKeys,
+    machineCleanupCommand,
+    userEnv: uEnv,
+    machineEnv: mEnv,
+    machineEnvHasProp: mHasProp
+  };
+}
+
+function readFreshWindowsUserEnv(options = {}) {
+  const baseEnv = (options && options.baseEnv && typeof options.baseEnv === "object")
+    ? { ...options.baseEnv }
+    : { ...process.env };
+
+  let hkcuEnv = {};
+  let hklmEnv = {};
+
+  if (process.platform === "win32" && !options.skipRegistryRead) {
+    try {
+      const keysLiteral = SAFE_AI_ENV_KEYS.map((k) => `'${k}'`).join(",");
+      const psScript = [
+        "$ErrorActionPreference = 'SilentlyContinue'",
+        `$keys = @(${keysLiteral})`,
+        "$u = @{}",
+        "$m = @{}",
+        "$uProps = (Get-ItemProperty -Path 'HKCU:\\Environment' -ErrorAction SilentlyContinue).PSObject.Properties",
+        "$mProps = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment' -ErrorAction SilentlyContinue).PSObject.Properties",
+        "foreach ($k in $keys) {",
+        "  if ($null -ne $uProps -and $null -ne $uProps[$k] -and $null -ne $uProps[$k].Value) { $u[$k] = [string]$uProps[$k].Value } else { $uv = [Environment]::GetEnvironmentVariable($k, 'User'); $u[$k] = if ($null -eq $uv) { '' } else { [string]$uv } }",
+        "  if ($null -ne $mProps -and $null -ne $mProps[$k] -and $null -ne $mProps[$k].Value) { $m[$k] = [string]$mProps[$k].Value } else { $mv = [Environment]::GetEnvironmentVariable($k, 'Machine'); $m[$k] = if ($null -eq $mv) { '' } else { [string]$mv } }",
+        "}",
+        "@{ user = $u; machine = $m } | ConvertTo-Json -Depth 3 -Compress"
+      ].join("; ");
+
+      const stdout = execFileSync(
+        "powershell",
+        ["-NoProfile", "-NonInteractive", "-Command", psScript],
+        {
+          windowsHide: true,
+          timeout: 4000,
+          maxBuffer: 256 * 1024,
+          encoding: "utf8"
+        }
+      );
+      if (stdout && String(stdout).trim()) {
+        const parsed = JSON.parse(String(stdout).trim());
+        if (parsed && typeof parsed === "object") {
+          hkcuEnv = parsed.user && typeof parsed.user === "object" ? parsed.user : {};
+          hklmEnv = parsed.machine && typeof parsed.machine === "object" ? parsed.machine : {};
+        }
+      }
+    } catch (_err) {
+      // Fallback a process.env + RECOMMENDED_ENV_VARS si falla la lectura de registro
+    }
+  }
+
+  const merged = { ...baseEnv };
+
+  for (const [k, v] of Object.entries(hklmEnv)) {
+    const clean = String(v ?? "").trim();
+    if (clean !== "") {
+      merged[k] = clean;
+    }
+  }
+
+  // Valores no vacíos de HKCU (User) tienen prioridad sobre valores vacíos o antiguos de Machine / process.env
+  for (const [k, v] of Object.entries(hkcuEnv)) {
+    const clean = String(v ?? "").trim();
+    if (clean !== "") {
+      merged[k] = clean;
+    }
+  }
+
+  // Garantizar las variables recomendadas de RECOMMENDED_ENV_VARS cuando se lanza o reinicia Ollama
+  for (const [k, recVal] of Object.entries(RECOMMENDED_ENV_VARS)) {
+    const current = String(merged[k] ?? "").trim();
+    if (!current || (k === "OLLAMA_IGPU_ENABLE" && current === "0") || (k === "OLLAMA_FLASH_ATTENTION" && current === "0")) {
+      merged[k] = recVal;
+    }
+  }
+
+  return merged;
 }
 
 function normalizeRuntimeEnvValue(key, rawVal) {
@@ -481,6 +638,14 @@ function readOllamaServerLogBounded(logPath) {
   }
 }
 
+function isOllamaRunnerProcess(p) {
+  if (!p || typeof p !== "object") return false;
+  if (p.CommandLine && /\brunner\b/i.test(String(p.CommandLine))) return true;
+  if (p.commandLine && /\brunner\b/i.test(String(p.commandLine))) return true;
+  if (String(p.role || "").toLowerCase() === "runner") return true;
+  return false;
+}
+
 async function detectLiveOllamaAcceleration(options = {}) {
   const cim = options.cim !== undefined
     ? options.cim
@@ -490,11 +655,19 @@ async function detectLiveOllamaAcceleration(options = {}) {
     ? options.processes
     : (Array.isArray(cim?.processes) ? cim.processes : (cim?.processes ? [cim.processes] : []));
 
-  const ollamaProcs = rawProcesses.filter((p) => p && String(p.name || "").toLowerCase() === "ollama.exe");
-  const ollamaAppProcs = rawProcesses.filter((p) => p && String(p.name || "").toLowerCase() === "ollama app.exe");
+  const ollamaProcs = rawProcesses.filter(
+    (p) => p && String(p.name || "").toLowerCase() === "ollama.exe" && !isOllamaRunnerProcess(p)
+  );
+  const ollamaRunnerProcs = rawProcesses.filter(
+    (p) => p && String(p.name || "").toLowerCase() === "ollama.exe" && isOllamaRunnerProcess(p)
+  );
+  const ollamaAppProcs = rawProcesses.filter(
+    (p) => p && String(p.name || "").toLowerCase() === "ollama app.exe" && !isOllamaRunnerProcess(p)
+  );
   const directmlProcs = rawProcesses.filter((p) => p && String(p.kind || "").toLowerCase() === "directml");
 
   const pids = ollamaProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
+  const runnerPids = ollamaRunnerProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
   const appPids = ollamaAppProcs.map((p) => Number(p.pid)).filter((n) => Number.isFinite(n) && n > 0);
   const alive = pids.length > 0 || appPids.length > 0;
 
@@ -599,6 +772,7 @@ async function detectLiveOllamaAcceleration(options = {}) {
     ollamaRuntime: {
       alive,
       pids,
+      runnerPids,
       appPids,
       startedAt,
       spawnedByStudio,
@@ -632,14 +806,26 @@ async function getHostHardwareTelemetry(options = {}) {
     const ov = options.telemetryOverride;
     const processEnv = sanitizeEnvSubset({ ...process.env, ...(ov.env?.process || {}) });
     const userEnv = sanitizeEnvSubset(ov.env?.user || ov.env?.effective || processEnv);
+    const machineEnv = sanitizeEnvSubset(ov.env?.machine || ov.machineEnv || {});
+    const machineEnvHasProp = sanitizeEnvBoolMap(ov.env?.machineEnvHasProp || ov.machineEnvHasProp || {});
     const effective = {};
     for (const key of SAFE_AI_ENV_KEYS) {
-      effective[key] = processEnv[key] || userEnv[key] || "";
+      effective[key] = processEnv[key] || userEnv[key] || machineEnv[key] || "";
     }
+    const shadowAudit = computeMachineShadowAudit({
+      snap: { isAdmin: Boolean(ov.isAdmin ?? ov.envAudit?.isAdmin) },
+      userEnv,
+      machineEnv,
+      machineEnvHasProp,
+      explicitShadowKeys: Array.isArray(ov.env?.machineShadowKeys)
+        ? ov.env.machineShadowKeys
+        : (Array.isArray(ov.envAudit?.machineShadowKeys) ? ov.envAudit.machineShadowKeys : null)
+    });
     const ovOllama = ov.ollamaRuntime && typeof ov.ollamaRuntime === "object" ? ov.ollamaRuntime : null;
     const ovDml = ov.directmlRuntime && typeof ov.directmlRuntime === "object" ? ov.directmlRuntime : null;
     return {
       platform: ov.platform || process.platform,
+      isAdmin: shadowAudit.isAdmin,
       collectedAt: new Date().toISOString(),
       cpu: {
         name: ov.cpu?.name || "AMD Ryzen AI 7 350 w/ Radeon 860M",
@@ -666,11 +852,26 @@ async function getHostHardwareTelemetry(options = {}) {
       env: {
         process: processEnv,
         user: userEnv,
+        machine: machineEnv,
+        machineEnvHasProp,
+        machineShadowKeys: shadowAudit.machineShadowKeys,
+        machineCleanupCommand: shadowAudit.machineCleanupCommand,
+        effective
+      },
+      envAudit: {
+        isAdmin: shadowAudit.isAdmin,
+        machineShadowKeys: shadowAudit.machineShadowKeys,
+        machineCleanupCommand: shadowAudit.machineCleanupCommand,
+        user: userEnv,
+        machine: machineEnv,
+        machineEnvHasProp,
+        process: processEnv,
         effective
       },
       ollamaRuntime: ovOllama ? {
         alive: ovOllama.alive !== false,
         pids: Array.isArray(ovOllama.pids) ? ovOllama.pids : [],
+        runnerPids: Array.isArray(ovOllama.runnerPids) ? ovOllama.runnerPids : [],
         appPids: Array.isArray(ovOllama.appPids) ? ovOllama.appPids : [],
         startedAt: ovOllama.startedAt || null,
         spawnedByStudio: Boolean(ovOllama.spawnedByStudio),
@@ -687,6 +888,7 @@ async function getHostHardwareTelemetry(options = {}) {
       } : {
         alive: false,
         pids: [],
+        runnerPids: [],
         appPids: [],
         startedAt: null,
         spawnedByStudio: false,
@@ -724,7 +926,7 @@ async function getHostHardwareTelemetry(options = {}) {
   const totalGb = roundGb(os.totalmem() / (1024 * 1024 * 1024));
   const freeGb = roundGb(os.freemem() / (1024 * 1024 * 1024));
   const cpus = os.cpus() || [];
-  const cim = await queryWindowsCimSnapshot(Boolean(options.forceRefresh));
+  const cim = options.cim !== undefined ? options.cim : await queryWindowsCimSnapshot(Boolean(options.forceRefresh));
 
   const cpuName = (cim && cim.cpu && cim.cpu.Name) || (cpus[0] && cpus[0].model) || "CPU Host";
   const logicalThreads = Number((cim && cim.cpu && cim.cpu.NumberOfLogicalProcessors) || cpus.length || 8);
@@ -736,10 +938,19 @@ async function getHostHardwareTelemetry(options = {}) {
 
   const processEnv = sanitizeEnvSubset(process.env);
   const userEnv = sanitizeEnvSubset((cim && cim.userEnv) || {});
+  const machineEnv = sanitizeEnvSubset((cim && cim.machineEnv) || {});
+  const machineEnvHasProp = sanitizeEnvBoolMap((cim && cim.machineEnvHasProp) || {});
   const effective = {};
   for (const key of SAFE_AI_ENV_KEYS) {
-    effective[key] = processEnv[key] || userEnv[key] || "";
+    effective[key] = processEnv[key] || userEnv[key] || machineEnv[key] || "";
   }
+
+  const shadowAudit = computeMachineShadowAudit({
+    snap: cim,
+    userEnv,
+    machineEnv,
+    machineEnvHasProp
+  });
 
   const { ollamaRuntime, directmlRuntime } = await detectLiveOllamaAcceleration({
     cim,
@@ -748,6 +959,7 @@ async function getHostHardwareTelemetry(options = {}) {
 
   return {
     platform: process.platform,
+    isAdmin: shadowAudit.isAdmin,
     collectedAt: new Date().toISOString(),
     cpu: {
       name: String(cpuName).trim(),
@@ -774,6 +986,20 @@ async function getHostHardwareTelemetry(options = {}) {
     env: {
       process: processEnv,
       user: userEnv,
+      machine: machineEnv,
+      machineEnvHasProp,
+      machineShadowKeys: shadowAudit.machineShadowKeys,
+      machineCleanupCommand: shadowAudit.machineCleanupCommand,
+      effective
+    },
+    envAudit: {
+      isAdmin: shadowAudit.isAdmin,
+      machineShadowKeys: shadowAudit.machineShadowKeys,
+      machineCleanupCommand: shadowAudit.machineCleanupCommand,
+      user: userEnv,
+      machine: machineEnv,
+      machineEnvHasProp,
+      process: processEnv,
       effective
     },
     ollamaRuntime,
@@ -1191,6 +1417,29 @@ function evaluateDualConfiguration({
     recommendations.push("Ollama utiliza modelo :cloud (0 GB VRAM local): puedes usar Paralelo o Pipeline sin contención física.");
   }
 
+  // Auditoría de variables sombra en HKLM (Machine) y estado de administrador (isAdmin)
+  const shadowAudit = computeMachineShadowAudit({
+    snap: { isAdmin: Boolean(effectiveTelemetry.isAdmin ?? effectiveTelemetry.envAudit?.isAdmin) },
+    userEnv: effectiveTelemetry.env?.user || envEff,
+    machineEnv: effectiveTelemetry.env?.machine || {},
+    machineEnvHasProp: effectiveTelemetry.env?.machineEnvHasProp || {},
+    explicitShadowKeys: Array.isArray(effectiveTelemetry.env?.machineShadowKeys)
+      ? effectiveTelemetry.env.machineShadowKeys
+      : (Array.isArray(effectiveTelemetry.envAudit?.machineShadowKeys) ? effectiveTelemetry.envAudit.machineShadowKeys : null)
+  });
+
+  if (shadowAudit.machineShadowKeys.length > 0) {
+    const keysList = shadowAudit.machineShadowKeys.join(", ");
+    recommendations.push(
+      `Variables sombra detectadas en HKLM (${keysList}). Para limpiarlas permanentemente en consola Administrador ejecuta: ${shadowAudit.machineCleanupCommand}`
+    );
+    if (hasLocalOllama && (ollamaRunningOnCpu || igpuMissing)) {
+      warnings.push(
+        `Propiedad de sistema HKLM sombreando entorno de usuario (${keysList}). Studio inyectará las variables ROCm al iniciar/reiniciar Ollama.`
+      );
+    }
+  }
+
   // Verificar compatibilidad de prompt/contexto del proyecto activo con la ventana KV DirectML (8192 / guardia 6144)
   const hasProjectCompat = Boolean(projectCompatibility && typeof projectCompatibility === "object");
   const directmlIncompatibleWithProject = Boolean(hasDirectml && hasProjectCompat && projectCompatibility.compatible === false);
@@ -1221,6 +1470,16 @@ function evaluateDualConfiguration({
     );
   }
 
+  const envAudit = {
+    isAdmin: shadowAudit.isAdmin,
+    machineShadowKeys: shadowAudit.machineShadowKeys,
+    machineCleanupCommand: shadowAudit.machineCleanupCommand,
+    user: shadowAudit.userEnv,
+    machine: shadowAudit.machineEnv,
+    machineEnvHasProp: shadowAudit.machineEnvHasProp,
+    effective: envEff
+  };
+
   return {
     pair,
     workflow,
@@ -1239,6 +1498,11 @@ function evaluateDualConfiguration({
     requiresOllamaRestart,
     requiresDirectmlRestart,
     psGpuRatio,
+    isAdmin: shadowAudit.isAdmin,
+    machineShadowKeys: shadowAudit.machineShadowKeys,
+    machineCleanupCommand: shadowAudit.machineCleanupCommand,
+    adminCleanupCommand: shadowAudit.machineCleanupCommand,
+    envAudit,
     agentA: {
       source: normA.source,
       model: normA.model || "",
@@ -1268,7 +1532,10 @@ function evaluateDualConfiguration({
       psGpuRatio,
       ollamaRunningOnCpu,
       requiresOllamaRestart,
-      requiresDirectmlRestart
+      requiresDirectmlRestart,
+      isAdmin: shadowAudit.isAdmin,
+      machineShadowKeys: shadowAudit.machineShadowKeys,
+      machineCleanupCommand: shadowAudit.machineCleanupCommand
     },
     suggestedEnv: profile.suggestedEnv,
     suggestedRuntime: {
@@ -1280,6 +1547,58 @@ function evaluateDualConfiguration({
     },
     warnings,
     recommendations
+  };
+}
+
+async function evaluateSystemForStudio(options = {}) {
+  const snap = options.snap || options.cim || null;
+  const telemetry = options.telemetry || await getHostHardwareTelemetry({
+    ...options,
+    cim: snap !== null ? snap : options.cim
+  });
+
+  const shadowAudit = computeMachineShadowAudit({
+    snap: snap || { isAdmin: Boolean(telemetry.isAdmin ?? telemetry.envAudit?.isAdmin) },
+    userEnv: (snap && snap.userEnv) || telemetry.env?.user || {},
+    machineEnv: (snap && snap.machineEnv) || telemetry.env?.machine || {},
+    machineEnvHasProp: (snap && snap.machineEnvHasProp) || telemetry.env?.machineEnvHasProp || {},
+    explicitShadowKeys: Array.isArray(options.machineShadowKeys) ? options.machineShadowKeys : null
+  });
+
+  const mergedTelemetry = {
+    ...telemetry,
+    isAdmin: shadowAudit.isAdmin,
+    env: {
+      ...(telemetry.env || {}),
+      user: shadowAudit.userEnv,
+      machine: shadowAudit.machineEnv,
+      machineEnvHasProp: shadowAudit.machineEnvHasProp,
+      machineShadowKeys: shadowAudit.machineShadowKeys,
+      machineCleanupCommand: shadowAudit.machineCleanupCommand
+    },
+    envAudit: {
+      isAdmin: shadowAudit.isAdmin,
+      machineShadowKeys: shadowAudit.machineShadowKeys,
+      machineCleanupCommand: shadowAudit.machineCleanupCommand,
+      user: shadowAudit.userEnv,
+      machine: shadowAudit.machineEnv,
+      machineEnvHasProp: shadowAudit.machineEnvHasProp,
+      effective: telemetry.env?.effective || {}
+    }
+  };
+
+  const evaluation = evaluateDualConfiguration({
+    ...options,
+    telemetry: mergedTelemetry
+  });
+
+  return {
+    ok: true,
+    ...evaluation,
+    telemetry: mergedTelemetry,
+    evaluation,
+    profiles: getRecommendedProfiles(mergedTelemetry),
+    envAudit: mergedTelemetry.envAudit
   };
 }
 
@@ -1310,12 +1629,13 @@ function validateSafeEnvOverrides(envOverrides = {}) {
       }
       validated[key] = strVal;
     } else if (spec.type === "int") {
-      if (!/^\d+$/.test(strVal)) {
+      const cleanIntStr = key === "OLIVE_GPU_MEMORY_LIMIT" ? strVal.replace(/gb$/i, "").trim() : strVal;
+      if (!/^\d+$/.test(cleanIntStr)) {
         const err = new Error(`Valor entero inválido para ${key}: ${strVal}`);
         err.statusCode = 400;
         throw err;
       }
-      const num = parseInt(strVal, 10);
+      const num = parseInt(cleanIntStr, 10);
       if (num < spec.min || num > spec.max) {
         const err = new Error(`Valor de ${key} (${num}) fuera de rango seguro [${spec.min}..${spec.max}]`);
         err.statusCode = 400;
@@ -1339,10 +1659,21 @@ async function applySystemTuning({
   pair = null,
   envOverrides = null,
   telemetry = null,
+  snap = null,
   skipWindowsApply = false
 } = {}) {
   const cleanScope = scope === "windows_user" ? "windows_user" : "session";
-  const resolvedTelemetry = telemetry || await getHostHardwareTelemetry();
+  const resolvedTelemetry = telemetry || await getHostHardwareTelemetry({ cim: snap || undefined });
+
+  const shadowAudit = computeMachineShadowAudit({
+    snap: snap || { isAdmin: Boolean(resolvedTelemetry?.isAdmin ?? resolvedTelemetry?.envAudit?.isAdmin) },
+    userEnv: (snap && snap.userEnv) || resolvedTelemetry?.env?.user || {},
+    machineEnv: (snap && snap.machineEnv) || resolvedTelemetry?.env?.machine || {},
+    machineEnvHasProp: (snap && snap.machineEnvHasProp) || resolvedTelemetry?.env?.machineEnvHasProp || {},
+    explicitShadowKeys: Array.isArray(resolvedTelemetry?.env?.machineShadowKeys)
+      ? resolvedTelemetry.env.machineShadowKeys
+      : null
+  });
 
   let targetOverrides = envOverrides && Object.keys(envOverrides).length > 0
     ? { ...envOverrides }
@@ -1370,19 +1701,34 @@ async function applySystemTuning({
   }
 
   let persistedToWindows = false;
+  let machineShadowCleaned = false;
+
   if (cleanScope === "windows_user" && appliedKeys.length > 0 && !skipWindowsApply) {
     if (process.platform !== "win32") {
       throw new Error("La persistencia User Env de Windows solo está soportada en Windows.");
     }
-    const psScript = [
+    const psLines = [
       "$ErrorActionPreference = 'Stop'",
       "$map = $env:LOCAL_AI_TUNING_JSON | ConvertFrom-Json",
       "$regPath = 'HKCU:\\Environment'",
       "if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }",
-      "foreach ($prop in $map.PSObject.Properties) { Set-ItemProperty -Path $regPath -Name ([string]$prop.Name) -Value ([string]$prop.Value) -Type String }",
+      "foreach ($prop in $map.PSObject.Properties) { Set-ItemProperty -Path $regPath -Name ([string]$prop.Name) -Value ([string]$prop.Value) -Type String }"
+    ];
+
+    if (shadowAudit.isAdmin && shadowAudit.machineShadowKeys.length > 0) {
+      psLines.push(
+        "$shadowKeys = $env:LOCAL_AI_SHADOW_KEYS_JSON | ConvertFrom-Json",
+        "$hklmPath = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'",
+        "foreach ($sk in $shadowKeys) { Remove-ItemProperty -Path $hklmPath -Name ([string]$sk) -ErrorAction SilentlyContinue }"
+      );
+    }
+
+    psLines.push(
       "try { Add-Type -Namespace LocalAiEnv -Name Win32 -MemberDefinition '[System.Runtime.InteropServices.DllImport(\"user32.dll\", CharSet = System.Runtime.InteropServices.CharSet.Auto)] public static extern System.IntPtr SendMessageTimeout(System.IntPtr hWnd, uint Msg, System.UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out System.UIntPtr lpdwResult);'; $r = [UIntPtr]::Zero; [LocalAiEnv.Win32]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 2, 250, [ref]$r) | Out-Null } catch {}",
       "'OK'"
-    ].join("; ");
+    );
+
+    const psScript = psLines.join("; ");
 
     await new Promise((resolve, reject) => {
       execFile(
@@ -1393,7 +1739,8 @@ async function applySystemTuning({
           timeout: 15000,
           env: {
             ...process.env,
-            LOCAL_AI_TUNING_JSON: JSON.stringify(validated)
+            LOCAL_AI_TUNING_JSON: JSON.stringify(validated),
+            LOCAL_AI_SHADOW_KEYS_JSON: JSON.stringify(shadowAudit.machineShadowKeys)
           }
         },
         (err) => {
@@ -1403,21 +1750,65 @@ async function applySystemTuning({
       );
     });
     persistedToWindows = true;
+    if (shadowAudit.isAdmin && shadowAudit.machineShadowKeys.length > 0) {
+      machineShadowCleaned = true;
+    }
+    cachedCimSnapshot = null;
+  } else if (shadowAudit.isAdmin && shadowAudit.machineShadowKeys.length > 0 && !skipWindowsApply && process.platform === "win32") {
+    const psCleanup = [
+      "$shadowKeys = $env:LOCAL_AI_SHADOW_KEYS_JSON | ConvertFrom-Json",
+      "$hklmPath = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'",
+      "foreach ($sk in $shadowKeys) { Remove-ItemProperty -Path $hklmPath -Name ([string]$sk) -ErrorAction SilentlyContinue }",
+      "'OK'"
+    ].join("; ");
+    await new Promise((resolve) => {
+      execFile(
+        "powershell",
+        ["-NoProfile", "-NonInteractive", "-Command", psCleanup],
+        {
+          windowsHide: true,
+          timeout: 8000,
+          env: {
+            ...process.env,
+            LOCAL_AI_SHADOW_KEYS_JSON: JSON.stringify(shadowAudit.machineShadowKeys)
+          }
+        },
+        (err) => {
+          if (!err) machineShadowCleaned = true;
+          resolve();
+        }
+      );
+    });
     cachedCimSnapshot = null;
   }
+
+  const remainingShadowKeys = machineShadowCleaned ? [] : shadowAudit.machineShadowKeys;
+  const remainingCleanupCmd = machineShadowCleaned ? "" : shadowAudit.machineCleanupCommand;
+  const machineShadowWarnings = (!shadowAudit.isAdmin && remainingShadowKeys.length > 0)
+    ? [
+      `Se detectaron variables sombra en HKLM (${remainingShadowKeys.join(", ")}). Sin permisos de Administrador no se modifica HKLM; puedes limpiarlas manualmente con: ${remainingCleanupCmd}`
+    ]
+    : [];
 
   return {
     ok: true,
     scope: cleanScope,
     persistedToWindows,
     applied: validated,
-    appliedKeys
+    appliedKeys,
+    isAdmin: shadowAudit.isAdmin,
+    machineShadowCleaned,
+    machineShadowKeys: remainingShadowKeys,
+    machineCleanupCommand: remainingCleanupCmd,
+    adminCleanupCommand: remainingCleanupCmd,
+    machineShadowWarnings
   };
 }
 
 module.exports = {
   CANONICAL_PAIRS,
   CANONICAL_WORKFLOWS,
+  RECOMMENDED_ENV_VARS,
   SAFE_AI_ENV_KEYS,
   SAFE_AI_ENV_SCHEMA,
   normalizeEngineSource,
@@ -1432,10 +1823,16 @@ module.exports = {
   OLLAMA_LOG_MAX_READ_BYTES,
   parseOllamaServerLog,
   readOllamaServerLogBounded,
+  isOllamaRunnerProcess,
   detectLiveOllamaAcceleration,
+  queryWindowsCimSnapshot,
+  computeMachineShadowAudit,
+  buildMachineCleanupCommand,
+  readFreshWindowsUserEnv,
   getHostHardwareTelemetry,
   getRecommendedProfiles,
   evaluateDualConfiguration,
+  evaluateSystemForStudio,
   validateSafeEnvOverrides,
   applySystemTuning
 };

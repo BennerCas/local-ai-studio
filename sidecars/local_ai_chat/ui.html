@@ -2462,6 +2462,142 @@
       font-size: 11.5px;
     }
 
+    .ollama-recovery-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 8px 14px;
+      background: linear-gradient(90deg, rgba(247, 118, 142, 0.16), rgba(224, 175, 104, 0.12));
+      border-bottom: 1px solid rgba(247, 118, 142, 0.42);
+      font-size: 12px;
+      color: var(--text-main);
+    }
+    .ollama-recovery-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex: 1 1 320px;
+      min-width: 0;
+    }
+    .ollama-recovery-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .dual-hw-hklm-note {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      background: rgba(224, 175, 104, 0.11);
+      border: 1px solid rgba(224, 175, 104, 0.38);
+      font-size: 11.5px;
+      color: var(--accent-yellow);
+    }
+    .dual-hw-hklm-cmd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #020204;
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent-cyan);
+      overflow-x: auto;
+    }
+
+    .img-studio-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    .img-studio-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .img-studio-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .img-sketch-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 8px;
+      background: #05060b;
+      border: 1px solid var(--border-color);
+    }
+    .img-sketch-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11.5px;
+    }
+    #img-sketch-canvas {
+      width: 100%;
+      max-width: 340px;
+      height: 240px;
+      background: #ffffff;
+      border-radius: 6px;
+      border: 1px solid rgba(122, 162, 247, 0.45);
+      cursor: crosshair;
+      touch-action: none;
+      align-self: center;
+    }
+    .img-result-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #030408;
+      border: 1px dashed rgba(122, 162, 247, 0.35);
+      gap: 8px;
+      text-align: center;
+    }
+    .img-result-box img {
+      max-width: 100%;
+      max-height: 310px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      object-fit: contain;
+    }
+    .zero-cost-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(158, 206, 106, 0.16);
+      color: var(--accent-green);
+      border: 1px solid rgba(158, 206, 106, 0.45);
+    }
+    @media (max-width: 760px) {
+      .img-studio-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 820px) {
       .dual-agents-grid {
         grid-template-columns: 1fr;
@@ -2656,12 +2792,30 @@
         <span>📄</span><span>Modelfile</span>
       </button>
 
+      <button type="button" id="btn-ollama-control" class="header-btn" title="Estado y arranque en 1 clic del servidor Ollama (ROCm iGPU)">
+        <span id="ollama-ctrl-icon">🟢</span>
+        <span id="ollama-ctrl-label">Ollama</span>
+      </button>
+      <button type="button" id="btn-ollama-restart" class="header-btn" title="Reiniciar daemon Ollama con variables ROCm / FlashAttention actualizadas">
+        <span>🔄</span><span>Reiniciar Ollama</span>
+      </button>
+      <button type="button" id="btn-ollama-refresh" class="header-btn" title="Recargar catálogo de modelos Ollama (11434)">
+        <span>↻</span>
+      </button>
+      <button type="button" id="btn-ollama-free-dml" class="header-btn" style="display:none; border-color:rgba(224,175,104,0.5); color:var(--accent-yellow);" title="Detener DirectML GPU para liberar toda la VRAM compartida a favor de Ollama">
+        <span>⚡🛑</span><span>Liberar VRAM DirectML</span>
+      </button>
+
       <button type="button" id="btn-dml-control" class="header-btn" style="display:none;" title="Control y estado del servidor DirectML">
         <span id="dml-icon">⚡</span>
         <span id="dml-label">DirectML GPU</span>
       </button>
       <button type="button" id="btn-dml-restart" class="header-btn btn-dml-restart" style="display:none;" title="Reiniciar servidor DirectML GPU liberando VRAM">
         <span>🔄</span><span>Reiniciar DirectML</span>
+      </button>
+
+      <button type="button" id="btn-open-image-studio" class="header-btn btn-accent-cyan" title="Abrir Estudio de Imagen Free.ai 100% Sin Costo (FLUX.2 Klein, ControlNet ProMax Boceto->Render, Qwen-Image, SDXL, Real-ESRGAN, SAM)">
+        <span>🎨</span><span>Estudio Imagen (Gratis)</span>
       </button>
     </div>
 
@@ -2762,6 +2916,24 @@
     </div>
   </div>
 
+  <!-- Banner de Recuperación Interactiva para Modo "Solo Ollama" -->
+  <div id="ollama-recovery-banner" class="ollama-recovery-banner" role="alert" aria-live="polite" style="display:none;">
+    <div class="ollama-recovery-main">
+      <span style="font-size:16px;" aria-hidden="true">🛠️</span>
+      <div>
+        <div id="ollama-recovery-title" style="font-weight:700; color:#ff8aa3;">Ollama no conectado o sin modelos disponibles</div>
+        <div id="ollama-recovery-detail" style="font-size:11.5px; color:var(--text-main);">Puedes iniciar o reiniciar el servidor Ollama (ROCm iGPU) directamente desde aquí sin salir de la interfaz.</div>
+      </div>
+    </div>
+    <div class="ollama-recovery-actions">
+      <button type="button" id="btn-ollama-banner-start" class="header-btn btn-primary">🚀 Iniciar Ollama (ROCm)</button>
+      <button type="button" id="btn-ollama-banner-restart" class="header-btn">🔄 Reiniciar + Recargar</button>
+      <button type="button" id="btn-ollama-banner-free-dml" class="header-btn" style="display:none; border-color:rgba(224,175,104,0.5); color:var(--accent-yellow);">⚡🛑 Liberar DirectML e Iniciar</button>
+      <button type="button" id="btn-ollama-banner-switch-dml" class="header-btn">⚡ Usar DirectML GPU</button>
+      <button type="button" id="btn-ollama-banner-switch-freeai" class="header-btn">🌐 Usar Free.ai Cloud</button>
+    </div>
+  </div>
+
   <!-- Panel Colapsable de Configuración Dual Independiente & Hardware Advisor -->
   <section id="dual-config-panel" aria-label="Configuración de Agentes en Modo Dual" aria-hidden="true">
     <div class="dual-toolbar-row">
@@ -2810,6 +2982,13 @@
       <div id="dual-hw-warnings" class="dual-hw-list"></div>
       <div id="dual-hw-recommendations" class="dual-hw-list"></div>
       <div id="dual-hw-runtime-note" class="dual-hw-runtime-note" style="display:none;"></div>
+      <div id="dual-hw-hklm-note" class="dual-hw-hklm-note" style="display:none;">
+        <div id="dual-hw-hklm-text">⚠️ Variable sombra vacía detectada en HKLM (Machine): <code>OLLAMA_IGPU_ENABLE=""</code>. Studio ya prioriza tu variable de Usuario (<code>HKCU=1</code>), pero puedes eliminar la entrada vacía en consola PowerShell (Administrador):</div>
+        <div class="dual-hw-hklm-cmd">
+          <code id="dual-hw-hklm-code">Remove-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name "OLLAMA_IGPU_ENABLE" -ErrorAction SilentlyContinue</code>
+          <button type="button" id="btn-copy-hklm-cleanup" class="chip-btn">📋 Copiar Comando</button>
+        </div>
+      </div>
       <div class="dual-hw-restarts">
         <label class="dual-hw-restart-opt" title="Reinicia el servicio Ollama tras aplicar variables para activar aceleración iGPU / KV">
           <input type="checkbox" id="dual-restart-ollama-check">
@@ -3271,6 +3450,195 @@
     </div>
   </div>
 
+  <!-- Modal de Estudio de Imagen Free.ai 100% Sin Costo (Self-Hosted Only) -->
+  <div id="freeai-image-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="freeai-img-modal-title">
+    <div class="modal-card" style="max-width:860px;">
+      <div class="modal-header">
+        <div class="modal-title" id="freeai-img-modal-title">
+          <span>🎨</span>
+          <span>Estudio de Imagen Free.ai</span>
+          <span class="zero-cost-pill">🟢 100% Gratis • Self-Hosted</span>
+        </div>
+        <button type="button" class="modal-close-btn" data-close-modal="freeai-image-modal" aria-label="Cerrar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="img-studio-tabs" role="tablist">
+          <button type="button" id="img-tab-generate" class="tab-btn active" data-img-tab="generate" role="tab" aria-selected="true">✨ Texto → Imagen</button>
+          <button type="button" id="img-tab-sketch" class="tab-btn" data-img-tab="sketch" role="tab" aria-selected="false">✏️ Boceto → Render (ControlNet ProMax)</button>
+          <button type="button" id="img-tab-edit" class="tab-btn" data-img-tab="edit" role="tab" aria-selected="false">🪄 Editar / Upscale / SAM</button>
+        </div>
+
+        <div class="img-studio-grid">
+          <div class="img-studio-col">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+              <div style="flex:1; min-width:210px;">
+                <label for="img-model-select" style="font-size:11.5px; color:var(--accent-cyan); font-weight:600; display:block; margin-bottom:3px;">Modelo Gratuito (Self-Hosted):</label>
+                <select id="img-model-select" class="int-select" style="width:100%;">
+                  <option value="flux2-klein">FLUX.2 Klein (4B) — Apache 2.0 · GEMINI.md</option>
+                  <option value="qwen-image-2512">Qwen-Image 2512 — Texto en Imagen</option>
+                  <option value="sdxl">Stable Diffusion XL 1.0 — IP-Adapter</option>
+                  <option value="hidream-o1">HiDream-O1-Image (8B) — Artístico</option>
+                </select>
+              </div>
+              <div id="img-size-wrap" style="width:135px;">
+                <label for="img-size-select" style="font-size:11.5px; color:var(--text-muted); font-weight:600; display:block; margin-bottom:3px;">Resolución:</label>
+                <select id="img-size-select" class="int-select" style="width:100%;">
+                  <option value="1024x1024" selected>1024 × 1024</option>
+                  <option value="1024x768">1024 × 768 (16:12)</option>
+                  <option value="768x1024">768 × 1024 (Vertical)</option>
+                  <option value="768x768">768 × 768</option>
+                  <option value="512x512">512 × 512 (Rápido)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="img-model-badge-note" style="font-size:11px; color:var(--accent-green);">
+              🔒 Política estricta sin costo: Modelos de pago (Nano Banana, GPT-5 Image, premium/*) bloqueados por completo.
+            </div>
+
+            <!-- Controles exclusivos de ControlNet-Union SDXL ProMax (Boceto -> Render estilo Vizcom) -->
+            <div id="img-sketch-controls" class="img-sketch-wrap" style="display:none;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <div style="flex:1; min-width:160px;">
+                  <label for="img-control-type" style="font-size:11px; color:var(--accent-purple); font-weight:600;">Modo ControlNet (12 modos):</label>
+                  <select id="img-control-type" class="int-select" style="width:100%;">
+                    <option value="scribble" selected>scribble (Boceto libre / Vizcom)</option>
+                    <option value="lineart">lineart (Líneas limpias / CAD)</option>
+                    <option value="canny">canny (Bordes estructurales)</option>
+                    <option value="depth">depth (Mapa de profundidad)</option>
+                    <option value="pose">pose (Postura / OpenPose)</option>
+                    <option value="anime-lineart">anime-lineart (Ilustración)</option>
+                    <option value="mlsd">mlsd (Arquitectura / Líneas rectas)</option>
+                    <option value="hed">hed (Contornos suaves HED)</option>
+                    <option value="soft-edge">soft-edge (Bordes difusos)</option>
+                    <option value="normal">normal (Mapa de normales 3D)</option>
+                    <option value="segmentation">segmentation (Regiones semánticas)</option>
+                    <option value="tile">tile (Detalle / Textura)</option>
+                  </select>
+                </div>
+                <div style="width:120px;">
+                  <label for="img-control-strength" style="font-size:11px; color:var(--accent-cyan); font-weight:600;">Fuerza (<span id="img-ctrl-str-val">0.75</span>):</label>
+                  <input type="range" id="img-control-strength" min="0.3" max="1.2" step="0.05" value="0.75" style="width:100%;">
+                </div>
+              </div>
+              <div class="img-sketch-toolbar">
+                <button type="button" id="btn-sketch-draw" class="chip-btn" style="border-color:var(--accent-cyan);">✏️ Lápiz</button>
+                <button type="button" id="btn-sketch-erase" class="chip-btn">🧽 Borrador</button>
+                <input type="color" id="img-sketch-color" value="#111111" title="Color del trazo" style="width:26px; height:24px; border:none; background:transparent; cursor:pointer;">
+                <input type="range" id="img-sketch-size" min="2" max="24" value="4" title="Grosor del trazo" style="width:65px;">
+                <button type="button" id="btn-sketch-clear" class="chip-btn" style="color:var(--accent-red);">🗑️ Limpiar</button>
+                <label class="chip-btn" style="cursor:pointer;">
+                  📂 Subir Boceto
+                  <input type="file" id="img-sketch-upload" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                </label>
+              </div>
+              <canvas id="img-sketch-canvas" width="512" height="512"></canvas>
+            </div>
+
+            <!-- Controles de IP-Adapter opcional para SDXL en modo generate -->
+            <div id="img-sdxl-ref-wrap" style="display:none; padding:7px 10px; border-radius:7px; background:#05060b; border:1px solid var(--border-color); font-size:11.5px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="color:var(--accent-purple); font-weight:600;">🖼️ Referencia de Estilo IP-Adapter (Opcional para SDXL):</span>
+                <button type="button" id="btn-clear-sdxl-ref" class="chip-btn" style="display:none;">✕ Quitar</button>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center; margin-top:5px; flex-wrap:wrap;">
+                <input type="file" id="img-sdxl-ref-upload" accept="image/png,image/jpeg,image/webp" style="font-size:11px; flex:1;">
+                <label style="font-size:11px; color:var(--text-muted);">Escala:
+                  <input type="number" id="img-ip-scale" class="int-input" min="0.1" max="1.0" step="0.1" value="0.6" style="width:64px; padding:3px 6px;">
+                </label>
+              </div>
+            </div>
+
+            <!-- Controles de Imagen Base en modo Edición / Upscale / SAM -->
+            <div id="img-edit-source-wrap" style="display:none; padding:8px 10px; border-radius:7px; background:#05060b; border:1px solid var(--border-color); font-size:11.5px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:5px;">
+                <span style="color:var(--accent-cyan); font-weight:600;">🖼️ Imagen Base para Editar / Escalar / Segmentar:</span>
+                <span id="img-edit-source-status" style="color:var(--text-muted); font-size:11px;">Sin imagen cargada</span>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <label class="chip-btn" style="cursor:pointer;">
+                  📂 Subir Imagen (PNG/JPG/WebP)
+                  <input type="file" id="img-edit-upload" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                </label>
+                <button type="button" id="btn-edit-use-last" class="chip-btn">🔄 Usar Última Generada</button>
+                <button type="button" id="btn-edit-use-canvas" class="chip-btn">✏️ Usar Boceto del Lienzo</button>
+                <div id="img-scale-wrap" style="display:none; margin-left:auto; align-items:center; gap:4px;">
+                  <label for="img-upscale-select" style="font-size:11px; color:var(--accent-green);">Escala:</label>
+                  <select id="img-upscale-select" class="int-select" style="width:72px; padding:3px 6px;">
+                    <option value="2">2x</option>
+                    <option value="4" selected>4x</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label for="img-prompt-input" style="font-size:11.5px; color:var(--text-strong); font-weight:600; display:block; margin-bottom:3px;">Prompt Descriptivo:</label>
+              <textarea id="img-prompt-input" class="mf-textarea" style="min-height:66px; height:74px; color:var(--text-strong);" placeholder="Describe la imagen o el estilo de render que deseas generar..."></textarea>
+            </div>
+
+            <div id="img-neg-prompt-wrap">
+              <label for="img-neg-prompt-input" style="font-size:11px; color:var(--text-muted); font-weight:600; display:block; margin-bottom:3px;">Negative Prompt (opcional):</label>
+              <input type="text" id="img-neg-prompt-input" class="int-input" style="width:100%;" placeholder="blurry, low quality, distorted, watermark...">
+            </div>
+
+            <div id="img-advanced-params" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+              <div>
+                <label for="img-steps-input" style="font-size:11px; color:var(--text-muted); display:block;">Pasos (Steps):</label>
+                <input type="number" id="img-steps-input" class="int-input" min="1" max="50" value="20" style="width:100%;">
+              </div>
+              <div>
+                <label for="img-cfg-input" style="font-size:11px; color:var(--text-muted); display:block;">Guidance (CFG):</label>
+                <input type="number" id="img-cfg-input" class="int-input" min="1" max="20" step="0.5" value="7.0" style="width:100%;">
+              </div>
+              <div>
+                <label for="img-seed-input" style="font-size:11px; color:var(--text-muted); display:block;">Seed (opcional):</label>
+                <input type="number" id="img-seed-input" class="int-input" placeholder="Aleatorio" style="width:100%;">
+              </div>
+            </div>
+
+            <label style="display:flex; gap:8px; align-items:center; font-size:12px; cursor:pointer; color:var(--accent-cyan);">
+              <input type="checkbox" id="img-autosave-biblioteca" checked style="accent-color:var(--accent-cyan);">
+              <span>Auto-guardar en <code>&lt;proyecto&gt;/biblioteca/YYYYMMDD_HHMMSS_imagen_*.png + .json</code> (ESTRUCTURA.md)</span>
+            </label>
+          </div>
+
+          <div class="img-studio-col">
+            <div class="img-result-box" id="img-result-box">
+              <div id="img-result-placeholder" style="color:var(--text-muted); font-size:12px; padding:20px;">
+                🎨 Selecciona un modelo gratuito (ej. <strong>FLUX.2 Klein 4B</strong> o <strong>ControlNet ProMax</strong>), escribe tu prompt y haz clic en <strong>Generar Imagen Gratis</strong>.
+              </div>
+              <img id="img-result-preview" alt="Resultado generado" style="display:none;">
+              <div id="img-result-meta" class="metrics-strip" style="justify-content:center;"></div>
+              <div id="img-saved-note" style="display:none; font-size:11px; color:var(--accent-green); word-break:break-all;"></div>
+            </div>
+
+            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+              <button type="button" id="btn-img-save-biblioteca" class="header-btn btn-accent-cyan" disabled title="Guardar imagen y archivo .json de metadatos en <proyecto>/biblioteca/">
+                💾 Guardar en biblioteca/
+              </button>
+              <button type="button" id="btn-img-insert-chat" class="header-btn" disabled title="Insertar vista previa de la imagen generada en la conversación actual">
+                💬 Insertar en Chat
+              </button>
+              <button type="button" id="btn-img-send-to-edit" class="header-btn" disabled title="Usar esta imagen como base en la pestaña Editar / Upscale / SAM">
+                🪄 Enviar a Edición
+              </button>
+              <button type="button" id="btn-img-download" class="header-btn" disabled title="Descargar archivo de imagen">
+                ⬇️ Descargar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="header-btn" data-close-modal="freeai-image-modal">Cerrar</button>
+        <button type="button" id="btn-img-generate-run" class="header-btn btn-primary">
+          <span>🚀 Generar Imagen Gratis (0 Costo)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <!-- Panel Flotante Desplegable de Integraciones (GitHub / Netlify / Hugging Face) -->
     <section id="integrations-drawer" aria-label="Panel de integraciones Cloud y Hugging Face">
@@ -3374,6 +3742,7 @@
       <button type="button" class="pill" data-quick-prompt="Revisa las tareas recientes de la sesión de Antigravity y dime qué paso sigue.">🚀 Continuar Avance</button>
       <button type="button" class="pill" data-quick-prompt="Genera una prueba unitaria para los módulos principales del proyecto.">🧪 Generar Tests</button>
       <button type="button" class="pill" data-quick-prompt="Examina el proyecto en busca de optimizaciones de código y rendimiento.">🔍 Optimizar Código</button>
+      <button type="button" id="pill-open-image-studio" class="pill" style="border-color:rgba(158,206,106,0.45); color:var(--accent-green);" title="Abrir Estudio de Imagen Free.ai 100% Gratis (FLUX.2 Klein, ControlNet Boceto->Render, Qwen-Image, SDXL)">🎨 Imagen Gratis</button>
       <div class="pill-compound">
         <button type="button" id="btn-enter-context" class="pill pill-context" title="Recolectar telemetría forense Git/checklists/avances y diagnosticar el punto exacto para continuar">🧠 Entrar en Contexto</button>
         <button type="button" id="btn-master-prompt-gear" class="pill pill-gear" aria-label="Configurar Prompt Maestro" title="Configurar Prompt Maestro (Ollama, DirectML, Free.ai y Analizador)">⚙️</button>
@@ -4130,7 +4499,7 @@
           return false;
         }
         const idName = `${m.rawId || ''} ${m.name || ''} ${m.displayName || ''}`.toLowerCase();
-        if (/\b(?:flux|sdxl|dall-?e|stable-diffusion|imagen|whisper|tts|kokoro|piper|bark|elevenlabs|embed|embedding|bge-|e5-|rerank|moderation|sora|veo|runway|midjourney)\b/i.test(idName)) {
+        if (/\b(?:flux|sdxl|dall-?e|stable-diffusion|imagen|whisper|tts|kokoro|piper|bark|elevenlabs|embed|embedding|bge-|e5-|rerank|moderation|sora|veo|runway|midjourney|qwen-image|hidream|controlnet|step1x|deoldify|realesrgan|sam|nano-banana|gpt-5-image)\b/i.test(idName)) {
           return false;
         }
       }
@@ -4705,6 +5074,25 @@
         } else if (act === 'tts') {
           toggleSpeechForMessage(dualPaneBtn, paneEl);
         }
+        return;
+      }
+
+      const ollamaRecBtn = event.target.closest('[data-ollama-recover]');
+      if (ollamaRecBtn) {
+        const recAct = ollamaRecBtn.dataset.ollamaRecover;
+        if (recAct === 'start') {
+          await handleOllamaControl({ forceStart: true });
+        } else if (recAct === 'restart') {
+          await restartOllamaFromUi();
+        } else if (recAct === 'free-dml') {
+          await freeDirectmlAndStartOllama();
+        } else if (recAct === 'switch-dml') {
+          switchAiSource('directml');
+        } else if (recAct === 'switch-freeai') {
+          switchAiSource('freeai');
+        } else if (recAct === 'open-hf') {
+          openIntegrationsTab('hf', true);
+        }
       }
     });
 
@@ -4956,6 +5344,13 @@
     // =========================================================================
     // 5. Modelos, Motores (Ollama / DirectML / Free.ai) y Modelfile
     // =========================================================================
+    let ollamaStatusData = {
+      isAlive: false,
+      modelsCount: 0,
+      runningModels: [],
+      directmlRunning: false
+    };
+
     function switchAiSource(source) {
       if (!['local', 'directml', 'freeai'].includes(source)) return;
       currentSource = source;
@@ -4968,16 +5363,32 @@
       const dmlBtn = document.getElementById('btn-dml-control');
       const dmlRestartBtn = document.getElementById('btn-dml-restart');
       const mfBtn = document.getElementById('btn-modelfile');
+      const ollCtrlBtn = document.getElementById('btn-ollama-control');
+      const ollRestBtn = document.getElementById('btn-ollama-restart');
+      const ollRefBtn = document.getElementById('btn-ollama-refresh');
+      const ollFreeDmlBtn = document.getElementById('btn-ollama-free-dml');
+
       if (dmlBtn) dmlBtn.style.display = currentSource === 'directml' ? 'inline-flex' : 'none';
       if (dmlRestartBtn) {
         dmlRestartBtn.style.display = (currentSource === 'directml' && directmlStatus === 'online') ? 'inline-flex' : 'none';
       }
       if (mfBtn) mfBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
+      if (ollCtrlBtn) ollCtrlBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
+      if (ollRestBtn) ollRestBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
+      if (ollRefBtn) ollRefBtn.style.display = currentSource === 'local' ? 'inline-flex' : 'none';
+      if (ollFreeDmlBtn) {
+        ollFreeDmlBtn.style.display = (currentSource === 'local' && directmlStatus === 'online') ? 'inline-flex' : 'none';
+      }
 
       populateModelSelect();
       updateDirectmlCompatBanner();
       if (currentSource === 'directml') {
         checkDirectMLStatus();
+        updateOllamaRecoveryBanner();
+      } else if (currentSource === 'local') {
+        checkOllamaStatusUi({ autoRecoverIfEmpty: true });
+      } else {
+        updateOllamaRecoveryBanner();
       }
     }
 
@@ -4987,8 +5398,204 @@
         allModels = Array.isArray(data.models) ? data.models : [];
         populateModelSelect();
         syncDualModelSelectsFromCatalog();
+        updateOllamaRecoveryBanner();
       } catch (_e) {
         modelSelect.innerHTML = '<option value="">⚠️ Error cargando modelos</option>';
+      }
+    }
+
+    function updateOllamaRecoveryBanner() {
+      const banner = document.getElementById('ollama-recovery-banner');
+      if (!banner) return;
+      if (dualConfig.enabled || currentSource !== 'local') {
+        banner.classList.remove('active');
+        return;
+      }
+      const localModels = allModels.filter((m) => m.isLocal);
+      const isOfflineOrEmpty = !ollamaStatusData.isAlive || localModels.length === 0;
+      const freeDmlBtn = document.getElementById('btn-ollama-banner-free-dml');
+      if (freeDmlBtn) {
+        freeDmlBtn.style.display = (directmlStatus === 'online' || ollamaStatusData.directmlRunning) ? 'inline-flex' : 'none';
+      }
+      const titleEl = document.getElementById('ollama-recovery-title');
+      const descEl = document.getElementById('ollama-recovery-desc');
+      if (isOfflineOrEmpty) {
+        banner.classList.add('active');
+        if (titleEl) {
+          titleEl.textContent = !ollamaStatusData.isAlive
+            ? '⚠️ Ollama Local no está respondiendo en 127.0.0.1:11434'
+            : '⚠️ Ollama Online pero no se detectan modelos GGUF instalados';
+        }
+        if (descEl) {
+          const dmlHint = (directmlStatus === 'online' || ollamaStatusData.directmlRunning)
+            ? ' El servidor DirectML GPU (:8002) está ocupando VRAM compartida; puedes detenerlo con un clic.'
+            : '';
+          descEl.textContent = !ollamaStatusData.isAlive
+            ? `Inicia o reinicia Ollama desde aquí con variables ROCm/Radeon 860M inyectadas automáticamente, o cambia de motor.${dmlHint}`
+            : `Recarga el catálogo o descarga un modelo GGUF desde Hugging Face Hub.${dmlHint}`;
+        }
+      } else {
+        banner.classList.remove('active');
+      }
+    }
+
+    async function checkOllamaStatusUi({ autoRecoverIfEmpty = false } = {}) {
+      const btn = document.getElementById('btn-ollama-control');
+      const icon = document.getElementById('ollama-ctrl-icon');
+      const label = document.getElementById('ollama-ctrl-label');
+      const freeDmlBtn = document.getElementById('btn-ollama-free-dml');
+      try {
+        const data = await fetchJson('/api/ollama/status');
+        ollamaStatusData = {
+          isAlive: Boolean(data.isAlive),
+          modelsCount: Number(data.modelsCount || 0),
+          runningModels: Array.isArray(data.runningModels) ? data.runningModels : [],
+          directmlRunning: Boolean(data.directml && data.directml.isAlive)
+        };
+        if (data.directml) {
+          directmlStatus = data.directml.isAlive ? 'online' : 'offline';
+        }
+        if (btn && icon && label) {
+          if (ollamaStatusData.isAlive) {
+            icon.textContent = '🟢';
+            const loadedCount = ollamaStatusData.runningModels.length;
+            label.textContent = loadedCount > 0
+              ? `Ollama GPU (${loadedCount} en VRAM)`
+              : `Ollama Online (${ollamaStatusData.modelsCount})`;
+            btn.style.borderColor = 'var(--accent-green)';
+            btn.style.color = 'var(--accent-green)';
+            btn.title = 'Ollama activo en 127.0.0.1:11434 — clic para verificar o liberar modelos en VRAM';
+          } else {
+            icon.textContent = '🔴';
+            label.textContent = 'Iniciar Ollama';
+            btn.style.borderColor = 'var(--accent-red)';
+            btn.style.color = 'var(--accent-red)';
+            btn.title = 'Ollama detenido — clic para iniciar con aceleración ROCm Radeon 860M';
+          }
+        }
+        if (freeDmlBtn) {
+          freeDmlBtn.style.display = (currentSource === 'local' && ollamaStatusData.directmlRunning) ? 'inline-flex' : 'none';
+        }
+        if (ollamaStatusData.isAlive && allModels.filter((m) => m.isLocal).length === 0 && ollamaStatusData.modelsCount > 0) {
+          await loadModels();
+        } else if (!ollamaStatusData.isAlive && autoRecoverIfEmpty && currentSource === 'local') {
+          await handleOllamaControl({ forceStart: true, silentToast: false });
+          return ollamaStatusData;
+        }
+      } catch (_e) {
+        ollamaStatusData.isAlive = false;
+        if (btn && icon && label) {
+          icon.textContent = '🔴';
+          label.textContent = 'Iniciar Ollama';
+          btn.style.borderColor = 'var(--accent-red)';
+          btn.style.color = 'var(--accent-red)';
+        }
+      }
+      updateOllamaRecoveryBanner();
+      return ollamaStatusData;
+    }
+
+    async function handleOllamaControl({ forceStart = false, silentToast = false } = {}) {
+      const btn = document.getElementById('btn-ollama-control');
+      const label = document.getElementById('ollama-ctrl-label');
+      if (btn) btn.disabled = true;
+      try {
+        if (!forceStart && ollamaStatusData.isAlive && ollamaStatusData.runningModels.length > 0) {
+          if (label) label.textContent = 'Liberando VRAM...';
+          const unloadRes = await fetchJson('/api/ollama/unload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+          });
+          if (!silentToast) {
+            showToast(
+              unloadRes.ok
+                ? `🧹 Modelos Ollama descargados de VRAM (${(unloadRes.unloaded || []).length}).`
+                : '⚠️ No se pudo liberar VRAM de Ollama.',
+              unloadRes.ok ? 'info' : 'warn'
+            );
+          }
+          await checkOllamaStatusUi();
+          if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+          return unloadRes;
+        }
+
+        if (label) label.textContent = 'Iniciando Ollama...';
+        if (!silentToast) showToast('🚀 Iniciando daemon Ollama con entorno ROCm Radeon 860M...', 'info');
+        const data = await fetchJson('/api/ollama/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stopDirectML: false })
+        });
+        await loadModels();
+        await checkOllamaStatusUi();
+        if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+        if (data.ok && data.isAlive) {
+          if (!silentToast) {
+            showToast(`✅ Ollama activo (${data.modelsCount || 0} modelos detectados).`, 'success');
+          }
+        } else if (!silentToast) {
+          showToast(`⚠️ Ollama no pudo iniciar: ${data.message || 'verifica instalación'}`, 'warn');
+        }
+        return data;
+      } catch (err) {
+        if (!silentToast) showToast(`❌ Error controlando Ollama: ${err.message}`, 'error');
+        await checkOllamaStatusUi();
+        return { ok: false, error: err.message };
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function restartOllamaFromUi() {
+      const btn = document.getElementById('btn-ollama-restart');
+      const origText = btn ? btn.textContent : '🔄';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳';
+      }
+      try {
+        showToast('🔄 Reiniciando Ollama con variables ROCm + Flash Attention + KV q8_0...', 'info');
+        const data = await fetchJson('/api/ollama/restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stopDirectML: false })
+        });
+        await loadModels();
+        await checkOllamaStatusUi();
+        if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+        if (data.ok) {
+          showToast(`✅ Ollama reiniciado y conectado (${data.modelsCount || 0} modelos).`, 'success');
+        } else {
+          showToast(`⚠️ Reinicio de Ollama: ${data.message || 'verifica estado'}`, 'warn');
+        }
+      } catch (err) {
+        showToast(`❌ Error reiniciando Ollama: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      }
+    }
+
+    async function freeDirectmlAndStartOllama() {
+      try {
+        showToast('🛑 Deteniendo DirectML (:8002) para liberar VRAM y activando Ollama...', 'info');
+        const data = await fetchJson('/api/ollama/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stopDirectML: true })
+        });
+        await checkDirectMLStatus();
+        await loadModels();
+        await checkOllamaStatusUi();
+        if (dualConfig.enabled) refreshDualHardwareEvaluation(true);
+        if (data.ok) {
+          showToast('✅ DirectML detenido y Ollama listo con toda la VRAM disponible.', 'success');
+        }
+      } catch (err) {
+        showToast(`❌ Error al liberar DirectML e iniciar Ollama: ${err.message}`, 'error');
       }
     }
 
@@ -5083,6 +5690,11 @@
         label.textContent = 'DirectML Offline';
         if (restartBtn) restartBtn.style.display = 'none';
       }
+      const ollFreeDmlBtn = document.getElementById('btn-ollama-free-dml');
+      if (ollFreeDmlBtn) {
+        ollFreeDmlBtn.style.display = (currentSource === 'local' && directmlStatus === 'online') ? 'inline-flex' : 'none';
+      }
+      updateOllamaRecoveryBanner();
     }
 
     async function handleDirectMLControl() {
@@ -5929,6 +6541,25 @@
         } else {
           runtimeNoteEl.style.display = 'none';
           runtimeNoteEl.innerHTML = '';
+        }
+      }
+
+      const hklmNoteEl = document.getElementById('dual-hw-hklm-note');
+      const hklmCodeEl = document.getElementById('dual-hw-hklm-code');
+      if (hklmNoteEl && hklmCodeEl) {
+        const shadowKeys =
+          (ev.envAudit && Array.isArray(ev.envAudit.machineShadowKeys) && ev.envAudit.machineShadowKeys) ||
+          (tel.env && Array.isArray(tel.env.machineShadowKeys) && tel.env.machineShadowKeys) ||
+          [];
+        const cleanupCmd =
+          (ev.envAudit && ev.envAudit.machineCleanupCommand) ||
+          (tel.env && tel.env.machineCleanupCommand) ||
+          '';
+        if (shadowKeys.length > 0 && cleanupCmd) {
+          hklmCodeEl.textContent = cleanupCmd;
+          hklmNoteEl.style.display = 'flex';
+        } else {
+          hklmNoteEl.style.display = 'none';
         }
       }
 
@@ -9021,8 +9652,32 @@
         return sendDualMessage(prompt);
       }
       if (!currentModelName) {
-        showToast('Selecciona primero un modelo AI disponible.', 'warn');
-        return;
+        if (currentSource === 'local') {
+          showToast('🔄 Conectando con Ollama Local y recargando modelos...', 'info');
+          await handleOllamaControl({ forceStart: true, silentToast: true });
+        }
+        if (!currentModelName) {
+          showToast('Selecciona o inicia un motor AI disponible.', 'warn');
+          if (currentSource === 'local') {
+            appendMessage(
+              'info',
+              `<div style="display:flex; flex-direction:column; gap:8px;">
+                <div><strong>⚠️ Ollama Local no tiene un modelo listo para responder.</strong></div>
+                <div style="font-size:12px; color:var(--text-muted);">Puedes iniciar/reiniciar el servidor Ollama desde aquí, liberar la VRAM de DirectML si estaba activa o cambiar de motor con un clic:</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button class="btn btn-success btn-xs" data-ollama-recover="start">🚀 Iniciar Ollama + Recargar</button>
+                  <button class="btn btn-primary btn-xs" data-ollama-recover="restart">🔄 Reiniciar con ROCm</button>
+                  <button class="btn btn-warn btn-xs" data-ollama-recover="free-dml">🛑 Detener DirectML y Usar Ollama</button>
+                  <button class="btn btn-xs" data-ollama-recover="switch-dml">⚡ Cambiar a DirectML</button>
+                  <button class="btn btn-xs" data-ollama-recover="switch-freeai">🌐 Cambiar a Free.ai</button>
+                </div>
+              </div>`,
+              false,
+              { allowHtml: true }
+            );
+          }
+          return;
+        }
       }
 
       promptInput.value = '';
@@ -9202,9 +9857,20 @@
           if (webSearchEnabled) loadSerpApiUsage();
           showToast('⏹️ Generación detenida.', 'info');
         } else {
+          const recoveryActionsHtml = currentSource === 'local'
+            ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                <button class="btn btn-success btn-xs" data-ollama-recover="start">🚀 Iniciar Ollama</button>
+                <button class="btn btn-primary btn-xs" data-ollama-recover="restart">🔄 Reiniciar Ollama (ROCm)</button>
+                <button class="btn btn-warn btn-xs" data-ollama-recover="free-dml">🛑 Detener DirectML (:8002)</button>
+                <button class="btn btn-xs" data-ollama-recover="switch-dml">⚡ Usar DirectML</button>
+                <button class="btn btn-xs" data-ollama-recover="switch-freeai">🌐 Usar Free.ai</button>
+              </div>`
+            : '';
           bodyEl.innerHTML =
             `<span style="color:var(--accent-red);">❌ Error ejecutando modelo (${escapeHtml(currentSource)}): ${escapeHtml(err.message)}</span>` +
-            `<div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Verifica que el servidor correspondiente esté activo o cambia de motor arriba.</div>`;
+            `<div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Verifica que el servidor correspondiente esté activo o utiliza las acciones rápidas de recuperación.</div>` +
+            recoveryActionsHtml;
+          if (currentSource === 'local') checkOllamaStatusUi();
         }
       } finally {
         if (activeStreamAbortController === abortCtrl) activeStreamAbortController = null;
@@ -9243,6 +9909,432 @@
     function clearChat() {
       newChat({ silent: true });
       showToast('🧹 Pantalla de chat limpiada.', 'info');
+    }
+
+    // =========================================================================
+    // 11.B. Free.ai Image Studio (100% Zero-Cost / Self-Hosted Models Only)
+    // =========================================================================
+    const DEFAULT_IMAGE_STUDIO_MODELS = [
+      { id: 'flux2-klein', name: 'FLUX.2 Klein (4B) — Apache 2.0 · GEMINI.md', mode: 'generate', self_hosted: true },
+      { id: 'qwen-image-2512', name: 'Qwen-Image 2512 — Texto en Imagen', mode: 'generate', self_hosted: true },
+      { id: 'sdxl', name: 'Stable Diffusion XL 1.0 — IP-Adapter', mode: 'generate', self_hosted: true },
+      { id: 'hidream-o1', name: 'HiDream-O1-Image (8B) — Artístico', mode: 'generate', self_hosted: true },
+      { id: 'controlnet-union-sdxl-promax', name: 'ControlNet-Union SDXL ProMax (Boceto → Render)', mode: 'controlnet', self_hosted: true },
+      { id: 'qwen-image-edit', name: 'Qwen-Image Edit — Edición por Instrucción', mode: 'edit', self_hosted: true },
+      { id: 'step1x-edit', name: 'Step1X-Edit — Edición Guiada', mode: 'edit', self_hosted: true },
+      { id: 'sdxl-edit', name: 'SDXL Img2Img — Variación / Refinamiento', mode: 'edit', self_hosted: true },
+      { id: 'deoldify', name: 'DeOldify — Colorización y Restauración', mode: 'edit', self_hosted: true },
+      { id: 'realesrgan', name: 'Real-ESRGAN — Upscale 2x / 4x', mode: 'edit', self_hosted: true },
+      { id: 'sam', name: 'Segment Anything (SAM) — Segmentación', mode: 'edit', self_hosted: true }
+    ];
+    let freeAiImageCatalog = [...DEFAULT_IMAGE_STUDIO_MODELS];
+    let currentImageStudioTab = 'generate';
+    let lastGeneratedImageData = null; // { dataUrl, mimeType, model, mode, prompt, savedToBiblioteca }
+    let editSourceImageDataUrl = '';
+    let sketchCanvasInitialized = false;
+    let sketchDrawing = false;
+    let sketchTool = 'pen';
+
+    async function loadFreeAiImageCatalog() {
+      try {
+        const data = await fetchJson('/api/freeai/image-models');
+        if (Array.isArray(data.models) && data.models.length > 0) {
+          freeAiImageCatalog = data.models.filter((m) => m && m.self_hosted === true && Number(m.costUsd || 0) === 0);
+        }
+      } catch (_e) {}
+    }
+
+    function openImageStudioModal(initialTab = 'generate') {
+      initSketchpadCanvas();
+      loadFreeAiImageCatalog().then(() => populateImageStudioModelSelect(currentImageStudioTab));
+      switchImageStudioTab(initialTab);
+      openModal('freeai-image-modal');
+    }
+
+    function populateImageStudioModelSelect(tab) {
+      const modelSel = document.getElementById('img-model-select');
+      if (!modelSel) return;
+      const prevVal = modelSel.value;
+      const targetMode = tab === 'sketch' ? 'controlnet' : (tab === 'edit' ? 'edit' : 'generate');
+      const models = freeAiImageCatalog.filter((m) => m.mode === targetMode && m.self_hosted === true);
+      const list = models.length > 0 ? models : DEFAULT_IMAGE_STUDIO_MODELS.filter((m) => m.mode === targetMode);
+      modelSel.innerHTML = '';
+      list.forEach((m) => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.name || m.id}${m.license ? ` (${m.license})` : ''}`;
+        modelSel.appendChild(opt);
+      });
+      if (list.some((m) => m.id === prevVal)) {
+        modelSel.value = prevVal;
+      } else if (list[0]) {
+        modelSel.value = list[0].id;
+      }
+      updateImageStudioSubControls();
+    }
+
+    function switchImageStudioTab(tab) {
+      if (!['generate', 'sketch', 'edit'].includes(tab)) tab = 'generate';
+      currentImageStudioTab = tab;
+      document.querySelectorAll('#freeai-image-modal [data-img-tab]').forEach((btn) => {
+        const active = btn.dataset.imgTab === tab;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      populateImageStudioModelSelect(tab);
+    }
+
+    function updateImageStudioSubControls() {
+      const tab = currentImageStudioTab;
+      const modelSel = document.getElementById('img-model-select');
+      const modelId = modelSel ? modelSel.value : '';
+      const skWrap = document.getElementById('img-sketch-controls');
+      const sdxlRefWrap = document.getElementById('img-sdxl-ref-wrap');
+      const editWrap = document.getElementById('img-edit-source-wrap');
+      const scaleWrap = document.getElementById('img-scale-wrap');
+      const sizeWrap = document.getElementById('img-size-wrap');
+      const negWrap = document.getElementById('img-neg-prompt-wrap');
+
+      if (skWrap) skWrap.style.display = tab === 'sketch' ? 'flex' : 'none';
+      if (sdxlRefWrap) sdxlRefWrap.style.display = (tab === 'generate' && modelId === 'sdxl') ? 'block' : 'none';
+      if (editWrap) editWrap.style.display = tab === 'edit' ? 'block' : 'none';
+      if (scaleWrap) scaleWrap.style.display = (tab === 'edit' && modelId === 'realesrgan') ? 'inline-flex' : 'none';
+      if (sizeWrap) sizeWrap.style.display = tab === 'edit' ? 'none' : 'block';
+      if (negWrap) negWrap.style.display = (tab === 'edit' && ['deoldify', 'realesrgan', 'sam'].includes(modelId)) ? 'none' : 'block';
+    }
+
+    function initSketchpadCanvas() {
+      if (sketchCanvasInitialized) return;
+      const canvas = document.getElementById('img-sketch-canvas');
+      if (!canvas) return;
+      sketchCanvasInitialized = true;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+        return {
+          x: ((clientX - rect.left) / (rect.width || canvas.width)) * canvas.width,
+          y: ((clientY - rect.top) / (rect.height || canvas.height)) * canvas.height
+        };
+      };
+
+      const startDraw = (e) => {
+        sketchDrawing = true;
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      };
+
+      const moveDraw = (e) => {
+        if (!sketchDrawing) return;
+        if (e.cancelable) e.preventDefault();
+        const pos = getPos(e);
+        const colorInp = document.getElementById('img-sketch-color');
+        const sizeInp = document.getElementById('img-sketch-size');
+        ctx.strokeStyle = sketchTool === 'eraser' ? '#ffffff' : (colorInp ? colorInp.value : '#111111');
+        ctx.lineWidth = Number(sizeInp ? sizeInp.value : 4) * (sketchTool === 'eraser' ? 3 : 1);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      };
+
+      const endDraw = () => {
+        sketchDrawing = false;
+      };
+
+      canvas.addEventListener('mousedown', startDraw);
+      canvas.addEventListener('mousemove', moveDraw);
+      window.addEventListener('mouseup', endDraw);
+      canvas.addEventListener('touchstart', startDraw, { passive: false });
+      canvas.addEventListener('touchmove', moveDraw, { passive: false });
+      window.addEventListener('touchend', endDraw);
+    }
+
+    function clearSketchpadCanvas() {
+      const canvas = document.getElementById('img-sketch-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve('');
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function loadFileOntoSketchCanvas(file) {
+      if (!file) return;
+      const dataUrl = await readFileAsDataUrl(file);
+      const canvas = document.getElementById('img-sketch-canvas');
+      if (!canvas || !dataUrl) return;
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
+        ctx.drawImage(img, x, y, w, h);
+      };
+      img.src = dataUrl;
+    }
+
+    async function runFreeAiImageAction() {
+      const runBtn = document.getElementById('btn-img-generate-run');
+      const placeholderEl = document.getElementById('img-result-placeholder');
+      const metaEl = document.getElementById('img-result-meta');
+      const savedNoteEl = document.getElementById('img-saved-note');
+      const modelSel = document.getElementById('img-model-select');
+      const sizeSel = document.getElementById('img-size-select');
+      const promptEl = document.getElementById('img-prompt-input');
+      const negEl = document.getElementById('img-neg-prompt-input');
+      const stepsEl = document.getElementById('img-steps-input');
+      const cfgEl = document.getElementById('img-cfg-input');
+      const seedEl = document.getElementById('img-seed-input');
+      const autoSaveChk = document.getElementById('img-autosave-biblioteca');
+
+      const model = modelSel ? modelSel.value : 'flux2-klein';
+      const prompt = promptEl ? promptEl.value.trim() : '';
+      const negative_prompt = negEl ? negEl.value.trim() : '';
+      const steps = Number(stepsEl ? stepsEl.value : 20) || 20;
+      const guidance_scale = Number(cfgEl ? cfgEl.value : 7.0) || 7.0;
+      const seedRaw = seedEl && seedEl.value.trim() !== '' ? Number(seedEl.value) : undefined;
+      const sizeVal = sizeSel ? sizeSel.value : '1024x1024';
+      const [wStr, hStr] = sizeVal.split('x');
+      const proj = getActiveProjectDescriptor();
+      const autoSaveToProject = Boolean(autoSaveChk && autoSaveChk.checked && !proj.isGeneral);
+
+      if (runBtn) runBtn.disabled = true;
+      if (placeholderEl) {
+        placeholderEl.style.display = 'block';
+        placeholderEl.style.color = 'var(--accent-cyan)';
+        placeholderEl.textContent = '⏳ Procesando en Free.ai Self-Hosted GPU ($0.00)...';
+      }
+
+      try {
+        let data = null;
+        if (currentImageStudioTab === 'generate') {
+          if (!prompt) throw new Error('Escribe un prompt descriptivo para generar la imagen.');
+          let reference_image = '';
+          const refUploadEl = document.getElementById('img-sdxl-ref-upload');
+          const ipScaleEl = document.getElementById('img-ip-scale');
+          if (model === 'sdxl' && refUploadEl && refUploadEl.files && refUploadEl.files[0]) {
+            reference_image = await readFileAsDataUrl(refUploadEl.files[0]);
+          }
+          data = await fetchJson('/api/freeai/image/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              prompt,
+              negative_prompt: negative_prompt || undefined,
+              width: Number(wStr) || 1024,
+              height: Number(hStr) || 1024,
+              steps,
+              guidance_scale,
+              seed: seedRaw,
+              reference_image: reference_image || undefined,
+              ip_adapter_scale: reference_image ? Number(ipScaleEl ? ipScaleEl.value : 0.6) : undefined,
+              project: proj.name,
+              projectPath: proj.path || undefined,
+              autoSaveToProject
+            })
+          });
+        } else if (currentImageStudioTab === 'sketch') {
+          const ctrlTypeSel = document.getElementById('img-control-type');
+          const strengthInp = document.getElementById('img-control-strength');
+          const canvas = document.getElementById('img-sketch-canvas');
+          if (!prompt) throw new Error('Escribe un prompt indicando cómo renderizar el boceto.');
+          if (!canvas) throw new Error('No se encontró el lienzo del boceto.');
+          const control_image = canvas.toDataURL('image/png');
+          data = await fetchJson('/api/freeai/image/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'controlnet-union-sdxl-promax',
+              prompt,
+              negative_prompt: negative_prompt || undefined,
+              width: Number(wStr) || 1024,
+              height: Number(hStr) || 1024,
+              steps,
+              guidance_scale,
+              seed: seedRaw,
+              control_image,
+              control_type: ctrlTypeSel ? ctrlTypeSel.value : 'scribble',
+              control_strength: Number(strengthInp ? strengthInp.value : 0.75),
+              project: proj.name,
+              projectPath: proj.path || undefined,
+              autoSaveToProject
+            })
+          });
+        } else {
+          const editUploadEl = document.getElementById('img-edit-upload');
+          const scaleSel = document.getElementById('img-upscale-select');
+          let sourceImage = editSourceImageDataUrl;
+          if (!sourceImage && editUploadEl && editUploadEl.files && editUploadEl.files[0]) {
+            sourceImage = await readFileAsDataUrl(editUploadEl.files[0]);
+          }
+          if (!sourceImage && lastGeneratedImageData && lastGeneratedImageData.dataUrl) {
+            sourceImage = lastGeneratedImageData.dataUrl;
+          }
+          if (!sourceImage) {
+            throw new Error('Sube una imagen base o usa la última generada / boceto para editar.');
+          }
+          if (!['deoldify', 'realesrgan'].includes(model) && !prompt) {
+            throw new Error('Escribe una instrucción o prompt para guiar la edición/segmentación.');
+          }
+          data = await fetchJson('/api/freeai/image/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              image: sourceImage,
+              prompt: prompt || undefined,
+              negative_prompt: negative_prompt || undefined,
+              scale: model === 'realesrgan' ? Number(scaleSel ? scaleSel.value : 4) : undefined,
+              steps,
+              guidance_scale,
+              project: proj.name,
+              projectPath: proj.path || undefined,
+              autoSaveToProject
+            })
+          });
+        }
+
+        if (!data || !data.ok || !data.dataUrl) {
+          throw new Error((data && (data.error || data.message)) || 'No se recibió imagen válida');
+        }
+
+        lastGeneratedImageData = {
+          dataUrl: data.dataUrl,
+          mimeType: data.mimeType || 'image/png',
+          model: data.model || model,
+          mode: data.mode || currentImageStudioTab,
+          prompt,
+          savedToBiblioteca: data.savedToBiblioteca || null
+        };
+
+        const previewImg = document.getElementById('img-result-preview');
+        const btnSave = document.getElementById('btn-img-save-biblioteca');
+        const btnInsert = document.getElementById('btn-img-insert-chat');
+        const btnSendEdit = document.getElementById('btn-img-send-to-edit');
+        const btnDownload = document.getElementById('btn-img-download');
+
+        if (previewImg) {
+          previewImg.src = data.dataUrl;
+          previewImg.style.display = 'block';
+        }
+        if (placeholderEl) placeholderEl.style.display = 'none';
+        if (metaEl) {
+          metaEl.innerHTML = `<span class="zero-cost-pill">${escapeHtml(data.model || model)} • $0.00 Self-Hosted</span>`;
+        }
+        if (savedNoteEl) {
+          if (data.savedToBiblioteca && data.savedToBiblioteca.ok) {
+            savedNoteEl.style.display = 'block';
+            savedNoteEl.textContent = `📁 Guardado en biblioteca/${data.savedToBiblioteca.fileName}`;
+          } else {
+            savedNoteEl.style.display = 'none';
+          }
+        }
+        [btnSave, btnInsert, btnSendEdit, btnDownload].forEach((b) => {
+          if (b) b.disabled = false;
+        });
+        showToast('🎨 Imagen generada con éxito (Free.ai Self-Hosted $0.00).', 'success');
+      } catch (err) {
+        if (placeholderEl) {
+          placeholderEl.style.display = 'block';
+          placeholderEl.style.color = 'var(--accent-red)';
+          placeholderEl.textContent = `❌ ${err.message}`;
+        }
+        showToast(`❌ Error Free.ai Image: ${err.message}`, 'error');
+      } finally {
+        if (runBtn) runBtn.disabled = false;
+      }
+    }
+
+    async function saveGeneratedImageToBiblioteca() {
+      if (!lastGeneratedImageData || !lastGeneratedImageData.dataUrl) return;
+      const proj = getActiveProjectDescriptor();
+      if (proj.isGeneral && !proj.path) {
+        showToast('Selecciona un proyecto activo (no General) para guardar en su carpeta biblioteca/.', 'warn');
+        return;
+      }
+      try {
+        const res = await fetchJson('/api/freeai/image/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project: proj.name,
+            projectPath: proj.path || undefined,
+            dataUrl: lastGeneratedImageData.dataUrl,
+            prompt: lastGeneratedImageData.prompt || '',
+            model: lastGeneratedImageData.model || 'flux2-klein',
+            mode: lastGeneratedImageData.mode || 'generate'
+          })
+        });
+        if (res.ok) {
+          lastGeneratedImageData.savedToBiblioteca = res;
+          const savedNoteEl = document.getElementById('img-saved-note');
+          if (savedNoteEl) {
+            savedNoteEl.style.display = 'block';
+            savedNoteEl.textContent = `📁 Guardado en biblioteca/${res.fileName}`;
+          }
+          showToast(`📁 Imagen + metadata JSON guardados en biblioteca/${res.fileName}`, 'success');
+        }
+      } catch (err) {
+        showToast(`❌ No se pudo guardar en biblioteca/: ${err.message}`, 'error');
+      }
+    }
+
+    function insertGeneratedImageInChat() {
+      if (!lastGeneratedImageData || !lastGeneratedImageData.dataUrl) return;
+      const savedNote = lastGeneratedImageData.savedToBiblioteca && lastGeneratedImageData.savedToBiblioteca.fileName
+        ? `<div style="font-size:11px; color:var(--accent-green); margin-top:4px;">📁 Archivo en proyecto: <code>biblioteca/${escapeHtml(lastGeneratedImageData.savedToBiblioteca.fileName)}</code></div>`
+        : '';
+      appendMessage(
+        'ai',
+        `<div style="display:flex; flex-direction:column; gap:6px;">
+          <div><strong>🎨 Free.ai Image Studio (${escapeHtml(lastGeneratedImageData.model || 'self-hosted')} • $0.00)</strong></div>
+          <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(lastGeneratedImageData.prompt || '')}</div>
+          <img src="${lastGeneratedImageData.dataUrl}" alt="Generated Image" style="max-width:360px; border-radius:8px; border:1px solid var(--border);" />
+          ${savedNote}
+        </div>`,
+        false,
+        { allowHtml: true }
+      );
+      closeModal('freeai-image-modal');
+    }
+
+    function sendGeneratedImageToEdit() {
+      if (!lastGeneratedImageData || !lastGeneratedImageData.dataUrl) return;
+      editSourceImageDataUrl = lastGeneratedImageData.dataUrl;
+      const statusEl = document.getElementById('img-edit-source-status');
+      if (statusEl) statusEl.textContent = '✅ Usando última imagen generada';
+      switchImageStudioTab('edit');
+      showToast('🪄 Imagen actual cargada como base para Editar / Upscale / SAM.', 'info');
+    }
+
+    function downloadGeneratedImage() {
+      if (!lastGeneratedImageData || !lastGeneratedImageData.dataUrl) return;
+      const a = document.createElement('a');
+      a.href = lastGeneratedImageData.dataUrl;
+      const ext = (lastGeneratedImageData.mimeType || '').includes('jpeg') ? 'jpg' : 'png';
+      a.download = `freeai_${(lastGeneratedImageData.model || 'image').replace(/[^a-z0-9_-]/gi, '_')}_${Date.now()}.${ext}`;
+      a.click();
     }
 
     // =========================================================================
@@ -9299,6 +10391,131 @@
       document.getElementById('btn-dml-control').addEventListener('click', handleDirectMLControl);
       const dmlRestartEl = document.getElementById('btn-dml-restart');
       if (dmlRestartEl) dmlRestartEl.addEventListener('click', restartDirectmlControl);
+
+      // Controles Ollama UI & Banner de Recuperación ("Solo Ollama" + Ollama/DirectML)
+      const ollCtrlEl = document.getElementById('btn-ollama-control');
+      if (ollCtrlEl) ollCtrlEl.addEventListener('click', () => handleOllamaControl({ forceStart: false }));
+      const ollRestEl = document.getElementById('btn-ollama-restart');
+      if (ollRestEl) ollRestEl.addEventListener('click', restartOllamaFromUi);
+      const ollRefEl = document.getElementById('btn-ollama-refresh');
+      if (ollRefEl) {
+        ollRefEl.addEventListener('click', async () => {
+          await loadModels();
+          await checkOllamaStatusUi();
+          showToast('🔄 Catálogo y estado de Ollama actualizados.', 'info');
+        });
+      }
+      const ollFreeDmlEl = document.getElementById('btn-ollama-free-dml');
+      if (ollFreeDmlEl) ollFreeDmlEl.addEventListener('click', freeDirectmlAndStartOllama);
+
+      const banStartEl = document.getElementById('btn-ollama-banner-start');
+      if (banStartEl) banStartEl.addEventListener('click', () => handleOllamaControl({ forceStart: true }));
+      const banRestEl = document.getElementById('btn-ollama-banner-restart');
+      if (banRestEl) banRestEl.addEventListener('click', restartOllamaFromUi);
+      const banFreeDmlEl = document.getElementById('btn-ollama-banner-free-dml');
+      if (banFreeDmlEl) banFreeDmlEl.addEventListener('click', freeDirectmlAndStartOllama);
+      const banSwDmlEl = document.getElementById('btn-ollama-banner-switch-dml');
+      if (banSwDmlEl) banSwDmlEl.addEventListener('click', () => switchAiSource('directml'));
+      const banSwFreeEl = document.getElementById('btn-ollama-banner-switch-freeai');
+      if (banSwFreeEl) banSwFreeEl.addEventListener('click', () => switchAiSource('freeai'));
+      const banOpenHfEl = document.getElementById('btn-ollama-banner-open-hf');
+      if (banOpenHfEl) banOpenHfEl.addEventListener('click', () => openIntegrationsTab('hf', true));
+
+      const copyHklmBtn = document.getElementById('btn-copy-hklm-cleanup');
+      if (copyHklmBtn) {
+        copyHklmBtn.addEventListener('click', async () => {
+          const codeEl = document.getElementById('dual-hw-hklm-code');
+          if (codeEl && codeEl.textContent) {
+            await navigator.clipboard.writeText(codeEl.textContent);
+            showToast('📋 Comando PowerShell Admin copiado al portapapeles.', 'success');
+          }
+        });
+      }
+
+      // Free.ai Image Studio ($0.00 Self-Hosted)
+      const openImgBtn = document.getElementById('btn-open-image-studio');
+      if (openImgBtn) openImgBtn.addEventListener('click', () => openImageStudioModal('generate'));
+      const pillImgBtn = document.getElementById('pill-open-image-studio');
+      if (pillImgBtn) pillImgBtn.addEventListener('click', () => openImageStudioModal('sketch'));
+      document.querySelectorAll('#freeai-image-modal [data-img-tab]').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => switchImageStudioTab(tabBtn.dataset.imgTab));
+      });
+      const imgModelSel = document.getElementById('img-model-select');
+      if (imgModelSel) imgModelSel.addEventListener('change', updateImageStudioSubControls);
+      const sketchStrengthInp = document.getElementById('img-control-strength');
+      const sketchStrengthVal = document.getElementById('img-ctrl-str-val');
+      if (sketchStrengthInp && sketchStrengthVal) {
+        sketchStrengthInp.addEventListener('input', () => {
+          sketchStrengthVal.textContent = Number(sketchStrengthInp.value).toFixed(2);
+        });
+      }
+      const penBtn = document.getElementById('btn-sketch-draw');
+      const eraserBtn = document.getElementById('btn-sketch-erase');
+      if (penBtn) {
+        penBtn.addEventListener('click', () => {
+          sketchTool = 'pen';
+          penBtn.style.borderColor = 'var(--accent-cyan)';
+          if (eraserBtn) eraserBtn.style.borderColor = '';
+        });
+      }
+      if (eraserBtn) {
+        eraserBtn.addEventListener('click', () => {
+          sketchTool = 'eraser';
+          eraserBtn.style.borderColor = 'var(--accent-cyan)';
+          if (penBtn) penBtn.style.borderColor = '';
+        });
+      }
+      const clearSkBtn = document.getElementById('btn-sketch-clear');
+      if (clearSkBtn) clearSkBtn.addEventListener('click', clearSketchpadCanvas);
+      const skUploadInp = document.getElementById('img-sketch-upload');
+      if (skUploadInp) {
+        skUploadInp.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) loadFileOntoSketchCanvas(e.target.files[0]);
+        });
+      }
+      const editUploadInp = document.getElementById('img-edit-upload');
+      if (editUploadInp) {
+        editUploadInp.addEventListener('change', async (e) => {
+          if (e.target.files && e.target.files[0]) {
+            editSourceImageDataUrl = await readFileAsDataUrl(e.target.files[0]);
+            const st = document.getElementById('img-edit-source-status');
+            if (st) st.textContent = `📂 ${e.target.files[0].name}`;
+          }
+        });
+      }
+      const btnEditUseLast = document.getElementById('btn-edit-use-last');
+      if (btnEditUseLast) {
+        btnEditUseLast.addEventListener('click', () => {
+          if (lastGeneratedImageData && lastGeneratedImageData.dataUrl) {
+            editSourceImageDataUrl = lastGeneratedImageData.dataUrl;
+            const st = document.getElementById('img-edit-source-status');
+            if (st) st.textContent = '✅ Usando última imagen generada';
+          } else {
+            showToast('Aún no hay una imagen generada en esta sesión.', 'warn');
+          }
+        });
+      }
+      const btnEditUseCanvas = document.getElementById('btn-edit-use-canvas');
+      if (btnEditUseCanvas) {
+        btnEditUseCanvas.addEventListener('click', () => {
+          const canvas = document.getElementById('img-sketch-canvas');
+          if (canvas) {
+            editSourceImageDataUrl = canvas.toDataURL('image/png');
+            const st = document.getElementById('img-edit-source-status');
+            if (st) st.textContent = '✏️ Usando boceto del lienzo';
+          }
+        });
+      }
+      const runImgBtn = document.getElementById('btn-img-generate-run');
+      if (runImgBtn) runImgBtn.addEventListener('click', runFreeAiImageAction);
+      const saveImgBtn = document.getElementById('btn-img-save-biblioteca');
+      if (saveImgBtn) saveImgBtn.addEventListener('click', saveGeneratedImageToBiblioteca);
+      const insImgBtn = document.getElementById('btn-img-insert-chat');
+      if (insImgBtn) insImgBtn.addEventListener('click', insertGeneratedImageInChat);
+      const toEditImgBtn = document.getElementById('btn-img-send-to-edit');
+      if (toEditImgBtn) toEditImgBtn.addEventListener('click', sendGeneratedImageToEdit);
+      const dlImgBtn = document.getElementById('btn-img-download');
+      if (dlImgBtn) dlImgBtn.addEventListener('click', downloadGeneratedImage);
 
       const restartOllamaChk = document.getElementById('dual-restart-ollama-check');
       if (restartOllamaChk) {
@@ -9675,6 +10892,8 @@
       await migrateLegacySessions();
       await Promise.all([
         loadModels(),
+        checkOllamaStatusUi({ autoRecoverIfEmpty: false }),
+        loadFreeAiImageCatalog(),
         loadSkills(),
         loadProjects(),
         loadIntegrationsStatus(),

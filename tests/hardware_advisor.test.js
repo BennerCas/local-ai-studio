@@ -511,4 +511,121 @@ describe("hardware-advisor.js", () => {
     assert.equal(evalTight.riskLevel, "optimal");
     assert.ok(evalTight.recommendations.some((r) => r.includes("5,600") && r.includes("6,144")));
   });
+
+  it("readFreshWindowsUserEnv garantiza las variables recomendadas de ROCm iGPU y DirectML", () => {
+    const freshEnv = hardwareAdvisor.readFreshWindowsUserEnv();
+    assert.equal(typeof freshEnv, "object");
+    assert.equal(freshEnv.OLLAMA_IGPU_ENABLE, "1");
+    assert.equal(freshEnv.OLLAMA_FLASH_ATTENTION, "1");
+    assert.equal(freshEnv.OLLAMA_KV_CACHE_TYPE, "q8_0");
+    assert.equal(freshEnv.OLLAMA_MAX_LOADED_MODELS, "1");
+    assert.equal(freshEnv.OLLAMA_NUM_PARALLEL, "1");
+    assert.equal(freshEnv.HSA_OVERRIDE_GFX_VERSION, "11.0.0");
+    assert.ok(Boolean(freshEnv.OLIVE_GPU_MEMORY_LIMIT));
+    assert.ok(Boolean(freshEnv.OLIVE_CPU_THREADS));
+  });
+
+  it("evaluateSystemForStudio y applySystemTuning exponen envAudit.machineShadowKeys, envAudit.isAdmin y machineCleanupCommand sin bypass UAC", async () => {
+    const mockSnap = {
+      isAdmin: false,
+      cpu: { Name: "AMD Ryzen AI 7 350 w/ Radeon 860M", NumberOfCores: 8, NumberOfLogicalProcessors: 16, MaxClockSpeed: 2000 },
+      gpu: { Name: "AMD Radeon(TM) 860M Graphics", DriverVersion: "32.0.32015.12012", AdapterRAM: 2147483648 },
+      npu: { Name: "NPU Compute Accelerator Device", Status: "OK" },
+      userEnv: {
+        OLLAMA_IGPU_ENABLE: "1",
+        HSA_OVERRIDE_GFX_VERSION: "11.0.0",
+        OLLAMA_FLASH_ATTENTION: "1",
+        OLLAMA_KV_CACHE_TYPE: "q8_0",
+        OLLAMA_MAX_LOADED_MODELS: "1",
+        OLLAMA_NUM_PARALLEL: "1"
+      },
+      machineEnv: {
+        OLLAMA_IGPU_ENABLE: ""
+      },
+      machineEnvHasProp: {
+        OLLAMA_IGPU_ENABLE: true,
+        HSA_OVERRIDE_GFX_VERSION: false
+      },
+      processes: []
+    };
+
+    const sysEval = await hardwareAdvisor.evaluateSystemForStudio({
+      snap: mockSnap,
+      pair: "freeai+ollama",
+      agentA: { source: "freeai", model: "qwen-2.5-coder" },
+      agentB: { source: "ollama", model: "qwen2.5-coder:latest" }
+    });
+
+    assert.equal(typeof sysEval.envAudit, "object");
+    assert.equal(typeof sysEval.envAudit.isAdmin, "boolean");
+    assert.equal(sysEval.envAudit.isAdmin, false);
+    assert.equal(Array.isArray(sysEval.envAudit.machineShadowKeys), true);
+    assert.deepEqual(sysEval.envAudit.machineShadowKeys, ["OLLAMA_IGPU_ENABLE"]);
+    assert.equal(
+      sysEval.envAudit.machineCleanupCommand,
+      'Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" -Name "OLLAMA_IGPU_ENABLE" -ErrorAction SilentlyContinue'
+    );
+
+    const tuningRes = await hardwareAdvisor.applySystemTuning({
+      scope: "session",
+      pair: "freeai+ollama",
+      snap: mockSnap,
+      skipWindowsApply: true
+    });
+    assert.equal(tuningRes.ok, true);
+    assert.equal(tuningRes.isAdmin, false);
+    assert.deepEqual(tuningRes.machineShadowKeys, ["OLLAMA_IGPU_ENABLE"]);
+    assert.equal(
+      tuningRes.machineCleanupCommand,
+      'Remove-ItemProperty -Path "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" -Name "OLLAMA_IGPU_ENABLE" -ErrorAction SilentlyContinue'
+    );
+
+    const liveSysEval = await hardwareAdvisor.evaluateSystemForStudio();
+    assert.equal(typeof liveSysEval.envAudit, "object");
+    assert.equal(typeof liveSysEval.envAudit.isAdmin, "boolean");
+    assert.equal(Array.isArray(liveSysEval.envAudit.machineShadowKeys), true);
+  });
+
+  it("detectLiveOllamaAcceleration filtra subprocesos 'ollama runner' para preservar startedAt del daemon y logMatchesLiveProcess", async () => {
+    const daemonStartMs = Date.now() - 60000;
+    const logBootMs = daemonStartMs + 1000;
+    const runnerStartMs = Date.now(); // El runner se lanza mucho después del inicio del daemon y del server.log
+
+    const daemonIso = new Date(daemonStartMs).toISOString();
+    const logIso = new Date(logBootMs).toISOString();
+    const runnerIso = new Date(runnerStartMs).toISOString();
+
+    const liveRes = await hardwareAdvisor.detectLiveOllamaAcceleration({
+      processes: [
+        {
+          name: "ollama.exe",
+          pid: 5100,
+          ppid: 100,
+          CommandLine: '"C:\\Users\\Benner\\AppData\\Local\\Programs\\Ollama\\ollama.exe" serve',
+          startedAt: daemonIso
+        },
+        {
+          name: "ollama.exe",
+          pid: 5250,
+          ppid: 5100,
+          CommandLine: '"C:\\Users\\Benner\\AppData\\Local\\Programs\\Ollama\\ollama.exe" runner --model C:\\models\\blob --port 59812',
+          startedAt: runnerIso
+        }
+      ],
+      logContent: [
+        `time=${logIso} level=INFO msg="server config" env="map[OLLAMA_IGPU_ENABLE:1 HSA_OVERRIDE_GFX_VERSION:11.0.0 OLLAMA_FLASH_ATTENTION:1 OLLAMA_KV_CACHE_TYPE:q8_0]"`,
+        `time=${logIso} level=INFO msg="inference compute" id=GPU-0 library=rocm compute=gfx1100`,
+        `time=${logIso} level=INFO msg="vram-based default context" total_vram="2.0 GiB"`
+      ].join("\n"),
+      logMtimeMs: logBootMs
+    });
+
+    assert.equal(liveRes.ollamaRuntime.alive, true);
+    assert.deepEqual(liveRes.ollamaRuntime.pids, [5100]);
+    assert.deepEqual(liveRes.ollamaRuntime.runnerPids, [5250]);
+    assert.equal(liveRes.ollamaRuntime.startedAt, daemonIso);
+    assert.equal(liveRes.ollamaRuntime.logMatchesLiveProcess, true);
+    assert.equal(liveRes.ollamaRuntime.gpuDetected, true);
+    assert.equal(liveRes.ollamaRuntime.computeBackend, "rocm");
+  });
 });

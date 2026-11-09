@@ -222,16 +222,22 @@ function injectSystemMessage(rawMessages, systemPrompt) {
 function detectEngineTarget(payload = {}) {
   const rawModel = typeof payload.model === "string" ? payload.model : "";
   const lowerModel = rawModel.toLowerCase();
-  const isDirectML = payload.isDirectML === true ||
-    lowerModel.includes("directml") ||
-    lowerModel.includes("onnx") ||
-    rawModel.startsWith("directml:") ||
-    payload.source === "directml";
+  const cleanSrc = String(payload.source || "").trim().toLowerCase();
+  const explicitOllama = cleanSrc === "local" || cleanSrc === "ollama";
+  const explicitFreeAi = cleanSrc === "freeai" || cleanSrc === "free.ai" || cleanSrc === "free-ai" || cleanSrc === "cloud";
 
-  const isFreeAi = !isDirectML && (
+  const isDirectML = !explicitOllama && !explicitFreeAi && (
+    payload.isDirectML === true ||
+    cleanSrc === "directml" ||
+    cleanSrc === "dml" ||
+    rawModel.startsWith("directml:") ||
+    (!cleanSrc && (lowerModel.includes("directml") || lowerModel.includes("onnx")))
+  );
+
+  const isFreeAi = !isDirectML && !explicitOllama && (
     payload.isFreeAi === true ||
-    rawModel.startsWith("freeai:") ||
-    payload.source === "freeai"
+    explicitFreeAi ||
+    rawModel.startsWith("freeai:")
   );
 
   if (isDirectML) {
@@ -248,7 +254,7 @@ function detectEngineTarget(payload = {}) {
   }
   return {
     engine: "ollama",
-    model: rawModel
+    model: rawModel.replace(/^ollama:/i, "")
   };
 }
 
@@ -803,7 +809,166 @@ function createStudioServer(options = {}) {
     return results;
   }
 
-  async function restartOllamaDaemon() {
+  function checkOllamaAlive() {
+    return new Promise((resolve) => {
+      const req = http.get({
+        hostname: config.ollamaHost,
+        port: config.ollamaPort,
+        path: "/api/tags",
+        timeout: 1800
+      }, (res) => {
+        let data = "";
+        res.on("data", (c) => { data += c; });
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+            resolve({ isAlive: false, models: [] });
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            resolve({
+              isAlive: true,
+              models: Array.isArray(parsed.models) ? parsed.models : []
+            });
+          } catch (_e) {
+            resolve({ isAlive: true, models: [] });
+          }
+        });
+      });
+      req.on("error", () => resolve({ isAlive: false, models: [] }));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve({ isAlive: false, models: [] });
+      });
+    });
+  }
+
+  async function getOllamaStatus() {
+    const [aliveInfo, loadedModels, dmlHealth] = await Promise.all([
+      checkOllamaAlive(),
+      getOllamaPs(),
+      getDirectmlHealth()
+    ]);
+    const models = Array.isArray(aliveInfo.models) ? aliveInfo.models : [];
+    const loaded = Array.isArray(loadedModels) ? loadedModels : [];
+    return {
+      ok: true,
+      isAlive: Boolean(aliveInfo.isAlive),
+      modelsCount: models.length,
+      models: models.map((m) => ({
+        name: m.name || m.model || "",
+        size: m.size || 0,
+        modified_at: m.modified_at || null
+      })),
+      loadedCount: loaded.length,
+      loadedModels: loaded.map((m) => ({
+        name: m.name || m.model || "",
+        size: m.size || 0,
+        size_vram: m.size_vram || 0
+      })),
+      directmlRunning: Boolean(dmlHealth && dmlHealth.isAlive),
+      directmlActiveModel: (dmlHealth && dmlHealth.active_model) || null
+    };
+  }
+
+  function buildOllamaSpawnEnv(envOverrides = {}) {
+    const freshWinEnv = (typeof hardwareAdvisor.readFreshWindowsUserEnv === "function" && !config.skipWindowsApply)
+      ? hardwareAdvisor.readFreshWindowsUserEnv()
+      : { ...process.env };
+    const spawnEnv = {
+      ...process.env,
+      ...freshWinEnv,
+      ...(envOverrides && typeof envOverrides === "object" ? envOverrides : {})
+    };
+    const rec = hardwareAdvisor.RECOMMENDED_ENV_VARS || {};
+    const ollamaKeys = [
+      "OLLAMA_IGPU_ENABLE",
+      "HSA_OVERRIDE_GFX_VERSION",
+      "OLLAMA_FLASH_ATTENTION",
+      "OLLAMA_KV_CACHE_TYPE",
+      "OLLAMA_MAX_LOADED_MODELS",
+      "OLLAMA_NUM_PARALLEL"
+    ];
+    for (const k of ollamaKeys) {
+      if (!spawnEnv[k] || String(spawnEnv[k]).trim() === "") {
+        spawnEnv[k] = rec[k] || (k === "HSA_OVERRIDE_GFX_VERSION" ? "11.0.0" : (k === "OLLAMA_KV_CACHE_TYPE" ? "q8_0" : "1"));
+      }
+      process.env[k] = String(spawnEnv[k]);
+    }
+    return spawnEnv;
+  }
+
+  function getOllamaServerLogPath() {
+    const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || "C:\\Users\\Benner", "AppData", "Local");
+    return path.join(localAppData, "Ollama", "server.log");
+  }
+
+  async function spawnOllamaServeWithLog(envOverrides = {}) {
+    const spawnEnv = buildOllamaSpawnEnv(envOverrides);
+    const logPath = getOllamaServerLogPath();
+    let logFd = null;
+    try {
+      try {
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        logFd = fs.openSync(logPath, "a");
+      } catch (_logErr) {
+        logFd = null;
+      }
+      const child = spawn("ollama", ["serve"], {
+        detached: true,
+        stdio: logFd !== null ? ["ignore", logFd, logFd] : "ignore",
+        windowsHide: true,
+        env: spawnEnv
+      });
+      child.unref();
+    } finally {
+      if (logFd !== null) {
+        try { fs.closeSync(logFd); } catch (_e) {}
+      }
+    }
+
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      const check = await checkOllamaAlive();
+      if (check.isAlive) {
+        return {
+          ok: true,
+          alive: true,
+          modelsCount: check.models.length,
+          logPath
+        };
+      }
+    }
+    return {
+      ok: true,
+      alive: false,
+      modelsCount: 0,
+      logPath,
+      message: "Ollama iniciando en segundo plano..."
+    };
+  }
+
+  async function startOllamaDaemon(envOverrides = {}) {
+    const preCheck = await checkOllamaAlive();
+    if (preCheck.isAlive) {
+      return {
+        ok: true,
+        alive: true,
+        alreadyRunning: true,
+        modelsCount: preCheck.models.length
+      };
+    }
+    if (!config.allowHostProcessControl) {
+      return { ok: true, alive: false, skippedHostControl: true };
+    }
+    try {
+      return await spawnOllamaServeWithLog(envOverrides);
+    } catch (err) {
+      return { ok: false, alive: false, error: safeErrMsg(err) };
+    }
+  }
+
+  async function restartOllamaDaemon(envOverrides = {}) {
     if (!config.allowHostProcessControl) {
       return { ok: true, skippedHostControl: true };
     }
@@ -824,34 +989,17 @@ function createStudioServer(options = {}) {
       await new Promise((r) => setTimeout(r, 700));
     }
     try {
-      const child = spawn("ollama", ["serve"], {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: true,
-        env: { ...process.env }
-      });
-      child.unref();
-      for (let i = 0; i < 10; i++) {
-        await new Promise((r) => setTimeout(r, 400));
-        const psOk = await new Promise((resolve) => {
-          const r = http.get({
-            hostname: config.ollamaHost,
-            port: config.ollamaPort,
-            path: "/api/tags",
-            timeout: 1200
-          }, (res) => {
-            res.resume();
-            resolve(res.statusCode === 200);
-          });
-          r.on("error", () => resolve(false));
-          r.on("timeout", () => { r.destroy(); resolve(false); });
-        });
-        if (psOk) return { ok: true, alive: true };
-      }
-      return { ok: true, alive: false, message: "Ollama iniciando en segundo plano..." };
+      return await spawnOllamaServeWithLog(envOverrides);
     } catch (err) {
       return { ok: false, error: safeErrMsg(err) };
     }
+  }
+
+  async function ensureOllamaRunning() {
+    const check = await checkOllamaAlive();
+    if (check.isAlive) return { ok: true, alive: true, alreadyRunning: true };
+    if (!config.allowHostProcessControl) return { ok: false, alive: false, skippedHostControl: true };
+    return startOllamaDaemon();
   }
 
   async function fetchCombinedModelsCatalog() {
@@ -1128,6 +1276,13 @@ function createStudioServer(options = {}) {
       if (!alive && config.autoStartDirectML) {
         await startDirectMLServer();
       }
+      if (signal && signal.aborted) {
+        const abortErr = new Error("Conexión cerrada por el cliente");
+        abortErr.aborted = true;
+        throw abortErr;
+      }
+    } else if (engine === "ollama") {
+      await ensureOllamaRunning();
       if (signal && signal.aborted) {
         const abortErr = new Error("Conexión cerrada por el cliente");
         abortErr.aborted = true;
@@ -2481,6 +2636,50 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    if (pathname === "/api/ollama/status" && req.method === "GET") {
+      const status = await getOllamaStatus();
+      sendJson(res, 200, status);
+      return;
+    }
+
+    if (pathname === "/api/ollama/start" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      let stoppedDirectML = null;
+      if (payload.stopDirectML === true) {
+        stoppedDirectML = await stopDirectMLServer();
+      }
+      const envOverrides = (payload.envOverrides && typeof payload.envOverrides === "object")
+        ? hardwareAdvisor.validateSafeEnvOverrides(payload.envOverrides)
+        : {};
+      const startRes = await startOllamaDaemon(envOverrides);
+      const status = await getOllamaStatus();
+      sendJson(res, startRes.ok !== false ? 200 : 500, {
+        ...startRes,
+        stoppedDirectML,
+        status
+      });
+      return;
+    }
+
+    if (pathname === "/api/ollama/restart" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      let stoppedDirectML = null;
+      if (payload.stopDirectML === true) {
+        stoppedDirectML = await stopDirectMLServer();
+      }
+      const envOverrides = (payload.envOverrides && typeof payload.envOverrides === "object")
+        ? hardwareAdvisor.validateSafeEnvOverrides(payload.envOverrides)
+        : {};
+      const restartRes = await restartOllamaDaemon(envOverrides);
+      const status = await getOllamaStatus();
+      sendJson(res, restartRes.ok !== false ? 200 : 500, {
+        ...restartRes,
+        stoppedDirectML,
+        status
+      });
+      return;
+    }
+
     if (pathname === "/api/ollama/unload" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
       if (typeof payload.model === "string" && payload.model.trim()) {
@@ -2699,6 +2898,191 @@ function createStudioServer(options = {}) {
     }
 
     // ---------------------------------------------------------
+    // Estudio de Imagen Free.ai 100% Sin Costo (Self-Hosted)
+    // ---------------------------------------------------------
+    if (pathname === "/api/freeai/image-models" && req.method === "GET") {
+      try {
+        const catalog = await freeai.fetchImageCatalog();
+        const models = Array.isArray(catalog.models)
+          ? catalog.models.map((m) => ({
+              ...m,
+              cost: 0,
+              costUsd: 0
+            }))
+          : [];
+        sendJson(res, 200, {
+          ...catalog,
+          policy: "ZERO_COST_SELF_HOSTED_ONLY",
+          models
+        });
+      } catch (err) {
+        const statusCode = (err && Number.isInteger(err.statusCode)) ? err.statusCode : 502;
+        sendJsonError(res, statusCode, err, { code: (err && err.code) || "IMAGE_CATALOG_ERROR" });
+      }
+      return;
+    }
+
+    if (pathname === "/api/freeai/image/generate" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req, 25 * 1024 * 1024));
+      try {
+        const result = await freeai.generateImage(payload);
+        let savedToBiblioteca = null;
+        if (payload.autoSaveToProject === true) {
+          const projInfo = resolveProjectInfo(payload.project || payload.projectName || null, payload.projectPath || null);
+          if (!projInfo.isGeneral && projInfo.path && fs.existsSync(projInfo.path)) {
+            const rawSaved = await freeai.saveImageToBiblioteca({
+              projectPath: projInfo.path,
+              imageDataUrl: result.imageDataUrl,
+              imageUrl: result.imageUrl,
+              prompt: payload.prompt,
+              negativePrompt: payload.negativePrompt || payload.negative_prompt || "",
+              model: result.model,
+              params: {
+                steps: payload.steps || payload.num_inference_steps,
+                cfg_scale: payload.guidance_scale || payload.cfg_scale,
+                seed: result.seed,
+                width: result.width,
+                height: result.height,
+                control_type: payload.controlType || payload.control_type || null,
+                control_strength: payload.controlStrength || payload.control_strength || null,
+                operation: payload.controlImage || payload.control_image ? "sketch-to-render" : "text-to-image"
+              },
+              metrics: {
+                inference_time_ms: result.elapsedMs,
+                cost_usd: 0,
+                vram_local_mb: 0
+              },
+              sessionId: payload.sessionId || null,
+              allowedRoot: getBaseProjectsDir()
+            });
+            savedToBiblioteca = {
+              ...rawSaved,
+              fileName: rawSaved.fileName || rawSaved.imageFileName,
+              filePath: rawSaved.imagePath || rawSaved.imageFilePath || rawSaved.filePath,
+              metaPath: rawSaved.metadataPath || rawSaved.jsonFilePath || rawSaved.metaPath
+            };
+          }
+        }
+        sendJson(res, 200, {
+          ...result,
+          dataUrl: result.imageDataUrl || result.dataUrl,
+          costUsd: 0,
+          mode: (payload.controlImage || payload.control_image || result.model === "controlnet-union-sdxl-promax")
+            ? "controlnet"
+            : "generate",
+          savedToBiblioteca
+        });
+      } catch (err) {
+        const statusCode = (err && Number.isInteger(err.statusCode)) ? err.statusCode : 502;
+        sendJsonError(res, statusCode, err, { code: (err && err.code) || "IMAGE_GENERATE_ERROR" });
+      }
+      return;
+    }
+
+    if (pathname === "/api/freeai/image/edit" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req, 25 * 1024 * 1024));
+      try {
+        const result = await freeai.editImage(payload);
+        let savedToBiblioteca = null;
+        if (payload.autoSaveToProject === true) {
+          const projInfo = resolveProjectInfo(payload.project || payload.projectName || null, payload.projectPath || null);
+          if (!projInfo.isGeneral && projInfo.path && fs.existsSync(projInfo.path)) {
+            const rawSaved = await freeai.saveImageToBiblioteca({
+              projectPath: projInfo.path,
+              imageDataUrl: result.imageDataUrl,
+              imageUrl: result.imageUrl,
+              prompt: payload.prompt || `[${result.model}] Edición / mejora de imagen`,
+              negativePrompt: payload.negativePrompt || payload.negative_prompt || "",
+              model: result.model,
+              params: {
+                scale: payload.scale || null,
+                strength: payload.strength || null,
+                seed: result.seed,
+                width: result.width,
+                height: result.height,
+                operation: result.model === "realesrgan" ? "enhance" : (result.model === "sam" ? "segment" : "img2img")
+              },
+              metrics: {
+                inference_time_ms: result.elapsedMs,
+                cost_usd: 0,
+                vram_local_mb: 0
+              },
+              sessionId: payload.sessionId || null,
+              allowedRoot: getBaseProjectsDir()
+            });
+            savedToBiblioteca = {
+              ...rawSaved,
+              fileName: rawSaved.fileName || rawSaved.imageFileName,
+              filePath: rawSaved.imagePath || rawSaved.imageFilePath || rawSaved.filePath,
+              metaPath: rawSaved.metadataPath || rawSaved.jsonFilePath || rawSaved.metaPath
+            };
+          }
+        }
+        sendJson(res, 200, {
+          ...result,
+          dataUrl: result.imageDataUrl || result.dataUrl,
+          costUsd: 0,
+          mode: "edit",
+          savedToBiblioteca
+        });
+      } catch (err) {
+        const statusCode = (err && Number.isInteger(err.statusCode)) ? err.statusCode : 502;
+        sendJsonError(res, statusCode, err, { code: (err && err.code) || "IMAGE_EDIT_ERROR" });
+      }
+      return;
+    }
+
+    if (pathname === "/api/freeai/image/save" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req, 25 * 1024 * 1024));
+      const projInfo = resolveProjectInfo(payload.project || payload.projectName || null, payload.projectPath || null);
+      const targetProjectPath = payload.projectPath || (!projInfo.isGeneral ? projInfo.path : "");
+      if (!targetProjectPath) {
+        sendJsonError(res, 400, "Selecciona un proyecto local activo (no General) o indica projectPath para guardar en biblioteca/.");
+        return;
+      }
+      try {
+        const rawSaved = await freeai.saveImageToBiblioteca({
+          ...payload,
+          imageDataUrl: payload.imageDataUrl || payload.dataUrl || payload.image,
+          projectPath: targetProjectPath,
+          allowedRoot: getBaseProjectsDir()
+        });
+        const saved = {
+          ...rawSaved,
+          fileName: rawSaved.fileName || rawSaved.imageFileName,
+          filePath: rawSaved.imagePath || rawSaved.imageFilePath || rawSaved.filePath,
+          metaPath: rawSaved.metadataPath || rawSaved.jsonFilePath || rawSaved.metaPath
+        };
+        try {
+          memoryStore.recordFileChange({
+            project: projInfo.name || path.basename(targetProjectPath),
+            projectPath: targetProjectPath,
+            filePath: saved.relativeImagePath || `biblioteca/${saved.imageFileName}`,
+            action: "image_save",
+            model: payload.model || "freeai-image",
+            source: "freeai",
+            summary: `Imagen gratuita guardada en biblioteca/ (${saved.imageFileName} + ${saved.jsonFileName})`
+          });
+          bridge.appendProgressToProject(targetProjectPath, {
+            tool: "Free.ai Image Studio (Zero-Cost)",
+            model: payload.model || "flux2-klein",
+            task: "Generación de activo visual en biblioteca/",
+            summary: `Guardado ${saved.imageFileName} y su metadata ${saved.jsonFileName} conforme a ESTRUCTURA.md.`,
+            filesModified: [
+              saved.relativeImagePath || `biblioteca/${saved.imageFileName}`,
+              saved.relativeJsonPath || `biblioteca/${saved.jsonFileName}`
+            ]
+          });
+        } catch (_logErr) {}
+        sendJson(res, 200, saved);
+      } catch (err) {
+        const statusCode = (err && Number.isInteger(err.statusCode)) ? err.statusCode : 400;
+        sendJsonError(res, statusCode, err, { code: (err && err.code) || "IMAGE_SAVE_ERROR" });
+      }
+      return;
+    }
+
+    // ---------------------------------------------------------
     // Voz Local Kokoro TTS / Piper ES (/api/tts/*)
     // ---------------------------------------------------------
     if (pathname === "/api/tts/status" && req.method === "GET") {
@@ -2816,8 +3200,11 @@ function createStudioServer(options = {}) {
         return;
       }
 
+      await ensureOllamaRunning();
+
       const ollamaPayload = {
         ...payload,
+        model: target.model || payload.model,
         messages: unifiedMessages
       };
       if (payload.modelfileOptions && typeof payload.modelfileOptions === "object") {
@@ -2928,6 +3315,10 @@ function createStudioServer(options = {}) {
       if (baseHistory.length === 0) {
         sendJsonError(res, 400, "No hay mensajes válidos de usuario/asistente para procesar en Modo Dual.");
         return;
+      }
+
+      if (srcA === "ollama" || srcB === "ollama") {
+        await ensureOllamaRunning();
       }
 
       const [telemetry, catalog, ollamaPs, directmlStatus] = await Promise.all([
@@ -3641,5 +4032,6 @@ module.exports = {
   createStudioServer,
   readJsonBody,
   resolveProjectInfo,
+  detectEngineTarget,
   buildFallbackEnterContextReport
 };

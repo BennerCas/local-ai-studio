@@ -252,6 +252,16 @@ function createMockAiEngineServer() {
         return;
       }
 
+      if (req.url === "/freeai/v1/image/generate/" || req.url === "/freeai/v1/image/edit/" || req.url === "/freeai/v1/image/enhance/" || req.url === "/freeai/v1/image/segment/") {
+        const tinyPng = Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "base64"
+        );
+        res.writeHead(200, { "Content-Type": "image/png" });
+        res.end(tinyPng);
+        return;
+      }
+
       if (req.url === "/freeai/v1/chat/completions") {
         res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8" });
         const reply = parsed?.messages?.some((m) => String(m.content || "").includes("<critica_agente_b>"))
@@ -1735,5 +1745,82 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     });
     assert.equal(directml400Res.status, 400);
     assert.match(directml400Res.json.detail, /limite seguro 6144/);
+  });
+
+  it("13. detectEngineTarget respeta source: local/ollama, /api/ollama/status expone telemetría y Free.ai Image Studio bloquea modelos de pago (HTTP 400)", async () => {
+    const { detectEngineTarget } = require("../sidecars/local_ai_chat/server");
+    assert.equal(
+      detectEngineTarget({ source: "local", model: "hermes-3-onnx-test:latest" }).engine,
+      "ollama",
+      "source: local nunca debe ser secuestrado a directml por la palabra onnx en el nombre"
+    );
+    assert.equal(
+      detectEngineTarget({ source: "directml", model: "Hermes-3-8B-UNLOCKED-ONNX-DirectML" }).engine,
+      "directml"
+    );
+
+    const ollStatus = await httpReq("/api/ollama/status");
+    assert.equal(ollStatus.status, 200);
+    assert.equal(ollStatus.json.ok, true);
+    assert.equal(ollStatus.json.isAlive, true);
+    assert.ok(ollStatus.json.modelsCount >= 1);
+
+    const imgCat = await httpReq("/api/freeai/image-models");
+    assert.equal(imgCat.status, 200);
+    assert.equal(imgCat.json.ok, true);
+    assert.equal(imgCat.json.policy, "ZERO_COST_SELF_HOSTED_ONLY");
+    assert.ok(Array.isArray(imgCat.json.models) && imgCat.json.models.length >= 9);
+    for (const m of imgCat.json.models) {
+      assert.equal(m.self_hosted, true);
+      assert.equal(m.costUsd, 0);
+      assert.ok(!/nano-banana|gpt-5-image/i.test(m.id));
+    }
+
+    // Bloqueo Zero-Trust de modelos pagos con HTTP 400
+    for (const paidId of ["google/gemini-nano-banana-2.1", "openai/gpt-5-image", "premium/flux-pro"]) {
+      const blockedRes = await httpReq("/api/freeai/image/generate", {
+        method: "POST",
+        body: { model: paidId, prompt: "No permitido" }
+      });
+      assert.equal(blockedRes.status, 400, `Modelo de pago ${paidId} debe responder HTTP 400`);
+      assert.match(blockedRes.json.error, /Zero-Cost|bloqueado/i);
+    }
+
+    // Generación exitosa con flux2-klein + guardado automático en biblioteca/
+    process.env.FREEAI_BASE_URL = `http://127.0.0.1:${mockEnginePort}/freeai/v1`;
+    process.env.FREEAI_API_KEY_1 = "mock_freeai_img_key";
+    const tinyPngDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+    const genRes = await httpReq("/api/freeai/image/generate", {
+      method: "POST",
+      body: {
+        model: "flux2-klein",
+        prompt: "Render industrial cyberpunk",
+        project: "AlphaApp",
+        autoSaveToProject: true
+      }
+    });
+    assert.equal(genRes.status, 200);
+    assert.equal(genRes.json.ok, true);
+    assert.equal(genRes.json.costUsd, 0);
+    assert.match(genRes.json.dataUrl, /^data:image\/png;base64,/);
+    assert.ok(genRes.json.savedToBiblioteca && genRes.json.savedToBiblioteca.ok);
+    assert.ok(fs.existsSync(genRes.json.savedToBiblioteca.filePath));
+    assert.ok(fs.existsSync(genRes.json.savedToBiblioteca.metaPath));
+
+    // Sketch -> Render con controlnet-union-sdxl-promax
+    const ctrlRes = await httpReq("/api/freeai/image/generate", {
+      method: "POST",
+      body: {
+        model: "controlnet-union-sdxl-promax",
+        prompt: "Render industrial desde boceto",
+        control_image: tinyPngDataUrl,
+        control_type: "scribble",
+        control_strength: 0.8
+      }
+    });
+    assert.equal(ctrlRes.status, 200);
+    assert.equal(ctrlRes.json.ok, true);
+    assert.equal(ctrlRes.json.mode, "controlnet");
   });
 });

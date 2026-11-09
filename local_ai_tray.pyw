@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -46,6 +47,22 @@ def is_url_alive(url, timeout=1.5):
             return res.status in (200, 204)
     except Exception:
         return False
+
+
+def is_port_open(port, host="127.0.0.1", timeout=1.0):
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def _notify(icon, message, title="Local AI Studio"):
+    if icon is not None and hasattr(icon, "notify"):
+        try:
+            icon.notify(message, title)
+        except Exception:
+            pass
 
 
 def probe_directml_status(timeout=1.5):
@@ -109,10 +126,69 @@ def start_directml():
     )
 
 
+def start_ollama(icon=None, item=None):
+    if is_port_open(11434):
+        _notify(icon, "Ollama ya está en ejecución (11434).")
+        return
+    env = os.environ.copy()
+    env["OLLAMA_IGPU_ENABLE"] = "1"
+    env["HSA_OVERRIDE_GFX_VERSION"] = "11.0.0"
+    env["OLLAMA_FLASH_ATTENTION"] = "1"
+    env["OLLAMA_KV_CACHE_TYPE"] = "q8_0"
+    env["OLLAMA_MAX_LOADED_MODELS"] = "1"
+    env["OLLAMA_NUM_PARALLEL"] = "1"
+
+    local_app_data = os.environ.get("LOCALAPPDATA") or os.path.expanduser(r"~\AppData\Local")
+    ollama_dir = os.path.join(local_app_data, "Ollama")
+    os.makedirs(ollama_dir, exist_ok=True)
+    log_path = os.path.join(ollama_dir, "server.log")
+    try:
+        log_file = open(log_path, "ab")
+        subprocess.Popen(
+            ["ollama", "serve"],
+            stdout=log_file,
+            stderr=log_file,
+            env=env,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        _notify(icon, "Ollama Server iniciado con aceleración ROCm iGPU (11434).")
+    except Exception as exc:
+        _notify(icon, f"No se pudo iniciar Ollama: {exc}")
+    if icon is not None:
+        threading.Thread(target=refresh_status_cache, args=(icon,), daemon=True).start()
+
+
+def _stop_ollama_worker(icon=None):
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Get-Process ollama, 'ollama app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue",
+                ],
+                creationflags=CREATE_NO_WINDOW,
+                timeout=5,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+    _notify(icon, "Ollama Server detenido.")
+    refresh_status_cache(icon)
+
+
+def stop_ollama(icon=None, item=None):
+    threading.Thread(target=_stop_ollama_worker, args=(icon,), daemon=True).start()
+
+
 def ensure_services_running():
     with _service_op_lock:
         start_server_js()
         start_directml()
+        start_ollama()
 
 
 def _terminate_managed_proc(proc):
@@ -342,6 +418,8 @@ def setup_tray():
         MenuItem(get_dml_status_text, lambda icon, item: None, enabled=False),
         MenuItem(get_ollama_status_text, lambda icon, item: None, enabled=False),
         Menu.SEPARATOR,
+        MenuItem("Iniciar Ollama Server (ROCm iGPU)", start_ollama),
+        MenuItem("Detener Ollama Server", stop_ollama),
         MenuItem("🛑 Detener DirectML (Liberar VRAM)", stop_directml),
         MenuItem("🔄 Reiniciar Servidores", restart_services),
         Menu.SEPARATOR,
