@@ -84,6 +84,25 @@ function sanitizeSafeId(rawId, fallbackPrefix = "item") {
   return cleaned;
 }
 
+function normalizeSkillIdsArray(rawSkillIds, fallbackSkillId = "") {
+  const items = Array.isArray(rawSkillIds)
+    ? rawSkillIds
+    : (typeof rawSkillIds === "string" ? rawSkillIds.split(",") : []);
+  const fb = typeof fallbackSkillId === "string" ? fallbackSkillId.trim() : "";
+  const combined = items.length > 0 ? items : (fb ? fb.split(",") : []);
+  const seen = new Set();
+  const out = [];
+  for (const entry of combined) {
+    const clean = String(entry || "").trim();
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    out.push(clean);
+  }
+  return out;
+}
+
 function sanitizeBackupFileName(relPath) {
   const normalized = String(relPath || "file")
     .replace(/\\/g, "/")
@@ -210,6 +229,19 @@ function normalizeChatSession(sessionObj, existing = null) {
       : null);
   const dualConfig = rawDual ? normalizeDualConfig(rawDual) : null;
 
+  const hasExplicitSkillIds = sessionObj?.skillIds !== undefined;
+  const hasExplicitSkillId = sessionObj?.skillId !== undefined;
+  const skillIdStr = String(hasExplicitSkillId ? (sessionObj.skillId || "") : (existing?.skillId || ""));
+  let skillIds;
+  if (hasExplicitSkillIds) {
+    skillIds = normalizeSkillIdsArray(sessionObj.skillIds, hasExplicitSkillId ? skillIdStr : "");
+  } else if (hasExplicitSkillId) {
+    skillIds = normalizeSkillIdsArray(skillIdStr);
+  } else {
+    skillIds = normalizeSkillIdsArray(existing?.skillIds, skillIdStr);
+  }
+  const resolvedSkillId = skillIdStr || (skillIds[0] || "");
+
   return {
     id: safeId,
     title: String(sessionObj?.title || sessionObj?.name || existing?.title || "Nuevo Chat"),
@@ -219,7 +251,8 @@ function normalizeChatSession(sessionObj, existing = null) {
     mode: sessionObj?.mode === "dual" || (!sessionObj?.mode && existing?.mode === "dual") ? "dual" : "single",
     source: String(sessionObj?.source ?? existing?.source ?? "ollama"),
     model: String(sessionObj?.model ?? existing?.model ?? ""),
-    skillId: String(sessionObj?.skillId ?? existing?.skillId ?? ""),
+    skillId: resolvedSkillId,
+    skillIds,
     profileId: String(sessionObj?.profileId ?? existing?.profileId ?? ""),
     customSystemPrompt: String(sessionObj?.customSystemPrompt ?? existing?.customSystemPrompt ?? ""),
     dualConfig,
@@ -242,6 +275,7 @@ function toChatSummary(chat) {
     source: chat.source,
     model: chat.model,
     skillId: chat.skillId,
+    skillIds: normalizeSkillIdsArray(chat.skillIds, chat.skillId || ""),
     profileId: chat.profileId || "",
     dualConfigSummary: chat.dualConfigSummary || null,
     messageCount: Array.isArray(chat.messages) ? chat.messages.length : (chat.messageCount || 0),
@@ -301,7 +335,8 @@ function getChat(id) {
       mode: data.mode === "dual" ? "dual" : "single",
       source: data.source || "ollama",
       model: data.model || "",
-      skillId: data.skillId || "",
+      skillId: data.skillId || (normalizeSkillIdsArray(data.skillIds, "")[0] || ""),
+      skillIds: normalizeSkillIdsArray(data.skillIds, data.skillId || ""),
       profileId: data.profileId || "",
       customSystemPrompt: data.customSystemPrompt || "",
       dualConfig,
@@ -690,12 +725,19 @@ function normalizeDualAgentConfig(raw = {}, fallback = {}) {
     ? Math.min(65536, Math.max(1024, numCtxRaw))
     : 4096;
 
+  const agentSkillIdRaw = String(raw?.skillId ?? fallback.skillId ?? "");
+  const agentSkillIds = normalizeSkillIdsArray(
+    raw?.skillIds !== undefined ? raw.skillIds : fallback.skillIds,
+    agentSkillIdRaw
+  );
+
   return {
     source,
     model: String(raw?.model ?? fallback.model ?? ""),
     roleLabel: String(raw?.roleLabel ?? fallback.roleLabel ?? "Agente Especialista").slice(0, 80),
     profileId: String(raw?.profileId ?? fallback.profileId ?? ""),
-    skillId: String(raw?.skillId ?? fallback.skillId ?? ""),
+    skillId: agentSkillIdRaw || (agentSkillIds[0] || ""),
+    skillIds: agentSkillIds,
     customSystemPrompt: String(raw?.customSystemPrompt ?? fallback.customSystemPrompt ?? ""),
     temperature,
     maxTokens,
@@ -715,6 +757,7 @@ function buildDefaultDualConfig() {
       roleLabel: "Arquitecto / Planificador",
       profileId: "",
       skillId: "",
+      skillIds: [],
       customSystemPrompt: "",
       temperature: 0.35,
       maxTokens: 2048,
@@ -726,6 +769,7 @@ function buildDefaultDualConfig() {
       roleLabel: "Implementador / Auditor",
       profileId: "",
       skillId: "",
+      skillIds: [],
       customSystemPrompt: "",
       temperature: 0.25,
       maxTokens: 2048,

@@ -1,5 +1,6 @@
 const http = require("node:http");
 const https = require("node:https");
+const net = require("node:net");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn, execFile } = require("node:child_process");
@@ -61,6 +62,7 @@ function buildProjectCompatibilitySummary(opts = {}) {
   const ctx = bridge.buildProjectContext(opts.projectName || null, opts.convId || null, opts.token || null, {
     writeToDisk: false,
     skillId: opts.skillId || null,
+    skillIds: opts.skillIds || opts.skillId || null,
     profileId: opts.profileId || null,
     customSystemPrompt: opts.customSystemPrompt || null,
     modelOverridesPrompt: opts.modelOverridesPrompt || null,
@@ -183,6 +185,25 @@ function resolveProjectInfo(projectName = null, projectPath = null, convId = nul
     stateKey,
     convId: convId || (active && active.convId) || null
   };
+}
+
+function resolveRequestProjectTarget(projectName = null, projectPath = null, customPath = null) {
+  const cleanProj = (typeof projectName === "string" && projectName.trim()) ? projectName.trim() : null;
+  if (cleanProj && cleanProj.startsWith("conv:")) {
+    return cleanProj;
+  }
+  const rawPath = (typeof projectPath === "string" && projectPath.trim())
+    ? projectPath.trim()
+    : ((typeof customPath === "string" && customPath.trim()) ? customPath.trim() : "");
+  if (rawPath) {
+    try {
+      const resolved = path.resolve(rawPath);
+      if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+        return resolved;
+      }
+    } catch (_e) {}
+  }
+  return cleanProj;
 }
 
 function getBaseProjectsDir() {
@@ -461,8 +482,13 @@ function formatMessageAttachmentsForEngine(rawMsg, targetEngine = "any") {
         if (m && m[1]) ollamaB64.push(m[1]);
       }
       extraTextBlocks.push(`[Imagen adjunta: ${name}]`);
-    } else if (typeof att.content === "string" && att.content.trim()) {
-      extraTextBlocks.push(`<archivo_adjunto nombre="${name}">\n${att.content.slice(0, 16000)}\n</archivo_adjunto>`);
+    } else {
+      const textAtt = typeof att.content === "string"
+        ? att.content
+        : (typeof att.textContent === "string" ? att.textContent : "");
+      if (textAtt.trim()) {
+        extraTextBlocks.push(`<archivo_adjunto nombre="${name}">\n${textAtt.slice(0, 16000)}\n</archivo_adjunto>`);
+      }
     }
   }
 
@@ -479,6 +505,26 @@ function formatMessageAttachmentsForEngine(rawMsg, targetEngine = "any") {
     content: combinedText,
     images: ollamaB64
   };
+}
+
+function attachTopLevelAttachmentsToMessages(rawMessages, topAttachments) {
+  const list = Array.isArray(rawMessages)
+    ? rawMessages.map((m) => (m && typeof m === "object" ? { ...m } : m))
+    : [];
+  if (!Array.isArray(topAttachments) || topAttachments.length === 0) {
+    return list;
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    const msg = list[i];
+    if (!msg || typeof msg !== "object") continue;
+    if (String(msg.role || "").trim() === "user") {
+      if (!Array.isArray(msg.attachments) || msg.attachments.length === 0) {
+        msg.attachments = topAttachments;
+      }
+      break;
+    }
+  }
+  return list;
 }
 
 function flattenHistoryMessagesForDual(rawMessages, options = {}) {
@@ -669,6 +715,203 @@ function createStudioServer(options = {}) {
     allowHostProcessControl: options.allowHostProcessControl !== false
   };
   let activeDirectmlEnv = {};
+  const projectPreviewProcesses = new Map();
+  const PREVIEW_ENTRY_CANDIDATES = ["src/ui/index.html", "index.html", "public/index.html", "dist/index.html"];
+  const PREVIEW_ALLOWED_SCRIPTS = ["dev", "preview", "start"];
+
+  function buildPreviewBridgeScript() {
+    return `<script data-local-ai-preview-bridge="1">
+(function(){
+  window.addEventListener("error", function(ev){
+    try {
+      window.parent.postMessage({
+        type: "local-ai-preview-error",
+        message: ev.message || "Error de ejecución en UI",
+        source: ev.filename || "",
+        lineno: ev.lineno || 0,
+        colno: ev.colno || 0,
+        stack: (ev.error && ev.error.stack) ? String(ev.error.stack) : ""
+      }, "*");
+    } catch(_e){}
+  });
+  window.addEventListener("unhandledrejection", function(ev){
+    try {
+      var reason = ev.reason ? (ev.reason.stack || ev.reason.message || String(ev.reason)) : "Unhandled Promise Rejection";
+      window.parent.postMessage({
+        type: "local-ai-preview-error",
+        message: String(reason),
+        source: "Promise",
+        lineno: 0,
+        colno: 0,
+        stack: String(reason)
+      }, "*");
+    } catch(_e){}
+  });
+})();
+</script>`;
+  }
+
+  function injectPreviewBridgeHtml(htmlText) {
+    const bridgeScript = buildPreviewBridgeScript();
+    if (/<\/body>/i.test(htmlText)) {
+      return htmlText.replace(/<\/body>/i, `${bridgeScript}\n</body>`);
+    }
+    return `${htmlText}\n${bridgeScript}`;
+  }
+
+  function findFreeLoopbackPort() {
+    return new Promise((resolve, reject) => {
+      const srv = net.createServer();
+      srv.unref();
+      srv.on("error", reject);
+      srv.listen(0, "127.0.0.1", () => {
+        const addr = srv.address();
+        const port = addr && typeof addr === "object" ? addr.port : 0;
+        srv.close((closeErr) => {
+          if (closeErr) return reject(closeErr);
+          resolve(port);
+        });
+      });
+    });
+  }
+
+  function tryTcpConnect(host, port) {
+    return new Promise((resolve) => {
+      const socket = net.connect({ host, port });
+      let settled = false;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        try { socket.destroy(); } catch (_e) {}
+        resolve(ok);
+      };
+      socket.setTimeout(600);
+      socket.on("connect", () => finish(true));
+      socket.on("timeout", () => finish(false));
+      socket.on("error", () => finish(false));
+    });
+  }
+
+  async function waitForTcpPort(port, timeoutMs = 10000, proc = null) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (proc && (proc.exitCode !== null || proc.signalCode !== null)) {
+        return null;
+      }
+      if (await tryTcpConnect("127.0.0.1", port)) return "127.0.0.1";
+      if (await tryTcpConnect("::1", port)) return "::1";
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    return null;
+  }
+
+  function terminatePreviewProcessEntry(entry) {
+    return new Promise((resolve) => {
+      if (!entry || !entry.proc) {
+        resolve(false);
+        return;
+      }
+      const proc = entry.proc;
+      const pid = proc.pid;
+      if (proc.exitCode !== null) {
+        resolve(true);
+        return;
+      }
+      if (process.platform === "win32" && pid) {
+        execFile(
+          "taskkill",
+          ["/PID", String(pid), "/T", "/F"],
+          { windowsHide: true, timeout: 4000 },
+          () => {
+            try { proc.kill("SIGKILL"); } catch (_e) {}
+            resolve(true);
+          }
+        );
+        return;
+      }
+      try { proc.kill("SIGTERM"); } catch (_e) {}
+      setTimeout(() => {
+        try {
+          if (proc.exitCode === null) proc.kill("SIGKILL");
+        } catch (_e) {}
+        resolve(true);
+      }, 300);
+    });
+  }
+
+  async function stopManagedPreview(targetStateKey = null) {
+    if (targetStateKey) {
+      const entry = projectPreviewProcesses.get(targetStateKey);
+      if (!entry) return 0;
+      projectPreviewProcesses.delete(targetStateKey);
+      await terminatePreviewProcessEntry(entry);
+      return 1;
+    }
+    const entries = Array.from(projectPreviewProcesses.entries());
+    projectPreviewProcesses.clear();
+    await Promise.all(entries.map(([, entry]) => terminatePreviewProcessEntry(entry)));
+    return entries.length;
+  }
+
+  function readProjectPackageScripts(projPath) {
+    if (!projPath) return {};
+    try {
+      const pkgPath = path.join(projPath, "package.json");
+      if (!fs.existsSync(pkgPath)) return {};
+      const parsed = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+      return (parsed && parsed.scripts && typeof parsed.scripts === "object") ? parsed.scripts : {};
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  function getAvailablePreviewScripts(pkgScripts) {
+    return PREVIEW_ALLOWED_SCRIPTS.filter((k) => typeof pkgScripts[k] === "string" && pkgScripts[k].trim());
+  }
+
+  function resolvePreviewNpmSpawn(scriptName, port, scriptBody = "") {
+    const extraViteArgs = /\bvite\b/i.test(scriptBody) && !/--port\b/i.test(scriptBody)
+      ? ["--", "--port", String(port), "--host", "127.0.0.1"]
+      : [];
+    const npmCliCandidates = [
+      path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+      path.join(path.dirname(process.execPath), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")
+    ];
+    for (const cliPath of npmCliCandidates) {
+      try {
+        if (fs.existsSync(cliPath)) {
+          return { bin: process.execPath, args: [cliPath, "run", scriptName, ...extraViteArgs] };
+        }
+      } catch (_e) {}
+    }
+    if (process.platform === "win32") {
+      return { bin: "cmd.exe", args: ["/d", "/s", "/c", "npm.cmd", "run", scriptName, ...extraViteArgs] };
+    }
+    return { bin: "npm", args: ["run", scriptName, ...extraViteArgs] };
+  }
+
+  function getActiveManagedPreview(stateKey, projectName = null) {
+    if (stateKey && projectPreviewProcesses.has(stateKey)) {
+      const entry = projectPreviewProcesses.get(stateKey);
+      if (entry && entry.proc && entry.proc.exitCode === null) {
+        return entry;
+      }
+      projectPreviewProcesses.delete(stateKey);
+    }
+    if (projectName) {
+      const lowerName = String(projectName).trim().toLowerCase();
+      for (const [k, entry] of projectPreviewProcesses.entries()) {
+        if (!entry || !entry.proc || entry.proc.exitCode !== null) {
+          projectPreviewProcesses.delete(k);
+          continue;
+        }
+        if (String(entry.projName || "").trim().toLowerCase() === lowerName) {
+          return entry;
+        }
+      }
+    }
+    return null;
+  }
 
   function checkDirectMLAlive() {
     return new Promise((resolve) => {
@@ -1942,15 +2185,17 @@ function createStudioServer(options = {}) {
       const projects = bridge.listProjects();
       const convId = query.conversationId || null;
       const token = query.token || null;
+      const projTarget = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
-        projectName: query.project || null,
+        projectName: projTarget,
         convId,
         token,
-        skillId: query.skillIds || query.skillId || null,
+        skillId: query.skillId || null,
+        skillIds: query.skillIds || query.skillId || null,
         profileId: query.profileId || null,
         customSystemPrompt: query.customSystemPrompt || null
       });
-      const active = (ctx && ctx.project) || bridge.getActiveProject(query.project || null, convId, token);
+      const active = (ctx && ctx.project) || bridge.getActiveProject(projTarget, convId, token);
       const stateKey = (!active || active.isGeneral || String(active.name || "").toLowerCase() === "general")
         ? "General"
         : (active.path || active.name);
@@ -1968,7 +2213,7 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/context" && req.method === "GET") {
-      const projName = query.project || query.projectPath || null;
+      const projName = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const convId = query.conversationId || null;
       const token = query.token || null;
       const ctx = bridge.buildProjectContext(projName, convId, token, {
@@ -1987,7 +2232,7 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/project/preview-context" && req.method === "GET") {
-      const proj = query.project || query.projectPath || null;
+      const proj = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const convId = query.conversationId || null;
       const token = query.token || null;
       const ctx = bridge.buildProjectContext(proj, convId, token, {
@@ -2007,7 +2252,8 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/context/select" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const target = payload.projectName || payload.project || payload.selection || null;
+      const rawTarget = payload.projectName || payload.project || payload.selection || null;
+      const target = resolveRequestProjectTarget(rawTarget, payload.projectPath || null, payload.customPath || null);
       const ctx = bridge.buildProjectContext(target, payload.conversationId || null, payload.token || null, {
         writeToDisk: false,
         skillId: payload.skillId || null,
@@ -2093,8 +2339,9 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/load-folder" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const folderPath = typeof (payload.folderPath || payload.path) === "string"
-        ? (payload.folderPath || payload.path).trim()
+      const rawFolder = payload.folderPath || payload.path || payload.customPath || "";
+      const folderPath = typeof rawFolder === "string"
+        ? rawFolder.trim()
         : "";
       if (!folderPath || !fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
         sendJsonError(res, 400, `La carpeta no existe: ${folderPath}`);
@@ -2149,7 +2396,7 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/project/read-file" && req.method === "GET") {
-      const projName = query.project || query.projectPath || null;
+      const projName = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const filePath = (query.filePath || query.file || "").trim();
       if (!filePath) {
         sendJsonError(res, 400, "filePath requerido");
@@ -2166,7 +2413,7 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/save-file" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const filePath = typeof payload.filePath === "string" ? payload.filePath.trim() : "";
       const content = typeof payload.content === "string" ? payload.content : String(payload.content ?? "");
 
@@ -2187,7 +2434,7 @@ function createStudioServer(options = {}) {
         return;
       }
 
-      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || null);
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
       let githubSync;
       if (payload.syncGithub && payload.githubRepo) {
         try {
@@ -2230,7 +2477,7 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/apply-patch" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const filePath = typeof payload.filePath === "string" ? payload.filePath.trim() : "";
       const search = typeof payload.search === "string" ? payload.search : "";
       const replace = typeof payload.replace === "string" ? payload.replace : String(payload.replace ?? "");
@@ -2252,7 +2499,7 @@ function createStudioServer(options = {}) {
         return;
       }
 
-      const projInfo = resolveProjectInfo(projectName, payload.projectPath || null);
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
       let githubSync;
       if (payload.syncGithub && payload.githubRepo) {
         try {
@@ -2296,7 +2543,8 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/log-progress" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const ok = bridge.recordProjectProgress(payload.project || null, {
+      const projTarget = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
+      const ok = bridge.recordProjectProgress(projTarget, {
         tool: payload.tool || "Local AI Studio",
         model: payload.model || "Ollama",
         task: payload.task || "",
@@ -2312,7 +2560,7 @@ function createStudioServer(options = {}) {
     // ---------------------------------------------------------
     if (pathname === "/api/project/diff-preview" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const result = bridge.computeProjectDiffPreview(projectName, {
         kind: payload.kind || "write",
         filePath: payload.filePath || payload.relPath || "",
@@ -2330,7 +2578,7 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/apply-batch" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const actions = Array.isArray(payload.actions) ? payload.actions : [];
       if (actions.length === 0) {
         sendJsonError(res, 400, "Se requiere un arreglo 'actions' con al menos una operación.");
@@ -2349,7 +2597,7 @@ function createStudioServer(options = {}) {
         return;
       }
 
-      const projInfo = resolveProjectInfo(projectName, payload.projectPath || null);
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
       let githubSync = null;
       if (payload.syncGithub && payload.githubRepo) {
         try {
@@ -2396,7 +2644,7 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/project/backups" && req.method === "GET") {
-      const projName = query.project || query.projectPath || null;
+      const projName = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const relPath = query.relPath || query.filePath || null;
       const limit = query.limit ? Number(query.limit) : 50;
       const backups = memoryStore.listProjectBackups(projName, relPath, limit);
@@ -2406,7 +2654,7 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/rollback" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const result = bridge.rollbackProjectChange(projectName, {
         changeId: payload.changeId || payload.id || null,
         backupPath: payload.backupPath || null,
@@ -2424,7 +2672,7 @@ function createStudioServer(options = {}) {
     // Fase 2: Runner Seguro (POST /api/project/run & GET /api/project/scripts)
     // ---------------------------------------------------------
     if (pathname === "/api/project/scripts" && req.method === "GET") {
-      const projName = query.project || query.projectPath || null;
+      const projName = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const result = bridge.getProjectRunnableScripts(projName);
       if (!result.ok) {
         sendJsonError(res, 404, result.error || "Proyecto no encontrado");
@@ -2436,7 +2684,7 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/run" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const result = await bridge.runProjectCommand(projectName, {
         commandKey: payload.commandKey || payload.command || "node_test",
         scriptName: payload.scriptName || payload.script || "",
@@ -2456,7 +2704,7 @@ function createStudioServer(options = {}) {
     // ---------------------------------------------------------
     if (pathname === "/api/project/search" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projectName = payload.project || payload.projectPath || null;
+      const projectName = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const result = bridge.searchProjectCode(projectName, {
         query: payload.query || payload.q || "",
         caseSensitive: Boolean(payload.caseSensitive),
@@ -2473,17 +2721,68 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/pin-files" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || null);
-      const pinnedFiles = Array.isArray(payload.pinnedFiles)
-        ? payload.pinnedFiles.map((f) => String(f || "").trim()).filter(Boolean)
-        : [];
-      const state = memoryStore.updateProjectState(projInfo.stateKey, { pinnedFiles });
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
+      const rawList = Array.isArray(payload.files)
+        ? payload.files
+        : (Array.isArray(payload.pinnedFiles) ? payload.pinnedFiles : []);
+      const rawMode = String(payload.mode || (Array.isArray(payload.pinnedFiles) ? "set" : "add")).trim().toLowerCase();
+      const mode = (rawMode === "add" || rawMode === "remove" || rawMode === "set") ? rawMode : "set";
+      const cleanIncoming = rawList.map((f) => String(f || "").trim()).filter(Boolean);
+
+      if ((projInfo.isGeneral || !projInfo.path) && cleanIncoming.length > 0) {
+        sendJsonError(res, 400, "Selecciona un proyecto activo válido para fijar archivos.");
+        return;
+      }
+
+      const validatedRelPaths = [];
+      for (const rawItem of cleanIncoming) {
+        if (!projInfo.isGeneral && projInfo.path) {
+          const safe = bridge.resolveSafeProjectPath(projInfo.path, rawItem);
+          if (!safe.ok) {
+            sendJsonError(res, 403, safe.error || "Ruta protegida o fuera del proyecto");
+            return;
+          }
+          validatedRelPaths.push(safe.cleanRelPath);
+        } else {
+          validatedRelPaths.push(rawItem.replace(/\\/g, "/"));
+        }
+      }
+
+      const currentState = memoryStore.getProjectState(projInfo.stateKey);
+      const currentPinned = Array.isArray(currentState.pinnedFiles) ? currentState.pinnedFiles : [];
+      const dedupePins = (list) => {
+        const seen = new Set();
+        const out = [];
+        for (const item of list) {
+          const norm = String(item || "").trim().replace(/\\/g, "/");
+          if (!norm) continue;
+          const key = norm.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(norm);
+        }
+        return out;
+      };
+
+      let nextPinned = [];
+      if (mode === "set") {
+        nextPinned = dedupePins(validatedRelPaths);
+      } else if (mode === "add") {
+        nextPinned = dedupePins([...currentPinned, ...validatedRelPaths]);
+      } else {
+        const removeSet = new Set(validatedRelPaths.map((p) => p.toLowerCase()));
+        nextPinned = dedupePins(currentPinned.filter((p) => !removeSet.has(String(p || "").trim().replace(/\\/g, "/").toLowerCase())));
+      }
+
+      const projectState = memoryStore.updateProjectState(projInfo.stateKey, { pinnedFiles: nextPinned });
       const { ctx, directmlCompatibility } = buildProjectCompatibilitySummary({
         projectName: projInfo.isGeneral ? "General" : (projInfo.path || projInfo.name)
       });
       sendJson(res, 200, {
         ok: true,
-        pinnedFiles: state.pinnedFiles || [],
+        project: projInfo.name,
+        pinnedFiles: projectState.pinnedFiles || [],
+        projectState,
         metrics: ctx ? ctx.metrics : null,
         directmlCompatibility
       });
@@ -2491,30 +2790,71 @@ function createStudioServer(options = {}) {
     }
 
     // ---------------------------------------------------------
-    // Fase 4: Live Preview Estático y Estado de Preview
+    // Fase 4: Live Preview (Estático + Dev-Server Gestionado + Proxy)
     // ---------------------------------------------------------
     if (pathname === "/api/project/preview/status" && req.method === "GET") {
-      const projInfo = resolveProjectInfo(query.project || null, query.projectPath || null);
+      const projInfo = resolveProjectInfo(query.project || null, query.projectPath || query.customPath || null);
       if (projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
         sendJson(res, 200, {
           ok: true,
           mode: "none",
           running: false,
+          devServerRunning: false,
+          devPort: null,
+          scriptName: null,
+          supportsDevServer: false,
+          availablePreviewScripts: [],
           previewUrl: null,
           entryFile: null
         });
         return;
       }
-      const entryCandidates = ["src/ui/index.html", "index.html", "public/index.html", "dist/index.html"];
+
+      const pkgScripts = readProjectPackageScripts(projInfo.path);
+      const availablePreviewScripts = getAvailablePreviewScripts(pkgScripts);
+      const supportsDevServer = availablePreviewScripts.length > 0;
+      const activeManaged = getActiveManagedPreview(projInfo.stateKey, projInfo.name);
+
       let entryFile = null;
-      for (const cand of entryCandidates) {
-        const safe = bridge.resolveSafeProjectPath(projInfo.path, cand);
-        if (safe.ok && fs.existsSync(safe.fullPath) && fs.statSync(safe.fullPath).isFile()) {
-          entryFile = safe.cleanRelPath;
-          break;
+      const requestedEntry = typeof query.entry === "string" ? query.entry.trim() : "";
+      if (requestedEntry) {
+        const safeReq = bridge.resolveSafeProjectPath(projInfo.path, requestedEntry);
+        if (!safeReq.ok) {
+          sendJsonError(res, 403, safeReq.error || "Ruta protegida o fuera del proyecto");
+          return;
+        }
+        if (fs.existsSync(safeReq.fullPath) && fs.statSync(safeReq.fullPath).isFile()) {
+          entryFile = safeReq.cleanRelPath;
         }
       }
+      if (!entryFile) {
+        for (const cand of PREVIEW_ENTRY_CANDIDATES) {
+          const safe = bridge.resolveSafeProjectPath(projInfo.path, cand);
+          if (safe.ok && fs.existsSync(safe.fullPath) && fs.statSync(safe.fullPath).isFile()) {
+            entryFile = safe.cleanRelPath;
+            break;
+          }
+        }
+      }
+
       const encodedProj = encodeURIComponent(projInfo.name);
+      if (activeManaged) {
+        sendJson(res, 200, {
+          ok: true,
+          project: projInfo.name,
+          mode: "dev-server",
+          running: true,
+          devServerRunning: true,
+          devPort: activeManaged.port,
+          scriptName: activeManaged.scriptName,
+          supportsDevServer,
+          availablePreviewScripts,
+          previewUrl: `/api/project/preview-proxy/${encodedProj}/`,
+          entryFile
+        });
+        return;
+      }
+
       const previewUrl = entryFile
         ? `/api/project/static/${encodedProj}/${entryFile}`
         : `/api/project/static/${encodedProj}/index.html`;
@@ -2523,6 +2863,11 @@ function createStudioServer(options = {}) {
         project: projInfo.name,
         mode: "static",
         running: Boolean(entryFile),
+        devServerRunning: false,
+        devPort: null,
+        scriptName: null,
+        supportsDevServer,
+        availablePreviewScripts,
         previewUrl,
         entryFile
       });
@@ -2531,11 +2876,137 @@ function createStudioServer(options = {}) {
 
     if (pathname === "/api/project/preview/start" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || null);
-      const entryCandidates = ["src/ui/index.html", "index.html", "public/index.html", "dist/index.html"];
-      let entryFile = "index.html";
-      if (!projInfo.isGeneral && projInfo.path && fs.existsSync(projInfo.path)) {
-        for (const cand of entryCandidates) {
+      const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
+      if (projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
+        sendJsonError(res, 400, "Selecciona un proyecto activo válido para iniciar Live Preview.");
+        return;
+      }
+
+      const pkgScripts = readProjectPackageScripts(projInfo.path);
+      const availablePreviewScripts = getAvailablePreviewScripts(pkgScripts);
+      const supportsDevServer = availablePreviewScripts.length > 0;
+      const encodedProj = encodeURIComponent(projInfo.name);
+      const wantsDevServer = payload.mode === "dev-server" || payload.devServer === true;
+
+      if (wantsDevServer) {
+        const reqScript = typeof payload.scriptName === "string" ? payload.scriptName.trim() : "";
+        if (reqScript && !PREVIEW_ALLOWED_SCRIPTS.includes(reqScript)) {
+          sendJsonError(res, 400, `Script de dev-server no permitido: '${reqScript}'. Solo se permiten: ${PREVIEW_ALLOWED_SCRIPTS.join(", ")}.`);
+          return;
+        }
+        const scriptName = reqScript
+          ? (availablePreviewScripts.includes(reqScript) ? reqScript : null)
+          : (availablePreviewScripts[0] || null);
+        if (!scriptName) {
+          sendJsonError(res, 400, "El proyecto no tiene un script 'dev', 'preview' o 'start' en package.json.");
+          return;
+        }
+
+        const existing = getActiveManagedPreview(projInfo.stateKey, projInfo.name);
+        if (existing && existing.scriptName === scriptName) {
+          sendJson(res, 200, {
+            ok: true,
+            project: projInfo.name,
+            mode: "dev-server",
+            running: true,
+            devServerRunning: true,
+            devPort: existing.port,
+            scriptName: existing.scriptName,
+            supportsDevServer,
+            availablePreviewScripts,
+            previewUrl: `/api/project/preview-proxy/${encodedProj}/`
+          });
+          return;
+        }
+        if (existing) {
+          await stopManagedPreview(projInfo.stateKey);
+        }
+
+        const port = await findFreeLoopbackPort();
+        const spawnSpec = resolvePreviewNpmSpawn(scriptName, port, pkgScripts[scriptName] || "");
+        const proc = spawn(spawnSpec.bin, spawnSpec.args, {
+          cwd: projInfo.path,
+          shell: false,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            PORT: String(port),
+            VITE_PORT: String(port),
+            HOST: "127.0.0.1",
+            BROWSER: "none",
+            CI: "true"
+          }
+        });
+
+        let recentLogs = "";
+        const appendLog = (chunk) => {
+          recentLogs = (recentLogs + String(chunk || "")).slice(-4096);
+        };
+        if (proc.stdout) proc.stdout.on("data", appendLog);
+        if (proc.stderr) proc.stderr.on("data", appendLog);
+        proc.on("exit", () => {
+          const cur = projectPreviewProcesses.get(projInfo.stateKey);
+          if (cur && cur.proc === proc) {
+            projectPreviewProcesses.delete(projInfo.stateKey);
+          }
+        });
+
+        const connectedHost = await waitForTcpPort(port, Number(payload.timeoutMs) || 10000, proc);
+        if (!connectedHost) {
+          await terminatePreviewProcessEntry({ proc });
+          sendJsonError(
+            res,
+            502,
+            `El dev-server (${scriptName}) no respondió a tiempo en 127.0.0.1:${port}.${recentLogs.trim() ? ` Log: ${recentLogs.trim().slice(-240)}` : ""}`
+          );
+          return;
+        }
+
+        projectPreviewProcesses.set(projInfo.stateKey, {
+          proc,
+          port,
+          host: connectedHost,
+          scriptName,
+          projName: projInfo.name,
+          projPath: projInfo.path,
+          stateKey: projInfo.stateKey,
+          startedAt: new Date().toISOString()
+        });
+
+        sendJson(res, 200, {
+          ok: true,
+          project: projInfo.name,
+          mode: "dev-server",
+          running: true,
+          devServerRunning: true,
+          devPort: port,
+          scriptName,
+          supportsDevServer,
+          availablePreviewScripts,
+          previewUrl: `/api/project/preview-proxy/${encodedProj}/`
+        });
+        return;
+      }
+
+      if (payload.stopDevServer === true) {
+        await stopManagedPreview(projInfo.stateKey);
+      }
+
+      let entryFile = null;
+      const requestedEntry = typeof payload.entry === "string" ? payload.entry.trim() : "";
+      if (requestedEntry) {
+        const safeReq = bridge.resolveSafeProjectPath(projInfo.path, requestedEntry);
+        if (!safeReq.ok) {
+          sendJsonError(res, 403, safeReq.error || "Ruta protegida o fuera del proyecto");
+          return;
+        }
+        if (fs.existsSync(safeReq.fullPath) && fs.statSync(safeReq.fullPath).isFile()) {
+          entryFile = safeReq.cleanRelPath;
+        }
+      }
+      if (!entryFile) {
+        for (const cand of PREVIEW_ENTRY_CANDIDATES) {
           const safe = bridge.resolveSafeProjectPath(projInfo.path, cand);
           if (safe.ok && fs.existsSync(safe.fullPath) && fs.statSync(safe.fullPath).isFile()) {
             entryFile = safe.cleanRelPath;
@@ -2543,12 +3014,18 @@ function createStudioServer(options = {}) {
           }
         }
       }
-      const encodedProj = encodeURIComponent(projInfo.name);
+      if (!entryFile) entryFile = "index.html";
+
       sendJson(res, 200, {
         ok: true,
         project: projInfo.name,
         mode: "static",
         running: true,
+        devServerRunning: false,
+        devPort: null,
+        scriptName: null,
+        supportsDevServer,
+        availablePreviewScripts,
         entryFile,
         previewUrl: `/api/project/static/${encodedProj}/${entryFile}`
       });
@@ -2556,7 +3033,127 @@ function createStudioServer(options = {}) {
     }
 
     if (pathname === "/api/project/preview/stop" && req.method === "POST") {
-      sendJson(res, 200, { ok: true, stopped: true });
+      const payload = ensurePlainObject(await readJsonBody(req));
+      let stoppedCount = 0;
+      if (payload.project || payload.projectPath || payload.customPath) {
+        const projInfo = resolveProjectInfo(payload.project || null, payload.projectPath || payload.customPath || null);
+        const activeByKey = getActiveManagedPreview(projInfo.stateKey, projInfo.name);
+        if (activeByKey) {
+          stoppedCount = await stopManagedPreview(activeByKey.stateKey);
+        }
+      } else {
+        stoppedCount = await stopManagedPreview(null);
+      }
+      sendJson(res, 200, { ok: true, stopped: true, running: false, stoppedCount });
+      return;
+    }
+
+    if (pathname.startsWith("/api/project/preview-proxy/") && (req.method === "GET" || req.method === "HEAD")) {
+      const rest = pathname.slice("/api/project/preview-proxy/".length);
+      const slashIdx = rest.indexOf("/");
+      const rawProjSeg = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+      const subPath = slashIdx === -1 ? "/" : `/${rest.slice(slashIdx + 1)}`;
+      let projSeg = "";
+      try {
+        projSeg = decodeURIComponent(rawProjSeg).trim();
+      } catch (_e) {
+        sendJsonError(res, 400, "Ruta de preview proxy malformada.");
+        return;
+      }
+
+      const projInfo = resolveProjectInfo(projSeg, query.projectPath || query.customPath || null);
+      const entry = getActiveManagedPreview(projInfo.stateKey, projInfo.name || projSeg);
+      if (!entry) {
+        sendJsonError(res, 503, `El dev-server de preview no está activo para ${projSeg}.`);
+        return;
+      }
+
+      const forwardParams = new URLSearchParams(parsedUrl.searchParams);
+      forwardParams.delete("projectPath");
+      forwardParams.delete("customPath");
+      const forwardQs = forwardParams.toString();
+      const targetPath = `${subPath}${forwardQs ? `?${forwardQs}` : ""}`;
+      const encodedProj = encodeURIComponent(projInfo.name || projSeg);
+      const proxyPrefix = `/api/project/preview-proxy/${encodedProj}`;
+
+      await new Promise((resolve) => {
+        const upHeaders = {
+          "accept": req.headers.accept || "*/*",
+          "accept-encoding": "identity"
+        };
+        if (req.headers["user-agent"]) upHeaders["user-agent"] = req.headers["user-agent"];
+
+        const upReq = http.request({
+          hostname: entry.host || "127.0.0.1",
+          port: entry.port,
+          path: targetPath,
+          method: req.method,
+          headers: upHeaders,
+          timeout: 15000
+        }, (upRes) => {
+          const headersOut = {};
+          for (const [k, v] of Object.entries(upRes.headers)) {
+            const lk = k.toLowerCase();
+            if (lk === "transfer-encoding" || lk === "content-length" || lk === "content-security-policy" || lk === "x-frame-options") {
+              continue;
+            }
+            if (lk === "location" && typeof v === "string" && v.startsWith("/") && !v.startsWith("//") && !v.startsWith(proxyPrefix)) {
+              headersOut[k] = `${proxyPrefix}${v}`;
+              continue;
+            }
+            headersOut[k] = v;
+          }
+          headersOut["Cache-Control"] = "no-store";
+
+          const contentType = String(upRes.headers["content-type"] || "").toLowerCase();
+          if (contentType.includes("text/html") && req.method !== "HEAD") {
+            const chunks = [];
+            upRes.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+            upRes.on("end", () => {
+              const htmlWithBridge = injectPreviewBridgeHtml(Buffer.concat(chunks).toString("utf-8"));
+              const outBuf = Buffer.from(htmlWithBridge, "utf-8");
+              headersOut["Content-Length"] = outBuf.length;
+              if (!res.headersSent) res.writeHead(upRes.statusCode || 200, headersOut);
+              res.end(outBuf);
+              resolve();
+            });
+            upRes.on("error", () => {
+              if (!res.headersSent) sendJsonError(res, 502, "Error leyendo HTML del dev-server de preview.");
+              else if (!res.writableEnded) res.end();
+              resolve();
+            });
+            return;
+          }
+
+          if (upRes.headers["content-length"] !== undefined) {
+            headersOut["Content-Length"] = upRes.headers["content-length"];
+          }
+          if (!res.headersSent) res.writeHead(upRes.statusCode || 200, headersOut);
+          if (req.method === "HEAD") {
+            upRes.resume();
+            res.end();
+            resolve();
+            return;
+          }
+          upRes.pipe(res);
+          upRes.on("end", () => resolve());
+          upRes.on("error", () => {
+            if (!res.writableEnded) res.end();
+            resolve();
+          });
+        });
+
+        upReq.on("error", (err) => {
+          sendJsonError(res, 502, `Error conectando con dev-server de preview: ${safeErrMsg(err)}`);
+          resolve();
+        });
+        upReq.on("timeout", () => {
+          try { upReq.destroy(); } catch (_e) {}
+          sendJsonError(res, 504, "Timeout conectando con dev-server de preview.");
+          resolve();
+        });
+        upReq.end();
+      });
       return;
     }
 
@@ -2575,7 +3172,7 @@ function createStudioServer(options = {}) {
         return;
       }
 
-      const projInfo = resolveProjectInfo(projSeg, null);
+      const projInfo = resolveProjectInfo(projSeg, query.projectPath || query.customPath || null);
       if (!projInfo || projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
         sendJsonError(res, 404, `Proyecto no encontrado para preview: ${projSeg}`);
         return;
@@ -2622,41 +3219,7 @@ function createStudioServer(options = {}) {
       const mimeType = STATIC_MIMES[ext] || "application/octet-stream";
 
       if (ext === ".html" || ext === ".htm") {
-        let htmlText = fs.readFileSync(safe.fullPath, "utf-8");
-        const bridgeScript = `<script data-local-ai-preview-bridge="1">
-(function(){
-  window.addEventListener("error", function(ev){
-    try {
-      window.parent.postMessage({
-        type: "local-ai-preview-error",
-        message: ev.message || "Error de ejecución en UI",
-        source: ev.filename || "",
-        lineno: ev.lineno || 0,
-        colno: ev.colno || 0,
-        stack: (ev.error && ev.error.stack) ? String(ev.error.stack) : ""
-      }, "*");
-    } catch(_e){}
-  });
-  window.addEventListener("unhandledrejection", function(ev){
-    try {
-      var reason = ev.reason ? (ev.reason.stack || ev.reason.message || String(ev.reason)) : "Unhandled Promise Rejection";
-      window.parent.postMessage({
-        type: "local-ai-preview-error",
-        message: String(reason),
-        source: "Promise",
-        lineno: 0,
-        colno: 0,
-        stack: String(reason)
-      }, "*");
-    } catch(_e){}
-  });
-})();
-</script>`;
-        if (/<\/body>/i.test(htmlText)) {
-          htmlText = htmlText.replace(/<\/body>/i, `${bridgeScript}\n</body>`);
-        } else {
-          htmlText += `\n${bridgeScript}`;
-        }
+        const htmlText = injectPreviewBridgeHtml(fs.readFileSync(safe.fullPath, "utf-8"));
         const buf = Buffer.from(htmlText, "utf-8");
         res.writeHead(200, {
           "Content-Type": mimeType,
@@ -2863,11 +3426,13 @@ function createStudioServer(options = {}) {
     // ---------------------------------------------------------
     if (pathname === "/api/project/enter-context" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
+      const projTarget = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const enterPayload = contextAnalyzer.buildEnterContextPayload({
-        projectName: payload.project || payload.projectPath || null,
+        projectName: projTarget,
         convId: payload.conversationId || null,
         token: payload.token || null,
         skillId: payload.skillId || null,
+        skillIds: payload.skillIds || payload.skillId || null,
         profileId: payload.profileId || null,
         customSystemPrompt: payload.customSystemPrompt || null
       });
@@ -3258,11 +3823,13 @@ function createStudioServer(options = {}) {
         (dmlAgent && typeof dmlAgent.customSystemPrompt === "string") ? dmlAgent.customSystemPrompt.trim() : ""
       ].filter(Boolean).join("\n\n");
 
+      const evalProjTarget = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const { directmlCompatibility: computedProjectCompat } = buildProjectCompatibilitySummary({
-        projectName: payload.project || payload.projectPath || null,
+        projectName: evalProjTarget,
         convId: payload.conversationId || null,
         token: payload.token || null,
         skillId: (dmlAgent && dmlAgent.skillId) || payload.skillId || null,
+        skillIds: (dmlAgent && (dmlAgent.skillIds || dmlAgent.skillId)) || payload.skillIds || payload.skillId || null,
         profileId: (dmlAgent && dmlAgent.profileId) || payload.profileId || null,
         customSystemPrompt: combinedDirective || null,
         modelOverridesPrompt: (dmlAgent && dmlAgent.modelSystemPrompt) || null,
@@ -3648,12 +4215,15 @@ function createStudioServer(options = {}) {
       }
 
       const target = detectEngineTarget(payload);
-      const flattenedMessages = payload.messages !== undefined
-        ? flattenHistoryMessagesForDual(payload.messages, { preserveSystem: true, targetEngine: target.engine })
+      const messagesWithAttachments = payload.messages !== undefined
+        ? attachTopLevelAttachmentsToMessages(payload.messages, payload.attachments)
         : undefined;
-      const mentionedFiles = extractMentionedFilesFromMessages(payload.messages || [], payload.mentionedFiles);
+      const flattenedMessages = messagesWithAttachments !== undefined
+        ? flattenHistoryMessagesForDual(messagesWithAttachments, { preserveSystem: true, targetEngine: target.engine })
+        : undefined;
+      const mentionedFiles = extractMentionedFilesFromMessages(messagesWithAttachments || [], payload.mentionedFiles);
 
-      const rawProjIdentifier = payload.project || payload.projectPath || null;
+      const rawProjIdentifier = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const convId = payload.conversationId || null;
       const ctx = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
@@ -3665,7 +4235,7 @@ function createStudioServer(options = {}) {
         modelOverridesPrompt: payload.modelSystemPrompt || null
       });
 
-      const webSearch = await runWebSearchForChat(payload, flattenedMessages || payload.messages || []);
+      const webSearch = await runWebSearchForChat(payload, flattenedMessages || messagesWithAttachments || []);
       let combinedSysPrompt = ctx && ctx.systemPrompt ? ctx.systemPrompt : "";
       if (webSearch && webSearch.contextSuffix) {
         combinedSysPrompt = combinedSysPrompt
@@ -3832,7 +4402,8 @@ function createStudioServer(options = {}) {
         return;
       }
 
-      const baseHistory = flattenHistoryMessagesForDual(payload.messages);
+      const dualMessagesWithAttachments = attachTopLevelAttachmentsToMessages(payload.messages, payload.attachments);
+      const baseHistory = flattenHistoryMessagesForDual(dualMessagesWithAttachments);
       if (baseHistory.length === 0) {
         sendJsonError(res, 400, "No hay mensajes válidos de usuario/asistente para procesar en Modo Dual.");
         return;
@@ -3875,7 +4446,7 @@ function createStudioServer(options = {}) {
 
       const evalNumCtxA = Number(rawA.numCtx || rawA.num_ctx);
       const evalNumCtxB = Number(rawB.numCtx || rawB.num_ctx);
-      const rawProjIdentifier = payload.project || payload.projectPath || null;
+      const rawProjIdentifier = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const convId = payload.conversationId || null;
       const globalDirective = typeof payload.customSystemPrompt === "string" ? payload.customSystemPrompt.trim() : "";
 
@@ -3890,6 +4461,7 @@ function createStudioServer(options = {}) {
           convId,
           token: payload.token || null,
           skillId: dmlRawSlot.skillId || null,
+          skillIds: dmlRawSlot.skillIds || dmlRawSlot.skillId || payload.skillIds || payload.skillId || null,
           profileId: dmlRawSlot.profileId || null,
           customSystemPrompt: dmlCombinedDirective || null,
           modelOverridesPrompt: dmlRawSlot.modelSystemPrompt || null,
@@ -3960,12 +4532,12 @@ function createStudioServer(options = {}) {
         return sections.join("\n\n");
       }
 
-      const dualMentionedFiles = extractMentionedFilesFromMessages(payload.messages || [], payload.mentionedFiles);
+      const dualMentionedFiles = extractMentionedFilesFromMessages(dualMessagesWithAttachments || [], payload.mentionedFiles);
 
       const ctxA = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: rawA.skillId || null,
-        skillIds: rawA.skillIds || rawA.skillId || payload.skillIds || null,
+        skillIds: rawA.skillIds || rawA.skillId || payload.skillIds || payload.skillId || null,
         profileId: rawA.profileId || null,
         mentionedFiles: dualMentionedFiles,
         customSystemPrompt: composeAgentDirective("A", roleLabelA, rawA.customSystemPrompt),
@@ -3975,7 +4547,7 @@ function createStudioServer(options = {}) {
       const ctxB = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: rawB.skillId || null,
-        skillIds: rawB.skillIds || rawB.skillId || payload.skillIds || null,
+        skillIds: rawB.skillIds || rawB.skillId || payload.skillIds || payload.skillId || null,
         profileId: rawB.profileId || null,
         mentionedFiles: dualMentionedFiles,
         customSystemPrompt: composeAgentDirective("B", roleLabelB, rawB.customSystemPrompt),
@@ -4507,6 +5079,7 @@ function createStudioServer(options = {}) {
   });
 
   serverInstance.on("close", () => {
+    stopManagedPreview().catch(() => {});
     ttsBridge.shutdownTtsWorker().catch(() => {});
   });
 

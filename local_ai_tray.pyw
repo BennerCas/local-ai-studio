@@ -11,7 +11,7 @@ from PIL import Image
 import pystray
 from pystray import MenuItem, Menu
 
-BASE_DIR = r"C:\Users\Benner\.gemini\config\plugins\local-ai-studio"
+BASE_DIR = r"C:\antigravityAS\Local AI Studio"
 SIDECAR_DIR = os.path.join(BASE_DIR, "sidecars", "local_ai_chat")
 SERVER_JS = os.path.join(SIDECAR_DIR, "server.js")
 MODELS_DIR = r"C:\antigravityAS\Modelos -ai-brains"

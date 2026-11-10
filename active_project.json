@@ -1,6 +1,6 @@
 {
   "activeProject": "DemoVibeApp",
-  "updatedAt": "2026-11-09T22:17:01.097Z",
+  "updatedAt": "2026-11-10T02:19:56.304Z",
   "selectedFilesMap": {
     "c:\\antigravityas\\synthia": [
       "server/index.ts",
@@ -9,14 +9,8 @@
       "AVANCES_LOCAL_AI.md",
       "biblioteca/20261104_152139_imagen_portada_ses-bcb85deb.json",
       "biblioteca/20261104_152208_imagen_portada_ses-e7a5f501.json"
-    ]
+    ],
+    "c:\\antigravityas\\vozstudio-omni-es": []
   },
-  "selectedFiles": [
-    "server/index.ts",
-    "package.json",
-    "biblioteca/README.md",
-    "AVANCES_LOCAL_AI.md",
-    "biblioteca/20261104_152139_imagen_portada_ses-bcb85deb.json",
-    "biblioteca/20261104_152208_imagen_portada_ses-e7a5f501.json"
-  ]
+  "selectedFiles": []
 }

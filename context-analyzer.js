@@ -505,6 +505,7 @@ function buildEnterContextPayload({
   convId = null,
   token = null,
   skillId = null,
+  skillIds = null,
   profileId = null,
   customSystemPrompt = null
 } = {}) {
@@ -515,8 +516,15 @@ function buildEnterContextPayload({
   const masterCfg = memoryStore.getMasterPromptConfig(projName);
   const analyzerBasePrompt = masterCfg.contextAnalyzerPrompt || memoryStore.DEFAULT_CONTEXT_ANALYZER_PROMPT;
 
-  const skillPrompt = (skillId || profileId)
-    ? skillsBridge.buildSkillSystemPrompt(skillId, profileId).trim()
+  const effectiveSkills = (Array.isArray(skillIds) && skillIds.length > 0)
+    ? skillIds
+    : (typeof skillIds === "string" && skillIds.trim() ? skillIds : skillId);
+  const hasAnySkill = Array.isArray(effectiveSkills)
+    ? effectiveSkills.length > 0
+    : Boolean(effectiveSkills && String(effectiveSkills).trim());
+
+  const skillPrompt = (hasAnySkill || profileId)
+    ? skillsBridge.buildSkillSystemPrompt(effectiveSkills, profileId).trim()
     : "";
 
   const sysParts = [analyzerBasePrompt];

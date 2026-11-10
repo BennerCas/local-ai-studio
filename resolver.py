@@ -11,7 +11,7 @@ elif os.environ.get("LOCAL_AI_BRAIN_DIR"):
     DB_PATH = ""
 else:
     DB_PATH = r"C:\Users\Benner\.gemini\antigravity\conversation_summaries.db"
-CONFIG_FILE = os.environ.get("LOCAL_AI_CONFIG_FILE") or r"C:\Users\Benner\.gemini\config\plugins\local-ai-studio\active_project.json"
+CONFIG_FILE = os.environ.get("LOCAL_AI_CONFIG_FILE") or r"C:\antigravityAS\Local AI Studio\active_project.json"
 BASE_PROJECTS_DIR = os.environ.get("LOCAL_AI_PROJECTS_DIR") or r"C:\antigravityAS"
 
 def decode_uri(uris_raw):
