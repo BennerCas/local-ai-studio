@@ -64,7 +64,7 @@ test('barra superior: selector de Modo y Swarm activo sincronizados en tiempo re
   assert.match(html, /function syncComboUI\(\)/);
   assert.match(html, /function staffComboFromBuiltins\(\)/);
   if (html.includes('id="dotOllama"')) throw new Error('pildoras viejas presentes');
-  assert.match(html, /id="staffWeather"/);
+  assert.match(html, /id="mwTemp"/);
   assert.match(html, /api.open-meteo.com/);
 });
 
