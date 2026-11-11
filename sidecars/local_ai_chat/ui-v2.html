@@ -321,7 +321,18 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-skills .tree-cat{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
 #view-skills .tree-cat>summary{cursor:pointer;padding:9px 11px;font-weight:800;font-size:12.5px;list-style:none;background:var(--card)}
 #view-skills .tree-cat>summary::-webkit-details-marker{display:none}
-#view-skills .tree-item{display:block;width:100%;text-align:left;padding:7px 11px 7px 20px;font-size:12px;background:none;border:none;border-top:1px solid var(--line);color:var(--text);cursor:pointer}
+#view-skills .tree-item{display:flex;align-items:center;gap:7px;width:100%;text-align:left;padding:7px 11px 7px 20px;font-size:12px;background:none;border:none;border-top:1px solid var(--line);color:var(--text);cursor:pointer}
+#view-skills .tree-item .tname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-skills .tree-item .tnum{flex-shrink:0;font-size:10px}
+#view-skills .tree-cat>summary{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:7px}
+#view-skills .tree-cat>summary .tag{margin-left:auto}
+#view-skills .tree-cat>summary::before{content:'▸';font-size:10px;transition:transform .15s}
+#view-skills .tree-cat[open]>summary::before{transform:rotate(90deg)}
+#profileDetail h3{font-size:19px;line-height:1.25}
+#profileDetail .masterbox{font-size:12.5px;line-height:1.65}
+#profileDetail .masterbox h1,#profileDetail .masterbox h2,#profileDetail .masterbox h3{font-size:13.5px;margin:12px 0 4px}
+#profileDetail .masterbox p{margin:5px 0}
+#profileSkillsCol .card{padding:10px 12px;border-radius:12px}
 #view-skills .tree-item:hover{background:var(--card)}
 #view-skills .tree-item.sel{background:var(--card);box-shadow:inset 3px 0 0 var(--vio,#8b7bff);font-weight:700}
 #view-skills .pstats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
@@ -1882,8 +1893,35 @@ async function loadProfilesReal(){
 }
 /* ----- Esquema jerarquico de perfiles + detalle (descripcion, skills, Master Prompt) ----- */
 let PROFILES_CACHE=[];
+let _skillsFallbackDone=false;
+async function enrichProfilesSkillsIfNeeded(){
+  if(_skillsFallbackDone) return;
+  if(PROFILES_CACHE.some(pf=>(pf.skillsSugeridas||[]).length)) return;
+  _skillsFallbackDone=true;
+  try{
+    const r=await API.get('/api/skills?limit=0');
+    const all=r.skills||[]; if(!all.length) return;
+    const STOP=new Set(['the','and','for','with','engineer','engineering','specialist','expert','agent','ai','pro','senior','lead','master','chief','head','de','la','el','en','y','staff','directory','people','event','events','manager','management','director','general','global','digital','online','content']);
+    const AFF={engineering:['development','web-development','frontend','devops','cloud','data'],specialized:['ai-ml','workflow','automation','development'],security:['security'],marketing:['marketing','content','business'],design:['design','frontend','content'],testing:['development','devops','workflow'],'game-development':['development','design','ai-ml'],sales:['business','marketing','productivity'],finance:['business','data'],product:['business','productivity','workflow'],'project-management':['productivity','workflow','business'],support:['productivity','workflow','business'],academic:['content','data','productivity'],'paid-media':['marketing','business'],'spatial-computing':['design','development','ai-ml']};
+    PROFILES_CACHE.forEach(pf=>{
+      const toks=new Set();
+      String((pf.slug||'')+' '+(pf.name||'')+' '+String(pf.category||'').replace(/-/g,' ')).toLowerCase().split(/[^a-z0-9]+/).forEach(w=>{ if(w.length>=3&&!STOP.has(w)) toks.add(w); });
+      const scored=[];
+      for(const s of all){
+        const nm=String(s.name||s.id||'').toLowerCase(), idl=String(s.id||'').toLowerCase(), cat=String(s.category||'').toLowerCase(), desc=String(s.description||'').toLowerCase();
+        let sc=(AFF[String(pf.category||'').toLowerCase()]||[]).includes(cat)?2:0;
+        toks.forEach(t=>{ if(nm.includes(t)||idl.includes(t)) sc+=3; else if(cat.includes(t)) sc+=2; else if(desc.includes(t)) sc+=1; });
+        if(sc>0) scored.push({id:s.id, name:s.name||s.id, category:s.category||'general', sc});
+      }
+      scored.sort((a,b)=>b.sc-a.sc||a.name.localeCompare(b.name));
+      pf.skillsSugeridas=scored.slice(0,8).map(({id,name,category})=>({id,name,category}));
+    });
+    renderProfileTree(PROFILES_CACHE, null);
+  }catch(e){ /* sin indice completo: se queda como esta */ }
+}
 function renderProfileTree(profiles, meta){
   PROFILES_CACHE=profiles||[];
+  enrichProfilesSkillsIfNeeded();
   const tree=document.getElementById('profileTree');
   const stats=document.getElementById('psStats');
   const byCat={};
@@ -1899,10 +1937,10 @@ function renderProfileTree(profiles, meta){
   if(!PROFILES_CACHE.length){ tree.innerHTML='<p class="muted tiny">Sin perfiles cargados.</p>'; return; }
   tree.innerHTML=cats.map((c,ci)=>{
     const items=byCat[c].slice().sort((a,b)=>a.name.localeCompare(b.name)).map(pf=>
-      '<button class="tree-item" data-pid="'+esc(pf.id)+'" onclick="selectProfileDetail(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">'+(pf.emoji?esc(pf.emoji)+' ':'🎭 ')+esc(pf.name)+' <span class="tiny muted">· '+((pf.skillsSugeridas||[]).length)+' skills</span></button>').join('');
+      '<button class="tree-item" data-pid="'+esc(pf.id)+'" title="'+esc(pf.name)+'" onclick="selectProfileDetail(\''+esc(pf.id).replace(/'/g,"\\'")+'\')"><span class="tname">'+(pf.emoji?esc(pf.emoji)+' ':'🎭 ')+esc(pf.name)+'</span><span class="tag tnum">'+((pf.skillsSugeridas||[]).length)+' skills</span></button>').join('');
     return '<details class="tree-cat" '+(ci===0?'open':'')+'><summary>📁 '+esc(c)+' <span class="tag">'+byCat[c].length+'</span></summary>'+items+'</details>';
   }).join('');
-  const first=PROFILES_CACHE.find(pf=>pf.id==='specialized/director-staff-vibecoding')||PROFILES_CACHE[0];
+  const first=PROFILES_CACHE.find(pf=>String(pf.id).includes('director-staff-vibecoding'))||PROFILES_CACHE[0];
   if(first) selectProfileDetail(first.id);
 }
 async function selectProfileDetail(id){
@@ -1925,7 +1963,7 @@ async function selectProfileDetail(id){
   try{
     const r=await API.get('/api/profiles/content?id='+encodeURIComponent(id));
     const box=document.getElementById('pfMaster');
-    if(box){ let c=String(r.content||''); c=c.replace(/^---[\s\S]*?---\s*/, ''); box.textContent=c.slice(0,6000)||'Su ficha no contiene cuerpo de Master Prompt.'; }
+    if(box){ let c=String(r.content||''); c=c.replace(/^---[\s\S]*?---\s*/, ''); box.innerHTML=c.trim()?md(c.slice(0,9000)):'Su ficha no contiene cuerpo de Master Prompt.'; }
   }catch(e){ const box=document.getElementById('pfMaster'); if(box) box.textContent='No se pudo leer su Master Prompt: '+e.message; }
 }
 function activateProfileSkills(id){

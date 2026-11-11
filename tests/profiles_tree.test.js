@@ -22,3 +22,8 @@ test('layout pedido: sin fusion, sin buscador, 3 columnas', () => {
   if (html.includes('Buscar skill')) throw new Error('buscador sigue presente');
   if (!html.includes('Sus 8 skills')) throw new Error('falta columna de 8 skills');
 });
+
+test('skills del perfil: fallback en navegador si el servidor no las manda', () => {
+  if (!html.includes('enrichProfilesSkillsIfNeeded')) throw new Error('sin fallback');
+  if (!html.includes("md(c.slice(0,9000))")) throw new Error('master prompt sin renderizar');
+});
