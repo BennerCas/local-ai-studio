@@ -94,6 +94,15 @@ try {
                     Write-Host "Token $v retirado de esta sesion (descarga publica en anonimo)." -ForegroundColor Yellow
                 }
             }
+            # Tambien hay que aislar el token guardado en el ARCHIVO de
+            # credenciales de HF (~/.cache/huggingface/token): aunque se
+            # retiren las variables, transformers sigue mandandolo y un
+            # token caducado provoca el 401 incluso en repos publicos.
+            # Con un HF_HOME propio y vacio, la construccion va en anonimo
+            # de verdad (y de paso su cache queda junto a los modelos).
+            $env:HF_HOME = Join-Path $CacheDir "hf-home"
+            New-Item -ItemType Directory -Force -Path $env:HF_HOME | Out-Null
+            Write-Host "HF_HOME aislado para la construccion: $($env:HF_HOME)" -ForegroundColor Yellow
         }
         $argsBuilder = @(
             "-m", "onnxruntime_genai.models.builder",
