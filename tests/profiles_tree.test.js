@@ -33,3 +33,8 @@ test('reparto 3 columnas estilo estudio: perfiles | descripcion+skills | master 
   if (!html.includes('id="profileSkillsCol"') || !html.includes('id="activateSkillsBtn"') || !html.includes('id="treeUseBtn"')) throw new Error('faltan piezas reubicadas');
   if (!html.includes('ps-col')) throw new Error('sin estilo de columna del estudio');
 });
+
+test('skills en rejilla 2x4 con tooltip propio', () => {
+  if (!html.includes('grid-template-columns:1fr 1fr')) throw new Error('sin rejilla');
+  if (!html.includes('data-tip=')) throw new Error('sin tooltip');
+});
