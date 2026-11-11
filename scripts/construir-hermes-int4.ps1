@@ -98,8 +98,8 @@ try {
     Titulo "4/5 Verificacion"
     $cfg = Join-Path $Salida "genai_config.json"
     $onnx = Get-ChildItem $Salida -Filter *.onnx -ErrorAction SilentlyContinue
-    if (-not (Test-Path $cfg)) { throw "Falta genai_config.json en $Salida: construccion incompleta." }
-    if (-not $onnx) { throw "No hay ningun .onnx en $Salida: construccion incompleta." }
+    if (-not (Test-Path $cfg)) { throw "Falta genai_config.json en ${Salida}: construccion incompleta." }
+    if (-not $onnx) { throw "No hay ningun .onnx en ${Salida}: construccion incompleta." }
     $bytes = (Get-ChildItem $Salida -Recurse | Measure-Object -Property Length -Sum).Sum
     $gb = [math]::Round($bytes / 1GB, 2)
     Write-Host "genai_config.json : OK"
