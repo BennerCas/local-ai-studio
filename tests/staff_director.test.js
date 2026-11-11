@@ -67,3 +67,10 @@ test('barra superior: selector de Modo y Swarm activo sincronizados en tiempo re
   assert.match(html, /id="staffWeather"/);
   assert.match(html, /api.open-meteo.com/);
 });
+
+test('saludo de Staff sin tarjetas: logo, pregunta y clima de Piura', () => {
+  if (html.includes('mac-widget')) throw new Error('sigue el widget en tarjeta');
+  assert.match(html, /latitude=-5\.1945&longitude=-80\.6328/);
+  assert.match(html, /staff-on #chatEmpty/);
+  assert.match(html, /¿En qué trabajamos hoy\?/);
+});

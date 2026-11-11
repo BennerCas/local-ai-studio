@@ -723,13 +723,9 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #masterGearMenu .btn{width:auto;text-align:center;white-space:nowrap;padding:7px 12px;font-size:12px}
 
 /* ===== Panel inicial del Director de Staff (en el chat) ===== */
-#staffWelcome .mac-widget{display:inline-flex;align-items:center;gap:11px;margin-top:12px;padding:10px 16px 10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.20);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
-#staffWelcome .mac-widget .mw-emoji{font-size:26px;line-height:1}
-#staffWelcome .mac-widget .mw-temp{font-size:19px;font-weight:800;line-height:1.1}
-#staffWelcome .mac-widget .mw-desc{font-size:11px;color:var(--muted)}
 #staffWelcome .sw-logo{width:52px;height:52px;border-radius:14px}
-#staffWelcome{display:none;border:1px solid var(--vio);border-radius:16px;padding:16px 18px;margin:0 0 14px;
-  background:linear-gradient(160deg, color-mix(in srgb, var(--vio) 12%, var(--panel2)), var(--panel2));text-align:left}
+body.staff-on #chatEmpty{display:none!important}
+#staffWelcome{display:none;padding:18px 4px 6px;margin:0 0 14px;text-align:left}
 #staffWelcome.show{display:block}
 #staffWelcome .sw-head{display:flex;gap:13px;align-items:center}
 #staffWelcome .sw-head img{width:46px;height:46px;border-radius:12px}
@@ -883,9 +879,9 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
           <div class="chat-scroll" id="chatScroll">
             <div id="staffWelcome">
               <img class="sw-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
-              <h3 id="staffGreeting" style="margin:10px 0 2px;font-size:19px">Hola, Benner</h3>
-              <p class="tiny muted" style="margin:0"><span id="staffClock">--:--</span> · <span id="staffDate">—</span></p>
-              <div class="mac-widget" id="staffWeather"><span class="mw-emoji">🌤️</span><div><div class="mw-temp" id="mwTemp">Trujillo · —°</div><div class="mw-desc" id="mwDesc">cargando clima…</div></div></div>
+              <h3 id="staffGreeting" style="margin:10px 0 2px;font-size:20px">Buenas tardes, Benner</h3>
+              <p style="margin:0 0 4px;font-size:14px;color:var(--muted)">¿En qué trabajamos hoy?</p>
+              <p class="tiny muted" style="margin:0"><span id="staffClock">--:--</span> · <span id="staffDate">—</span> · <span id="mwEmoji">🌤️</span> <span id="mwTemp">Piura · —°</span><span id="mwDesc"></span></p>
             </div>
             <div id="chatEmpty" class="empty-hero">
               <img class="hero-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
@@ -5066,13 +5062,14 @@ function staffClockTick(){
 async function staffWeatherLoad(){
   const t=document.getElementById('mwTemp'), d=document.getElementById('mwDesc'); if(!t||!d) return;
   try{
-    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=-8.1097&longitude=-79.0215&current=temperature_2m,relative_humidity_2m,weather_code&timezone=America%2FLima');
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=-5.1945&longitude=-80.6328&current=temperature_2m,relative_humidity_2m,weather_code&timezone=America%2FLima');
     const j=await r.json(); const cur=j.current||{};
     const code=cur.weather_code;
     const desc=code===0?'Despejado':code<=2?'Mayormente despejado':code===3?'Nublado':code<=48?'Niebla':code<=67?'Lluvia':code<=77?'Nieve':code<=82?'Chubascos':'Tormenta';
-    t.textContent='Trujillo · '+Math.round(cur.temperature_2m)+'°C';
-    d.textContent=desc+(cur.relative_humidity_2m!=null?' · humedad '+cur.relative_humidity_2m+'%':'');
-  }catch(e){ d.textContent='clima sin conexión'; }
+    t.textContent='Piura · '+Math.round(cur.temperature_2m)+'°C';
+    d.textContent=' · '+desc+(cur.relative_humidity_2m!=null?' · humedad '+cur.relative_humidity_2m+'%':'');
+    const em=document.getElementById('mwEmoji'); if(em) em.textContent=(code===0?'☀️':code<=3?'🌤️':code<=48?'🌫️':code<=82?'🌧️':'⛈️');
+  }catch(e){ d.textContent=' · clima sin conexión'; }
 }
 setInterval(()=>{ try{ staffClockTick(); }catch(e){} }, 20000);
 function staffMotorChanged(v){
@@ -5106,6 +5103,7 @@ function renderStaffWelcome(){
 }
 function enterStaffMode(){
   STAFF_MODE=true;
+  document.body.classList.add('staff-on');
   const mb=document.getElementById('composerMotorBtns'); if(mb) mb.style.display='none'; /* en Staff mandan las tarjetas, no los botones MOTOR */
   const hayFase=(typeof STAFF!=='undefined' && STAFF.fases)?STAFF.fases.some(f=>f.estado==='en curso'):false;
   if(!hayFase){
@@ -5121,7 +5119,7 @@ function enterStaffMode(){
   staffClockTick(); staffWeatherLoad();
   checkFreeAi();
 }
-function exitStaffMode(){ STAFF_MODE=false; const mb=document.getElementById('composerMotorBtns'); if(mb) mb.style.display='contents'; renderStaffWelcome(); }
+function exitStaffMode(){ STAFF_MODE=false; document.body.classList.remove('staff-on'); const mb=document.getElementById('composerMotorBtns'); if(mb) mb.style.display='contents'; renderStaffWelcome(); }
 /* ✏️ Edición del Director: extras persistentes sobre su Master Prompt */
 async function openDirectorEditor(){
   try{ document.getElementById('directorExtra').value=localStorage.getItem('las-director-extra')||''; }catch(e){}
