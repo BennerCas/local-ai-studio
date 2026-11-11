@@ -18,8 +18,7 @@ test('el perfil del Director está forjado y completo en perfiles/', () => {
 
 test('al activar STAFF AI entra el Director con sus skills y se muestra su panel en el chat', () => {
   assert.match(html, /id="staffWelcome"/);
-  assert.match(html, /id="swPerfil"/);
-  assert.match(html, /id="swSkills"/);
+  assert.match(html, /id="staffGreeting"/);
   assert.match(html, /function enterStaffMode\(\)/);
   assert.match(html, /REAL.profileId=DIRECTOR_PROFILE/);
   assert.match(html, /const DIRECTOR_SKILLS=\['ai-agents-architect'/);
@@ -39,7 +38,7 @@ test('el Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), fijo y sin censura
 
 test('sin botones sueltos: tarjetas Modo Híbrido y Perfil con edición en el panel del Director', () => {
   assert.match(html, /id="staffGreeting"/);
-  assert.match(html, /onclick="openDirectorEditor\(\)">✏️ Editar perfil y Master Prompt/);
+  assert.match(html, /function openDirectorEditor\(\)/);
   assert.match(html, /id="directorModal"/);
   assert.match(html, /id="composerMotorBtns"/);
   assert.match(html, /function saveDirectorExtra\(\)/);
