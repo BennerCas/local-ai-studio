@@ -27,3 +27,9 @@ test('skills del perfil: fallback en navegador si el servidor no las manda', () 
   if (!html.includes('enrichProfilesSkillsIfNeeded')) throw new Error('sin fallback');
   if (!html.includes("md(c.slice(0,9000))")) throw new Error('master prompt sin renderizar');
 });
+
+test('reparto 3 columnas estilo estudio: perfiles | descripcion+skills | master prompt', () => {
+  if (!html.includes('profileMasterCol')) throw new Error('falta columna master prompt');
+  if (!html.includes('Sección 1 · Descripción') || !html.includes('Sección 2 · Skills')) throw new Error('faltan secciones en columna 2');
+  if (!html.includes('ps-col')) throw new Error('sin estilo de columna del estudio');
+});
