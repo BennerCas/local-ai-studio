@@ -38,7 +38,7 @@ test('el Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), fijo y sin censura
 });
 
 test('sin botones sueltos: tarjetas Modo Híbrido y Perfil con edición en el panel del Director', () => {
-  assert.match(html, /Tarjeta del Modo Híbrido/);
+  assert.match(html, /id="staffGreeting"/);
   assert.match(html, /onclick="openDirectorEditor\(\)">✏️ Editar perfil y Master Prompt/);
   assert.match(html, /id="directorModal"/);
   assert.match(html, /id="composerMotorBtns"/);
@@ -58,4 +58,13 @@ test('combo hibrido: los 4 combos con DirectML siempre de Director', () => {
   assert.match(html, /STAFF_COMBOS/);
   assert.match(html, /staffComboMotors/);
   assert.match(html, /las-staff-combo/);
+});
+
+test('barra superior: selector de Modo y Swarm activo sincronizados en tiempo real', () => {
+  assert.match(html, /id="topSwarm"/);
+  assert.match(html, /function syncComboUI\(\)/);
+  assert.match(html, /function staffComboFromBuiltins\(\)/);
+  if (html.includes('id="dotOllama"')) throw new Error('pildoras viejas presentes');
+  assert.match(html, /id="staffWeather"/);
+  assert.match(html, /api.open-meteo.com/);
 });

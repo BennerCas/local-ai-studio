@@ -723,6 +723,11 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #masterGearMenu .btn{width:auto;text-align:center;white-space:nowrap;padding:7px 12px;font-size:12px}
 
 /* ===== Panel inicial del Director de Staff (en el chat) ===== */
+#staffWelcome .mac-widget{display:inline-flex;align-items:center;gap:11px;margin-top:12px;padding:10px 16px 10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.20);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#staffWelcome .mac-widget .mw-emoji{font-size:26px;line-height:1}
+#staffWelcome .mac-widget .mw-temp{font-size:19px;font-weight:800;line-height:1.1}
+#staffWelcome .mac-widget .mw-desc{font-size:11px;color:var(--muted)}
+#staffWelcome .sw-logo{width:52px;height:52px;border-radius:14px}
 #staffWelcome{display:none;border:1px solid var(--vio);border-radius:16px;padding:16px 18px;margin:0 0 14px;
   background:linear-gradient(160deg, color-mix(in srgb, var(--vio) 12%, var(--panel2)), var(--panel2));text-align:left}
 #staffWelcome.show{display:block}
@@ -853,10 +858,13 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
       <button class="icon-btn" id="menuBtn" style="display:none" onclick="toggleMenu()">☰</button>
       <div><h2 id="topTitle">Chat</h2><div class="sub" id="topSub">Motor local · sin consumo de cuota de nube</div></div>
       <div class="health">
-        <button class="new-chat top" onclick="go('chat');resetChat()">＋ Nuevo chat</button>
-        <button class="health-pill" onclick="go('motores')"><img class="pill-icon" src="assets/ollama-icon.png" alt="Ollama"><span class="dot on" id="dotOllama"></span>Ollama · <span id="hpOllama">activo</span></button>
-        <button class="health-pill" onclick="go('motores')"><span class="dot off" id="dotDml"></span>🎮 DirectML · <span id="hpDml">detenido</span></button>
-        <button class="health-pill" onclick="go('motores')"><img class="pill-icon" src="assets/freeai-icon.png" alt="Free.ai"><span class="dot on"></span>Free.ai · <span>listo</span></button>
+        <select class="input" id="staffMotorSel" style="width:auto;max-width:320px" onchange="staffMotorChanged(this.value)" title="Modo híbrido: el Director siempre es Hermes-3-8B-UNLOCKED en tu PC (DirectML, sin censura). El combo decide qué motores ejecutan las fases y las subtareas.">
+          <option value="dml-ollama-freeai">🌐 DirectML + Ollama + Free.ai</option>
+          <option value="dml-ollama">🔌 DirectML + Ollama</option>
+          <option value="dml-freeai">☁️ DirectML + Free.ai</option>
+          <option value="dml-ollama-freeai-apis">🐝 DirectML + Ollama + Free.ai + API 1…N</option>
+        </select>
+        <span class="health-pill" id="topSwarm" title="Swarm activo: se edita con el Modo (aquí arriba) o en la vista Agentes; ambos quedan sincronizados">🐝 Swarm: —</span>
         <button class="health-pill pill-hw" onclick="go('hardware')">🎛️ RX 7600 · 8 GB</button>
         <select class="input" id="themeSel" title="Tema de la app" style="width:auto;max-width:168px;padding:7px 9px" onchange="setTheme(this.value)">
           <option value="dark">🌙 Oscuro</option>
@@ -874,44 +882,10 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
         <div class="chat-main">
           <div class="chat-scroll" id="chatScroll">
             <div id="staffWelcome">
-              <div class="sw-head"><img src="assets/local-ai-studio-icon.png" alt="Local AI Studio"><div>
-                <h3>🐝 Hola, soy tu Director de Staff</h3>
-                <p class="tiny muted" style="margin:2px 0 0">Cuéntame tu idea en tus palabras: yo la traduzco a vibe coding, ordeno las fases y dirijo al staff. Nada queda a medias.</p>
-              </div></div>
-              <div class="sw-grid">
-                <div class="sw-box"><b>🎭 Perfil activo</b><p id="swPerfil">Director de Staff · Traductor Vibe Coding</p>
-                  <div class="flex mt" style="gap:6px"><button class="btn sm" onclick="openDirectorEditor()">✏️ Editar perfil y Master Prompt</button><button class="btn sm" onclick="document.getElementById('profileSel').focus();toast('Cambia el perfil con el selector 🎭 bajo el cajón de texto','ok')">Cambiar</button></div></div>
-                <div class="sw-box"><b>🌐 Tarjeta del Modo Híbrido</b><p id="swMotor">Director: Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML) · comprobando Free.ai…</p>
-                  <select class="input mt" id="staffMotorSel" onchange="staffMotorChanged(this.value)" title="El Director siempre es Hermes-3-8B-UNLOCKED en tu PC (DirectML, sin censura). El combo decide qué motores ejecutan las fases y las subtareas del enjambre.">
-                    <option value="dml-ollama-freeai">🌐 Híbrido · DirectML + Ollama + Free.ai</option>
-                    <option value="dml-ollama">🔌 Híbrido local · DirectML + Ollama</option>
-                    <option value="dml-freeai">☁️ Híbrido nube · DirectML + Free.ai</option>
-                    <option value="dml-ollama-freeai-apis">🐝 Híbrido total · DirectML + Ollama + Free.ai + API 1…N</option>
-                  </select>
-                  <p class="tiny muted mt" id="staffMotorState">Comprobando Free.ai…</p></div>
-                <div class="sw-box"><b>🧩 Skills activas</b><p id="swSkills">—</p></div>
-                <div class="sw-box"><b>🐝 Enjambre activo</b><p id="swAgents">Director 🐝 Hermes + …</p>
-                  <div class="flex wrap mt" style="gap:10px">
-                    <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgOllama" onchange="swarmBuiltinChanged()"> 🦙 Ollama</label>
-                    <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgFreeai" onchange="swarmBuiltinChanged()"> ☁️ Free.ai</label>
-                    <button class="btn sm" onclick="go('agentes')">➕ Añadir APIs</button>
-                  </div>
-                  <p class="tiny muted mt" id="swAgentsMode">Modo: —</p></div>
-                <div class="sw-box"><b>🧭 Cómo interactuar</b><ul>
-                  <li>Escribe tu idea o petición tal cual la piensas, aquí o en la caja de STAFF AI.</li>
-                  <li>Yo la traduzco: 🎯 Entendido como… → trabajo SOLO en la fase activa.</li>
-                  <li>Guarda los bloques con 💾, mira el resultado con 👁 y marca ✔ al terminar la fase.</li>
-                </ul></div>
-              </div>
-              <details><summary>🧠 Master Prompt del Director (cómo traduzco tu lenguaje)</summary>
-                <div class="sw-master">PROTOCOLO DE TRADUCCIÓN (aplica a cada mensaje tuyo en STAFF AI)
-1) Intención real: qué quieres lograr, no solo lo que escribiste.
-2) Fase activa: tu petición se interpreta DENTRO de la fase en curso; sin plan, primero planificamos (Orquestador), no código suelto.
-3) Perfil que piensa + skills que ejecutan: los de la fase (o el Director si aún no hay plan).
-4) Instrucción ejecutable: objetivo imperativo · alcance (qué toca y qué NO) · entregable verificable · restricciones · código COMPLETO en bloques con la ruta encima de cada bloque.
-5) Criterio de aceptación: 1–3 comprobaciones concretas de "esto está hecho".
-Comunicación: español directo, una fase cada vez, errores con causa y salida, nunca resultados fingidos.</div>
-              </details>
+              <img class="sw-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
+              <h3 id="staffGreeting" style="margin:10px 0 2px;font-size:19px">Hola, Benner</h3>
+              <p class="tiny muted" style="margin:0"><span id="staffClock">--:--</span> · <span id="staffDate">—</span></p>
+              <div class="mac-widget" id="staffWeather"><span class="mw-emoji">🌤️</span><div><div class="mw-temp" id="mwTemp">Trujillo · —°</div><div class="mw-desc" id="mwDesc">cargando clima…</div></div></div>
             </div>
             <div id="chatEmpty" class="empty-hero">
               <img class="hero-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
@@ -1535,6 +1509,13 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
         </div>
         <label class="small mt" style="display:block">Capacidades · qué se le da bien (Hermes asigna con esto)<input class="input mt" id="agCaps" placeholder="ej. código rápido, revisión, documentación, razonamiento largo…"></label>
         <div class="flex wrap mt" style="gap:6px"><button class="btn primary sm" onclick="saveAgentApi()">➕ Registrar agente</button><button class="btn sm" onclick="testAgentForm(this)">🔌 Probar conexión</button><span class="tiny muted" id="agFormState"></span></div>
+        <div class="card mt" style="background:var(--card2)"><b>🐝 Swarm activo</b><p class="tiny muted mt" id="swAgents">—</p>
+          <div class="flex wrap mt" style="gap:10px">
+            <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgOllama" onchange="swarmBuiltinChanged()"> 🦙 Ollama</label>
+            <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgFreeai" onchange="swarmBuiltinChanged()"> ☁️ Free.ai</label>
+          </div>
+          <p class="tiny muted mt" id="swAgentsMode">Modo: —</p>
+          <p class="tiny muted">Esto y el selector de Modo de la barra superior son lo mismo: cambiar uno cambia el otro al instante.</p></div>
         <div id="agList" class="mt"></div>
       </div>
       <div class="grid g3">
@@ -1745,7 +1726,7 @@ function resetChat(){
 function setEngine(btn){
   document.querySelectorAll('[data-engine]').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel'); engine=btn.dataset.engine;
-  if(engine==='directml' && document.getElementById('hpDml').textContent==='detenido'){
+  if(engine==='directml' && !dmlOn){
     toast('DirectML está detenido: se iniciará automáticamente al enviar (o inícialo en Motores)','err');
   } else toast('Motor: '+ENGINE_NAME[engine],'ok');
 }
@@ -1767,8 +1748,6 @@ document.addEventListener('keydown',e=>{
 let dmlOn=false;
 function toggleDml(){
   dmlOn=!dmlOn;
-  document.getElementById('dotDml').className='dot '+(dmlOn?'on':'off');
-  document.getElementById('hpDml').textContent=dmlOn?'activo':'detenido';
   const tag=document.getElementById('dmlTag');
   tag.textContent=dmlOn?'● activo':'● detenido';
   tag.className='tag '+(dmlOn?'green':'red');
@@ -3035,16 +3014,24 @@ function swarmModeLabel(){
   return 'Modo: ENJAMBRE ×'+n+' · subtareas distintas en paralelo dentro de la misma fase';
 }
 function renderSwarmSummary(){
+  const tw=document.getElementById('topSwarm'); if(tw) tw.textContent='🐝 Swarm: '+((typeof staffComboNames==='function')?staffComboNames():swarmActiveNames()).join(' · ');
   const el=document.getElementById('swAgents'); if(el) el.textContent=swarmActiveNames().join('  ·  ');
   const md=document.getElementById('swAgentsMode'); if(md) md.textContent=swarmModeLabel();
   const o=document.getElementById('swAgOllama'); if(o) o.checked=!!SWARM_BUILTINS.ollama;
   const f=document.getElementById('swAgFreeai'); if(f) f.checked=!!SWARM_BUILTINS.freeai;
 }
 function swarmBuiltinChanged(){
-  SWARM_BUILTINS.ollama=!!document.getElementById('swAgOllama').checked;
-  SWARM_BUILTINS.freeai=!!document.getElementById('swAgFreeai').checked;
+  const o=document.getElementById('swAgOllama'), f=document.getElementById('swAgFreeai');
+  if(o) SWARM_BUILTINS.ollama=!!o.checked;
+  if(f) SWARM_BUILTINS.freeai=!!f.checked;
+  if(!SWARM_BUILTINS.ollama&&!SWARM_BUILTINS.freeai) SWARM_BUILTINS.ollama=true;
   localStorage.setItem('las-agents-builtins', JSON.stringify(SWARM_BUILTINS));
-  renderSwarmSummary();
+  if(typeof staffComboFromBuiltins==='function'){
+    STAFF_COMBO=staffComboFromBuiltins();
+    STAFF_MOTOR=(STAFF_COMBO==='dml-ollama')?'solo-local':'hibrido';
+    try{ localStorage.setItem('las-staff-combo', STAFF_COMBO); localStorage.setItem('las-staff-motor', STAFF_MOTOR); }catch(e){}
+    syncComboUI();
+  } else renderSwarmSummary();
   toast('🐝 Enjambre: '+swarmModeLabel(),'ok');
 }
 function persistAgents(){ localStorage.setItem('las-agents-v1', JSON.stringify(AGENTS_API)); }
@@ -5056,6 +5043,38 @@ async function checkFreeAi(){
   renderStaffWelcome();
   return FREEAI_ONLINE;
 }
+function staffComboFromBuiltins(){
+  const o=SWARM_BUILTINS.ollama, f=SWARM_BUILTINS.freeai;
+  if(o&&f) return staffComboWorkers().apis?'dml-ollama-freeai-apis':'dml-ollama-freeai';
+  if(o) return 'dml-ollama';
+  if(f) return 'dml-freeai';
+  return 'dml-ollama';
+}
+function syncComboUI(){
+  const sel=document.getElementById('staffMotorSel'); if(sel) sel.value=STAFF_COMBO;
+  const tw=document.getElementById('topSwarm'); if(tw) tw.textContent='🐝 Swarm: '+staffComboNames().join(' · ');
+  if(typeof renderSwarmSummary==='function') renderSwarmSummary();
+  renderStaffWelcome();
+}
+function staffClockTick(){
+  const g=document.getElementById('staffGreeting'); if(!g) return;
+  const now=new Date(); const hr=now.getHours();
+  g.textContent=(hr<12?'Buenos días':hr<19?'Buenas tardes':'Buenas noches')+', Benner';
+  const c=document.getElementById('staffClock'); if(c) c.textContent=now.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  const d=document.getElementById('staffDate'); if(d) d.textContent=now.toLocaleDateString('es-PE',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+async function staffWeatherLoad(){
+  const t=document.getElementById('mwTemp'), d=document.getElementById('mwDesc'); if(!t||!d) return;
+  try{
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=-8.1097&longitude=-79.0215&current=temperature_2m,relative_humidity_2m,weather_code&timezone=America%2FLima');
+    const j=await r.json(); const cur=j.current||{};
+    const code=cur.weather_code;
+    const desc=code===0?'Despejado':code<=2?'Mayormente despejado':code===3?'Nublado':code<=48?'Niebla':code<=67?'Lluvia':code<=77?'Nieve':code<=82?'Chubascos':'Tormenta';
+    t.textContent='Trujillo · '+Math.round(cur.temperature_2m)+'°C';
+    d.textContent=desc+(cur.relative_humidity_2m!=null?' · humedad '+cur.relative_humidity_2m+'%':'');
+  }catch(e){ d.textContent='clima sin conexión'; }
+}
+setInterval(()=>{ try{ staffClockTick(); }catch(e){} }, 20000);
 function staffMotorChanged(v){
   STAFF_COMBO=STAFF_COMBOS[v]?v:'dml-ollama-freeai';
   STAFF_MOTOR=(STAFF_COMBO==='dml-ollama')?'solo-local':'hibrido';
@@ -5063,9 +5082,9 @@ function staffMotorChanged(v){
   const w=staffComboWorkers();
   SWARM_BUILTINS.ollama=w.ollama; SWARM_BUILTINS.freeai=w.freeai;
   try{ localStorage.setItem('las-agents-builtins', JSON.stringify(SWARM_BUILTINS)); }catch(e){}
-  if(typeof renderSwarmSummary==='function') renderSwarmSummary();
+  syncComboUI();
   toast('🐝 Combo híbrido: '+staffComboLabel()+' · Hermes dirige desde DirectML','ok');
-  checkFreeAi(); renderStaffWelcome();
+  checkFreeAi();
 }
 function renderStaffWelcome(){
   const panel=document.getElementById('staffWelcome'); if(!panel) return;
@@ -5099,6 +5118,7 @@ function enterStaffMode(){
     if(typeof renderSkills==='function') renderSkills('');
   }
   renderStaffWelcome();
+  staffClockTick(); staffWeatherLoad();
   checkFreeAi();
 }
 function exitStaffMode(){ STAFF_MODE=false; const mb=document.getElementById('composerMotorBtns'); if(mb) mb.style.display='contents'; renderStaffWelcome(); }
@@ -5152,7 +5172,7 @@ if(typeof activateFaseSilent==='function'){
   const _afs=activateFaseSilent;
   activateFaseSilent=function(i){ _afs(i); renderStaffWelcome(); };
 }
-window.addEventListener('DOMContentLoaded', ()=>{ const s=document.getElementById('staffMotorSel'); if(s) s.value=STAFF_COMBO; });
+window.addEventListener('DOMContentLoaded', ()=>{ try{ syncComboUI(); staffClockTick(); }catch(e){} });
 </script>
 </body>
 
