@@ -30,3 +30,16 @@ test('el servidor expone POST /api/profiles/content', () => {
   if (!server.includes('"/api/profiles/content" && req.method === "POST"')) throw new Error('sin endpoint POST');
   if (!server.includes('saveProfileContent')) throw new Error('sin puente de guardado');
 });
+
+test('crear perfil nuevo escribe el .md y rechaza duplicados y slugs malos', () => {
+  const r = bridge.createProfileFile({ category: 'fusions', slug: 'fusion-prueba', content: '# Fusión de prueba\n' });
+  if (!r.ok) throw new Error('no creo: ' + (r.error || ''));
+  if (!fs.existsSync(path.join(tmp, 'fusions', 'fusion-prueba.md'))) throw new Error('no existe el archivo');
+  if (bridge.createProfileFile({ category: 'fusions', slug: 'fusion-prueba', content: 'x' }).ok) throw new Error('acepto duplicado');
+  if (bridge.createProfileFile({ category: 'fusions', slug: 'Slug Malo!', content: 'x' }).ok) throw new Error('acepto slug invalido');
+});
+
+test('el servidor expone POST /api/profiles/create', () => {
+  const server = fs.readFileSync('sidecars/local_ai_chat/server.js', 'utf8');
+  if (!server.includes('"/api/profiles/create" && req.method === "POST"')) throw new Error('sin endpoint create');
+});

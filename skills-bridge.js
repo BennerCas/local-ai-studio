@@ -527,6 +527,31 @@ function saveProfileContent(profileId, content) {
   return { ok: true, id: entry.id, bytes: Buffer.byteLength(text, 'utf8') };
 }
 
+function createProfileFile(input) {
+  const { category, slug, content } = input || {};
+  const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  const cat = String(category || "").trim().toLowerCase();
+  const cleanSlug = String(slug || "").trim().toLowerCase();
+  if (!SLUG_RE.test(cat)) return { ok: false, error: "Clasificación inválida: " + cat };
+  if (!SLUG_RE.test(cleanSlug)) return { ok: false, error: "Slug inválido: " + cleanSlug };
+  const text = String(content == null ? "" : content);
+  if (!text.trim()) return { ok: false, error: "El contenido no puede quedar vacío." };
+  if (text.length > 200000) return { ok: false, error: "Contenido demasiado grande (máx. 200000 caracteres)." };
+  const dirs = getProfilesDirs();
+  const base = dirs[0];
+  const fullPath = path.join(base, cat, cleanSlug + ".md");
+  if (!isPathInside(base, fullPath)) return { ok: false, error: "Ruta fuera del directorio de perfiles." };
+  if (fs.existsSync(fullPath)) return { ok: false, error: "Ya existe un perfil con ese nombre: " + cat + "/" + cleanSlug };
+  try {
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, text, "utf8");
+  } catch (err) {
+    return { ok: false, error: "No se pudo crear: " + err.message };
+  }
+  profilesCache = null;
+  return { ok: true, id: cat + "/" + cleanSlug };
+}
+
 function parseSkillIdsList(skillIdOrList) {
   if (!skillIdOrList) return [];
   const rawItems = Array.isArray(skillIdOrList)
@@ -750,6 +775,7 @@ module.exports = {
   loadProfiles,
   getProfileContent,
   saveProfileContent,
+  createProfileFile,
   parseSkillIdsList,
   buildSkillSystemPrompt,
   saveSkillFusion,

@@ -2336,6 +2336,15 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    if (pathname === "/api/profiles/create" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      if (typeof payload.content !== "string") { sendJsonError(res, 400, "Parámetro 'content' requerido."); return; }
+      const result = skillsBridge.createProfileFile({ category: payload.category || "", slug: payload.slug || "", content: payload.content });
+      if (!result.ok) { sendJsonError(res, 400, result.error || "Error creando el perfil."); return; }
+      sendJson(res, 200, result);
+      return;
+    }
+
     if (pathname === "/api/skills/fuse" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
       const result = skillsBridge.saveSkillFusion({

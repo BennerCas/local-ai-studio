@@ -80,32 +80,31 @@ test('la seccion view-skills tiene los div balanceados', () => {
   if (opens !== closes) throw new Error('div desbalanceados: ' + opens + ' aperturas vs ' + closes + ' cierres');
 });
 
-test('prototipo C/B/A: diff, mesa y asistente por pasos', () => {
-  for (const id of ['npPowBefore', 'npPowBlocks', 'npFuseCanvas', 'npFuseChips', 'npStep1', 'npStep2', 'npStep3']) {
+test('potenciar: 8 tarjetas de diagnostico con Gen AI y Anadir', () => {
+  for (const id of ['npPowCards', 'npPowGenAiBtn', 'npPowAddBtn', 'npPowPreview']) {
     if (!html.includes(`id="${id}"`)) throw new Error('falta #' + id);
   }
-  if (!html.includes('npStep')) throw new Error('sin navegacion por pasos');
+  for (const fn of ['npPowGenAI', 'npPowImproveOne', 'npPowApply']) {
+    if (!html.includes(fn)) throw new Error('falta ' + fn);
+  }
+  if (html.includes('npPowDiagram')) throw new Error('el mapa sigue presente');
 });
 
 test('prototipo: volver visible, instrucciones y scroll hasta el fondo', () => {
   if (!html.includes('id="npBackTop"')) throw new Error('sin boton volver arriba');
   if (!html.includes('id="npHelp"')) throw new Error('sin instrucciones');
-  if (!html.includes('#psCreate{flex:1;min-height:0;overflow-y:auto')) throw new Error('sin scroll propio');
+  if (!html.includes('#psCreate{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden')) throw new Error('la vista no debe scrollear por fuera');
 });
 
-test('mapa radial del perfil con Mermaid local en Potenciar', () => {
-  const fs2 = require('fs');
-  if (!fs2.existsSync('sidecars/local_ai_chat/assets/mermaid.min.js')) throw new Error('falta mermaid vendorizado');
-  if (!html.includes('id="npPowDiagram"')) throw new Error('sin contenedor del mapa');
-  if (!html.includes('npProfileMindmap') || !html.includes('mindmap')) throw new Error('sin generador del diagrama');
-  const server = fs2.readFileSync('sidecars/local_ai_chat/server.js', 'utf8');
-  if (!server.includes('".js": "text/javascript')) throw new Error('assets sin MIME js');
+test('sin mapa Mermaid ni banner de prototipo', () => {
+  if (html.includes('npPowDiagram')) throw new Error('mapa presente');
+  if (html.includes('PROTOTIPO navegable')) throw new Error('banner presente');
 });
 
 test('el prototipo genera con el Hermes montado (Q8 DirectML)', () => {
   if (!html.includes("swarmChatOnce('directml'")) throw new Error('sin llamada al Director');
   if (!html.includes('Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)')) throw new Error('sin motor declarado');
-  for (const fn of ['npHermes', 'npPowHermes', 'npFuseHermes', 'npGenerateTemplate']) {
+  for (const fn of ['npHermes', 'npPowGenAI', 'npFuseHermes', 'npGenerateTemplate']) {
     if (!html.includes(fn)) throw new Error('falta ' + fn);
   }
 });
