@@ -229,8 +229,16 @@ async function serverAlive() {
     `**Resumen: ${okN}/${results.length} en verde.**`,
     'Comparte este archivo (o el .json hermano) en el chat de Arena para reparar sobre fallos reales.',
     ''
-  ].join('\n');
-  fs.writeFileSync(path.join(dir, `informe-${stamp}.md`), md);
+  ];
+  try {
+    const logPath = path.join(dir, 'directml-backend.log');
+    if (fs.existsSync(logPath)) {
+      const tail = fs.readFileSync(logPath, 'utf8').split('\n').slice(-60).join('\n');
+      md.push('## 📜 Log del backend DirectML (últimas 60 líneas)', '', '```', tail, '```', '');
+    }
+  } catch (_e) {}
+  const mdText = md.join('\n');
+  fs.writeFileSync(path.join(dir, `informe-${stamp}.md`), mdText);
   fs.writeFileSync(path.join(dir, `informe-${stamp}.json`), JSON.stringify({ fecha: new Date().toISOString(), base: BASE, director: DIRECTOR, results }, null, 2));
   console.log(`\n📄 Informe guardado en datos/pruebas/informe-${stamp}.md · ${okN}/${results.length} en verde`);
   if (child) { child.kill(); }

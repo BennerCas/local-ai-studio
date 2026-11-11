@@ -998,6 +998,10 @@ function createStudioServer(options = {}) {
         windowsHide: true,
         env: {
           ...process.env,
+          // Sin esto, un print() con caracteres no-cp1252 revienta DENTRO del
+          // manejador de errores del backend y oculta la causa real (visto en vivo).
+          PYTHONIOENCODING: "utf-8",
+          PYTHONUTF8: "1",
           OLIVE_GPU_MEMORY_LIMIT: process.env.OLIVE_GPU_MEMORY_LIMIT || "25",
           OLIVE_CPU_THREADS: process.env.OLIVE_CPU_THREADS || "12",
           ORT_DML_DEVICE_ID: process.env.ORT_DML_DEVICE_ID || "0",
