@@ -116,6 +116,13 @@ async function serverAlive() {
     try { await postJson('/api/directml/start', {}, 120000); log('🎮', 'DirectML arranque', true, 'start aceptado'); }
     catch (e) { log('🎮', 'DirectML arranque', false, e.message); }
   }
+  /* El backend tarda en cargar Hermes: esperar a que el 8002 escuche */
+  let backendListo = false;
+  for (let i = 0; i < 60 && !backendListo; i++) {
+    try { await getJson8002('/v1/models', 5000); backendListo = true; }
+    catch (_e) { await new Promise(r => setTimeout(r, 2000)); }
+  }
+  log('🎮', 'Backend 8002 escuchando', backendListo, backendListo ? 'listo' : 'no levantó en 120 s (mira el log del backend al final)');
   try { await postJson('/api/directml/load', { model: DIRECTOR }, 300000); log('🎮', 'Carga del Director (Hermes)', true, DIRECTOR); }
   catch (e) { log('🎮', 'Carga del Director (Hermes)', false, e.message + ' · (si tu Hermes se carga solo al chatear, la siguiente prueba es la que manda)'); }
 

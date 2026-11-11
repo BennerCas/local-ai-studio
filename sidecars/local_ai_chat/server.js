@@ -45,6 +45,7 @@ const ASSET_MIME_TYPES = {
 };
 
 let directMlProcess = null;
+let directmlSpawnAt = 0; // anti-carrera: nunca dos backends cargando a la vez
 
 function safeErrMsg(errOrMsg, extraSecrets = []) {
   return integrations.sanitizeSecrets(errOrMsg || "Error interno", extraSecrets);
@@ -983,6 +984,16 @@ function createStudioServer(options = {}) {
     if (isAlive) {
       return { ok: true, message: `DirectML ya está activo en http://${config.directmlHost}:${config.directmlPort}` };
     }
+    if (directMlProcess && Date.now() - directmlSpawnAt < 240000) {
+      // Ya hay un backend cargando (Hermes tarda decenas de segundos): lanzar
+      // otro solo consigue varios procesos peleando por la GPU (OOM 8007000E).
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (await checkDirectMLAlive()) return { ok: true, message: "DirectML iniciado (arranque ya en curso)" };
+        if (!directMlProcess) break;
+      }
+      return { ok: true, message: "DirectML sigue cargando el modelo; reintenta en unos segundos" };
+    }
     if (!config.autoStartDirectML) {
       return { ok: false, error: "DirectML no está disponible y autoStart está desactivado." };
     }
@@ -1007,6 +1018,7 @@ function createStudioServer(options = {}) {
           // Sin esto, un print() con caracteres no-cp1252 revienta DENTRO del
           // manejador de errores del backend y oculta la causa real (visto en vivo).
           PYTHONIOENCODING: "utf-8",
+          PYTHONUNBUFFERED: "1",
           PYTHONUTF8: "1",
           OLIVE_GPU_MEMORY_LIMIT: process.env.OLIVE_GPU_MEMORY_LIMIT || "25",
           OLIVE_CPU_THREADS: process.env.OLIVE_CPU_THREADS || "12",
@@ -1016,8 +1028,10 @@ function createStudioServer(options = {}) {
       });
       child.unref();
       directMlProcess = child;
+      directmlSpawnAt = Date.now();
+      child.on("exit", () => { if (directMlProcess === child) directMlProcess = null; });
 
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 120; i++) {
         await new Promise((r) => setTimeout(r, 500));
         if (await checkDirectMLAlive()) {
           return { ok: true, message: `DirectML iniciado exitosamente en puerto ${config.directmlPort}` };
@@ -1841,6 +1855,7 @@ function createStudioServer(options = {}) {
       if (engine === "directml") {
         const cleanDmlModel = String(model || "Phi-3.5-mini-instruct-ONNX").replace(/^directml:/i, "").trim() || "Phi-3.5-mini-instruct-ONNX";
         let dmlRetried = false;
+        let dmlRestarted = false;
         const fireDml = (useStream) => {
         const bodyData = JSON.stringify({
           model: cleanDmlModel,
@@ -1923,7 +1938,17 @@ function createStudioServer(options = {}) {
         activeReq = req;
 
         req.on("error", (err) => {
-          if (!settled) doneReject(`DirectML offline (${err.message})`);
+          if (settled) return;
+          if (!dmlRestarted && /ECONNREFUSED|ECONNRESET/i.test(err.message)) {
+            // El proceso backend murió (un reset de GPU solo se cura en un
+            // proceso nuevo): rearrancar una vez y repetir la petición.
+            dmlRestarted = true;
+            directMlProcess = null; directmlSpawnAt = 0;
+            startDirectMLServer().then(() => { if (!settled) fireDml(true); })
+              .catch(() => doneReject(`DirectML offline (${err.message})`));
+            return;
+          }
+          doneReject(`DirectML offline (${err.message})`);
         });
         req.on("timeout", () => {
           try { req.destroy(); } catch (_e) {}
