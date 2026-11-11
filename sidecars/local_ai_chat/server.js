@@ -23,7 +23,13 @@ const DEFAULT_OLLAMA_HOST = "127.0.0.1";
 const DEFAULT_OLLAMA_PORT = 11434;
 const DEFAULT_DIRECTML_HOST = "127.0.0.1";
 const DEFAULT_DIRECTML_PORT = 8002;
-const DIRECTML_SCRIPT = "C:\\antigravityAS\\Modelos -ai-brains\\api_openai.py";
+// Backend DirectML: se prefiere la copia versionada en el repo
+// (sidecars/directml/api_openai.py) para que sus correcciones lleguen con
+// git pull; DIRECTML_SCRIPT permite forzar otra ruta (legado por defecto).
+const DIRECTML_SCRIPT = process.env.DIRECTML_SCRIPT
+  || (fs.existsSync(path.join(__dirname, "..", "directml", "api_openai.py"))
+    ? path.join(__dirname, "..", "directml", "api_openai.py")
+    : "C:\\antigravityAS\\Modelos -ai-brains\\api_openai.py");
 const PRELOAD_PATH = "C:\\Users\\Benner\\.gemini\\antigravity\\lib\\node_modules\\sidecar_sdk\\preload.js";
 const HTML_FILE_PATH = path.join(__dirname, "ui.html");
 const HTML_V2_FILE_PATH = path.join(__dirname, "ui-v2.html");
