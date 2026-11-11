@@ -89,7 +89,7 @@ try {
             "-p", "int4",
             "-e", "dml",
             "-c", $CacheDir,
-            "--extra-options", "int4_block_size=128", "int4_accuracy_level=4"
+            "--extra_options", "int4_block_size=128", "int4_accuracy_level=4"
         )
         & python @argsBuilder
         if ($LASTEXITCODE -ne 0) { throw "El builder termino con error (codigo $LASTEXITCODE). Mira el log: $LogFile" }
