@@ -1348,7 +1348,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <label class="small">Nombre del agente<input class="input mt" id="agName" placeholder="ej. Groq · Llama 3.3 70B"></label>
           <label class="small">Modelo<input class="input mt" id="agModel" placeholder="ej. llama-3.3-70b-versatile"></label>
           <label class="small">URL base (termina en /v1)<input class="input mt" id="agUrl" placeholder="ej. https://api.groq.com/openai/v1"></label>
-          <label class="small">API key (opcional en local)<input class="input mt" id="agKey" type="password" placeholder="sk-… · vacío si es un servidor local" autocomplete="off"></label>
+          <label class="small">API key · varias = pool con rotación, separadas por comas<input class="input mt" id="agKey" type="password" placeholder="gsk-… , gsk-… · vacío si es un servidor local" autocomplete="off"></label>
         </div>
         <label class="small mt" style="display:block">Capacidades · qué se le da bien (Hermes asigna con esto)<input class="input mt" id="agCaps" placeholder="ej. código rápido, revisión, documentación, razonamiento largo…"></label>
         <div class="flex wrap mt" style="gap:6px"><button class="btn primary sm" onclick="saveAgentApi()">➕ Registrar agente</button><button class="btn sm" onclick="testAgentForm(this)">🔌 Probar conexión</button><span class="tiny muted" id="agFormState"></span></div>
@@ -2397,13 +2397,16 @@ function renderAgents(){
   el.innerHTML=AGENTS_API.map((a,i)=>'<div class="card" style="margin-top:8px"><div class="flex between"><b>🔌 '+esc(a.name)+'</b><span class="tag '+(a.active?'green':'')+'">'+(a.active?'activo en el enjambre':'inactivo')+'</span></div>'+
     '<p class="tiny muted mt mono">'+esc(a.url)+' · '+esc(a.model||'sin modelo')+'</p>'+
     (a.caps?'<p class="tiny mt">🎯 '+esc(a.caps)+'</p>':'')+
+    (agentKeyCount(a.key)>1?'<p class="tiny mt">🔑 Pool de '+agentKeyCount(a.key)+' claves (rotación al agotar cuota)</p>':'')+
     '<p class="tiny muted">'+(a.status?esc(a.status):'sin probar')+'</p>'+
     '<div class="flex wrap mt" style="gap:6px"><label class="tiny" style="cursor:pointer"><input type="checkbox" '+(a.active?'checked':'')+' onchange="toggleAgentApi('+i+',this.checked)"> En el enjambre</label>'+
     '<button class="btn sm" onclick="testAgentApi('+i+',this)">🔌 Probar</button>'+
     '<button class="btn sm danger" onclick="delAgentApi('+i+')">🗑 Eliminar</button></div></div>').join('');
 }
+function firstAgentKey(key){ return String(key||'').split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean)[0]||''; }
+function agentKeyCount(key){ return String(key||'').split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean).length; }
 async function testAgentRequest(url, key){
-  const r=await fetch('/api/agents/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseUrl:url, apiKey:key||''})});
+  const r=await fetch('/api/agents/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseUrl:url, apiKey:firstAgentKey(key)})});
   return r.json();
 }
 async function testAgentForm(btn){
