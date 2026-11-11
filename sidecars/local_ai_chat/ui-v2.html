@@ -319,7 +319,9 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 .cols-ps{display:grid;grid-template-columns:minmax(270px,1fr) minmax(0,1.7fr);gap:18px;align-items:start}
 #view-skills .cols-ps{grid-template-columns:minmax(230px,.85fr) minmax(300px,1.15fr) minmax(320px,1.35fr)}
 #view-skills .ps-col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-#view-skills .ps-col>.col-head{flex-shrink:0;font-size:13px;font-weight:800;letter-spacing:.02em;margin:0 0 4px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+#view-skills .ps-col>.col-head{flex-shrink:0;font-size:13px;font-weight:800;letter-spacing:.02em;margin:0 0 4px;padding-bottom:9px;border-bottom:1px solid var(--line);text-align:center}
+#view-skills .ps-foot{flex-shrink:0;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+#view-skills .ps-foot .btn{width:100%}
 #view-skills .ps-body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding-top:10px}
 #view-skills .ps-body::-webkit-scrollbar{width:0;height:0;display:none}
 #view-skills .ps-sec{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:14px 0 7px}
@@ -1070,7 +1072,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
         <div class="ps-col">
           <div class="col-head">🎭 Perfiles</div>
           <div class="ps-body">
-            <p class="tiny muted" style="margin:0 0 10px">Clasificación jerárquica: cada grupo despliega los perfiles que lo componen. Clic en un perfil para verlo al detalle.</p>
+            <button class="btn primary" id="treeUseBtn" style="width:100%;margin-bottom:10px" onclick="useSelectedProfile()">Usar en el chat</button>
             <div id="profileTree"><p class="muted tiny">Cargando clasificación…</p></div>
           </div>
         </div>
@@ -1079,6 +1081,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <div class="ps-body">
             <div id="profileDetail"><p class="muted tiny">Elige un perfil en la columna de la izquierda: aquí verás su descripción y sus skills.</p></div>
           </div>
+          <div class="ps-foot"><button class="btn primary" id="activateSkillsBtn" onclick="activateSelectedProfileSkills()">🧩 Activar skills</button></div>
           <div class="grid" id="profileGrid" style="display:none"></div>
         </div>
         <div class="ps-col">
@@ -1925,7 +1928,7 @@ async function enrichProfilesSkillsIfNeeded(){
         if(sc>0) scored.push({id:s.id, name:s.name||s.id, category:s.category||'general', sc});
       }
       scored.sort((a,b)=>b.sc-a.sc||a.name.localeCompare(b.name));
-      pf.skillsSugeridas=scored.slice(0,8).map(({id,name,category})=>({id,name,category}));
+      pf.skillsSugeridas=scored.map(s=>({id:s.id, name:s.name, category:s.category, description:String((all.find(x=>x.id===s.id)||{}).description||'').slice(0,280)})).slice(0,8);
     });
     renderProfileTree(PROFILES_CACHE, null);
   }catch(e){ /* sin indice completo: se queda como esta */ }
@@ -1959,15 +1962,14 @@ async function selectProfileDetail(id){
   document.querySelectorAll('#profileTree .tree-item').forEach(b=>b.classList.toggle('sel', b.dataset.pid===id));
   const el=document.getElementById('profileDetail'); if(!el) return;
   const skills=pf.skillsSugeridas||[];
-  el.innerHTML='<div class="flex between"><h3>'+(pf.emoji?esc(pf.emoji):'🎭')+' '+esc(pf.name)+'</h3><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
-    '<div class="ps-sec">📖 Sección 1 · Descripción</div>'+
-    '<p class="desc">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
+  window._selectedProfileId=id;
+  const useBtn=document.getElementById('treeUseBtn'); if(useBtn) useBtn.textContent='Usar en el chat · '+pf.name;
+  const actBtn=document.getElementById('activateSkillsBtn'); if(actBtn) actBtn.textContent='🧩 Activar sus '+skills.length+' skills';
+  el.innerHTML='<div class="flex" style="align-items:center;gap:8px"><h3 style="margin:0">'+esc(pf.name)+'</h3><span class="muted">|</span><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
+    '<p class="desc mt">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
     (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+
-    '<div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="useProfile(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">Usar en el chat</button>'+
-    '<button class="btn sm" onclick="activateProfileSkills(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">🧩 Activar sus '+skills.length+' skills</button></div>'+
-    '<div class="ps-sec">🧩 Sección 2 · Skills ('+skills.length+')</div>'+
-    '<div id="profileSkillsCol">'+(skills.length
-      ? skills.map(s=>'<div class="card" style="margin-bottom:8px"><div class="flex between"><b class="small">🧩 '+esc(s.name)+'</b><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div><p class="tiny muted mt">'+esc(s.id)+' · '+esc(s.category)+'</p></div>').join('')
+    '<div id="profileSkillsCol" style="margin-top:14px">'+(skills.length
+      ? skills.map(s=>'<div class="card" style="margin-bottom:8px" title="'+esc(s.description||s.id)+'"><div class="flex between"><b class="small">🧩 '+esc(s.name)+'</b><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div><p class="tiny muted mt">'+esc(s.id)+' · '+esc(s.category)+'</p></div>').join('')
       : '<p class="muted tiny">Este perfil aún no tiene skills asociadas.</p>')+'</div>';
   const mcol=document.getElementById('profileMasterCol');
   if(mcol) mcol.innerHTML='<p class="muted tiny">Cargando su Master Prompt…</p>';
@@ -1977,6 +1979,8 @@ async function selectProfileDetail(id){
     if(box){ let c=String(r.content||''); c=c.replace(/^---[\s\S]*?---\s*/, ''); box.innerHTML='<div class="masterbox">'+(c.trim()?md(c.slice(0,14000)):'Su ficha no contiene cuerpo de Master Prompt.')+'</div>'; }
   }catch(e){ const box=document.getElementById('profileMasterCol'); if(box) box.textContent='No se pudo leer su Master Prompt: '+e.message; }
 }
+function useSelectedProfile(){ if(window._selectedProfileId) useProfile(window._selectedProfileId); else toast('Elige primero un perfil','err'); }
+function activateSelectedProfileSkills(){ if(window._selectedProfileId) activateProfileSkills(window._selectedProfileId); }
 function activateProfileSkills(id){
   const pf=PROFILES_CACHE.find(x=>x.id===id); if(!pf) return;
   (pf.skillsSugeridas||[]).forEach(s=>REAL.activeSkills.add(s.id));

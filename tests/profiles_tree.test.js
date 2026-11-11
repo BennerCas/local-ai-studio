@@ -20,7 +20,7 @@ test('cada perfil trae sus skills asociadas desde el servidor', () => {
 test('layout pedido: sin fusion, sin buscador, 3 columnas', () => {
   if (html.includes('Fusionar skills')) throw new Error('fusion sigue presente');
   if (html.includes('Buscar skill')) throw new Error('buscador sigue presente');
-  if (!html.includes('Sección 2 · Skills')) throw new Error('falta seccion de skills');
+  if (!html.includes('id="profileSkillsCol"')) throw new Error('falta seccion de skills');
 });
 
 test('skills del perfil: fallback en navegador si el servidor no las manda', () => {
@@ -30,6 +30,6 @@ test('skills del perfil: fallback en navegador si el servidor no las manda', () 
 
 test('reparto 3 columnas estilo estudio: perfiles | descripcion+skills | master prompt', () => {
   if (!html.includes('profileMasterCol')) throw new Error('falta columna master prompt');
-  if (!html.includes('Sección 1 · Descripción') || !html.includes('Sección 2 · Skills')) throw new Error('faltan secciones en columna 2');
+  if (!html.includes('id="profileSkillsCol"') || !html.includes('id="activateSkillsBtn"') || !html.includes('id="treeUseBtn"')) throw new Error('faltan piezas reubicadas');
   if (!html.includes('ps-col')) throw new Error('sin estilo de columna del estudio');
 });

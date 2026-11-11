@@ -448,7 +448,7 @@ function suggestSkillsForProfile(slug, category, name) {
     const override = PROFILE_SKILL_OVERRIDES[String(slug || "").toLowerCase()];
     if (override) {
       const byId = new Map(loadSkillsIndex().filter(Boolean).map((s) => [s.id, s]));
-      const picked = override.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id).name || id, category: byId.get(id).category || "general" }));
+      const picked = override.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id).name || id, category: byId.get(id).category || "general", description: String(byId.get(id).description || "").slice(0, 280) }));
       if (picked.length) return picked;
     }
     const tokens = new Set();
@@ -467,10 +467,10 @@ function suggestSkillsForProfile(slug, category, name) {
         else if (cat.includes(t)) score += 2;
         else if (desc.includes(t)) score += 1;
       }
-      if (score > 0) scored.push({ id: s.id, name: s.name || s.id, category: s.category || "general", score });
+      if (score > 0) scored.push({ id: s.id, name: s.name || s.id, category: s.category || "general", description: String(s.description || "").slice(0, 280), score });
     }
     scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-    return scored.slice(0, 8).map(({ id, name, category: c }) => ({ id, name, category: c }));
+    return scored.slice(0, 8).map(({ id, name, category: c, description }) => ({ id, name, category: c, description: description || "" }));
   } catch (_e) { return []; }
 }
 
