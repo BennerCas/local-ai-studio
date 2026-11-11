@@ -354,6 +354,11 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #psCreate .np-plus{display:flex;align-items:center;font-size:18px;color:var(--muted)}
 #psCreate .np-stepdot{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:10px;font-size:12px;font-weight:800;color:var(--muted)}
 #psCreate .np-stepdot.on{background:var(--vio,#8b7bff);color:#fff;border-color:transparent}
+#psCreate{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 30px}
+#psCreate::-webkit-scrollbar{width:0;height:0;display:none}
+#psCreate .cols-ps{flex:none}
+#psCreate .cols-ps>div{height:auto}
+#npHelp{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);margin-bottom:12px;line-height:1.6}
 #profileMasterCol .master-edit{width:100%;height:100%;min-height:380px;resize:vertical;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font:12.5px/1.6 ui-monospace,Consolas,monospace}
 #treeUseBtn,#activateSkillsBtn{text-align:center;justify-content:center}
 #view-skills .ps-body::-webkit-scrollbar{width:0;height:0;display:none}
@@ -1105,10 +1110,12 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
       <div id="psCreate" style="display:none">
         <div class="np-banner">🧪 <b>PROTOTIPO navegable</b> — no guarda archivos; la generación rellena plantillas localmente. Se retirará tras tu validación.</div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn" id="npBackTop" onclick="psShowExplore()">← Explorar</button>
           <button class="btn primary" id="npTabPower" style="flex:1" onclick="psMode('power')">🚀 Potenciar perfil</button>
           <button class="btn" id="npTabFuse" style="flex:1" onclick="psMode('fuse')">🧬 Fusionar perfiles</button>
           <button class="btn" id="npTabNew" style="flex:1" onclick="psMode('new')">➕ Desde cero</button>
         </div>
+        <p id="npHelp" class="tiny"></p>
         <div id="npModePower">
           <div class="np-toolbar">
             <div class="np-field" style="flex:2;min-width:220px"><label>Perfil a potenciar</label><select class="input" id="npPowProfile" onchange="npPowLoad()" style="width:100%"></select></div>
@@ -2140,6 +2147,12 @@ function psMode(m){
   if(m==='fuse') npFusePreviewUpdate();
   if(m==='power') npPowPreviewUpdate();
   if(m==='new') npStep(window._npStep||1);
+  const help=document.getElementById('npHelp');
+  if(help) help.textContent={
+    power:'🚀 Cómo potenciar: 1) Elige un perfil existente. 2) Escribe qué quieres reforzar (opcional). 3) Pulsa «Diagnosticar»: a la izquierda queda su texto actual. 4) A la derecha, acepta ✓ o rechaza cada bloque de mejora. 5) Revisa el resultado compuesto y pulsa «Guardar potenciado».',
+    fuse:'🧬 Cómo fusionar: 1) Marca 2 o más perfiles en la paleta de la izquierda. 2) Aparecen como tarjetas en la mesa: elige en la derecha quién manda (👑). 3) Ponle nombre a la fusión. 4) Revisa el resultado y pulsa «Crear fusión».',
+    new:'➕ Cómo crear desde cero: Paso 1, la entrevista (nombre y propósito). Paso 2, genera y retoca las secciones. Paso 3, revisa el perfil completo y créalo. Usa «Siguiente/Anterior» para moverte.'
+  }[m]||'';
 }
 function npFillPickers(){
   const sel=document.getElementById('npPowProfile'); if(!sel) return;

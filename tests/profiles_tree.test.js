@@ -86,3 +86,9 @@ test('prototipo C/B/A: diff, mesa y asistente por pasos', () => {
   }
   if (!html.includes('npStep')) throw new Error('sin navegacion por pasos');
 });
+
+test('prototipo: volver visible, instrucciones y scroll hasta el fondo', () => {
+  if (!html.includes('id="npBackTop"')) throw new Error('sin boton volver arriba');
+  if (!html.includes('id="npHelp"')) throw new Error('sin instrucciones');
+  if (!html.includes('#psCreate{flex:1;min-height:0;overflow-y:auto')) throw new Error('sin scroll propio');
+});
