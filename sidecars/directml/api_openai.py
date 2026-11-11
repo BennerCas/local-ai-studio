@@ -527,6 +527,7 @@ def measure_dir_size_gb(path: str, fallback: str) -> str:
 HERMES_PATH = r"C:\antigravityAS\Modelos -ai-brains\Hermes-3-8B-UNLOCKED-ONNX-DirectML"
 LLAMA_PATH = r"C:\antigravityAS\Modelos -ai-brains\Llama-3.2-3B-ONNX-DirectML-INT4"
 PHI35_PATH = r"C:\antigravityAS\Modelos -ai-brains\phi-3.5-mini-instruct-onnx\gpu\gpu-int4-awq-block-128"
+HERMES_INT4_PATH = os.environ.get("HERMES_INT4_PATH", r"C:\antigravityAS\Modelos -ai-brains\Hermes-3-8B-UNLOCKED-INT4")
 
 MODELS_MAP: Dict[str, Dict[str, Any]] = {
     "Phi-3.5-mini-instruct-ONNX": {
@@ -545,6 +546,12 @@ MODELS_MAP: Dict[str, Dict[str, Any]] = {
         "path": HERMES_PATH,
         "displayName": "Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)",
         "size": "8.5 GB",
+        "ready": True,
+    },
+    "Hermes-3-8B-UNLOCKED-INT4": {
+        "path": HERMES_INT4_PATH,
+        "displayName": "Hermes-3-8B-UNLOCKED (INT4 AWQ DirectML)",
+        "size": measure_dir_size_gb(HERMES_INT4_PATH, "4.5 GB"),
         "ready": True,
     },
 }
