@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node sidecars/local_ai_chat/server.js",
     "start:preview": "LOCAL_AI_HOST=0.0.0.0 ANTIGRAVITY_SIDECAR_WEB_PORT=8021 node sidecars/local_ai_chat/server.js",
-    "test": "LOCAL_AI_OFFLINE_TESTS=1 node --test tests/context_patch.test.js tests/freeai_image.test.js tests/hardware_advisor.test.js tests/integrations_bridge.test.js tests/memory_store.test.js tests/master_prompts.test.js tests/wiring_audit.test.js tests/image_studio_wiring.test.js tests/staff_director.test.js tests/server_api.test.js tests/tts_bridge.test.js tests/vibe_coding_100.test.js",
+    "test": "LOCAL_AI_OFFLINE_TESTS=1 node --test tests/context_patch.test.js tests/freeai_image.test.js tests/hardware_advisor.test.js tests/integrations_bridge.test.js tests/memory_store.test.js tests/master_prompts.test.js tests/wiring_audit.test.js tests/image_studio_wiring.test.js tests/staff_director.test.js tests/agents_registry.test.js tests/server_api.test.js tests/tts_bridge.test.js tests/vibe_coding_100.test.js",
     "test:e2e": "node --test tests/ui_e2e.test.js",
     "probar": "node scripts/prueba-real.js",
     "probar:rapido": "node scripts/prueba-real.js --rapido"
