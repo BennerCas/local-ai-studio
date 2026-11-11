@@ -2361,6 +2361,89 @@ async function rollbackReal(changeId){
   catch(e){ toast('Rollback: '+e.message,'err'); }
 }
 
+/* ---------- Ejecutor del enjambre: subtareas en paralelo + integracion ---------- */
+async function swarmChatOnce(source, prompt, perfil, skills){
+  let model=undefined;
+  if(source==='ollama'){
+    try{ const t=await API.get('/api/tags'); const loc=(t.localModels||[]).map(m=>m.id||m.name).filter(n=>n&&!/cloud/i.test(n)); model=loc[0]; }catch(e){}
+    if(!model) throw new Error('Ollama sin modelos locales en el catalogo');
+  }
+  if(source==='directml') model=(typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:undefined;
+  const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model, stream:true, source, profileId:perfil||undefined,
+      skillIds:skills&&skills.length?skills:undefined,
+      project:REAL.project?(REAL.project.name||undefined):undefined,
+      projectPath:REAL.project?(REAL.project.path||undefined):undefined,
+      messages:[{role:'user', content:prompt}]})});
+  if(!res.ok){ const j=await res.json().catch(()=>({})); throw new Error(j.error||('HTTP '+res.status)); }
+  const reader=res.body.getReader(), dec=new TextDecoder(); let buf='', full='';
+  while(true){
+    const {done,value}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop()||'';
+    for(const line of lines){ const t=line.trim(); if(!t.startsWith('data:')) continue;
+      const jx=t.slice(5).trim(); if(jx==='[DONE]') continue;
+      try{ const px=JSON.parse(jx); if(px.error) throw new Error(typeof px.error==='string'?px.error:(px.error.message||'error del motor')); full+=(px.choices&&px.choices[0]&&px.choices[0].delta&&px.choices[0].delta.content)||''; }catch(e){ if(!/JSON|Unexpected/.test(e.message)) throw e; } }
+  }
+  if(!full.trim()) throw new Error('respuesta vacia de '+source);
+  return full;
+}
+async function swarmAgentOnce(sub){
+  const m=String(sub.motor||'ollama').toLowerCase();
+  const prompt=sub.tarea+(sub.entregable?'\n\nEntregable esperado: '+sub.entregable:'')+'\nTrabaja SOLO en esta subtarea. Entrega codigo completo en bloques con la ruta encima de cada bloque si creas archivos.';
+  if(m.startsWith('api:')){
+    const nombre=m.slice(4).trim();
+    const ag=(AGENTS_API||[]).find(a=>a.active && a.name.toLowerCase()===nombre) || (AGENTS_API||[]).find(a=>a.active && a.name.toLowerCase().includes(nombre));
+    if(!ag) throw new Error('agente API "'+nombre+'" no registrado o inactivo (vista Agentes)');
+    const r=await fetch('/api/agents/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({baseUrl:ag.url, apiKey:firstAgentKey(ag.key||''), model:ag.model||undefined,
+        messages:[{role:'system', content:'Eres un agente del enjambre de Local AI Studio. Tu perfil para esta subtarea: '+(sub.perfil||'especialista')+'. Capacidades declaradas: '+(ag.caps||'generales')+'.'},{role:'user', content:prompt}]})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.text) throw new Error(j.error||('HTTP '+r.status));
+    return j.text;
+  }
+  const source=(m==='freeai')?'freeai':(m==='directml')?'directml':'ollama';
+  return swarmChatOnce(source, prompt, sub.perfil, sub.skills);
+}
+async function runSwarmPhase(i, btn){
+  const f=STAFF.fases[i]; if(!f||!f.subtareas||!f.subtareas.length) return;
+  if(STAFF_MOTOR==='solo-local'){
+    f.subtareas.forEach(s=>{ if(String(s.motor).startsWith('freeai')||String(s.motor).startsWith('api:')) s.motor='ollama'; });
+    toast('🔌 Modo solo local: las subtareas remotas se reasignan a Ollama','ok');
+  }
+  btn.disabled=true;
+  f.estado='en curso'; f.subtareas.forEach(s=>{ s.estado='▶ en curso'; s.resultado=''; });
+  saveStaff(); renderStaff();
+  const p2=document.getElementById('swarm-'+i);
+  if(p2) p2.innerHTML='<div class="card mt"><b class="small">🐝 Enjambre trabajando en paralelo ('+f.subtareas.length+' subtareas)…</b><div id="swarm-log-'+i+'" class="tiny mt"></div></div>';
+  const log=(t)=>{ const l=document.getElementById('swarm-log-'+i); if(l) l.innerHTML+=t+'<br>'; };
+  try{
+    const results=await Promise.all(f.subtareas.map(async (s,k)=>{
+      const t0=Date.now();
+      try{ const txt=await swarmAgentOnce(s); s.estado='✔ hecha'; s.resultado=txt; log('✔ ['+esc(s.motor)+'] subtarea '+(k+1)+' · '+Math.round((Date.now()-t0)/1000)+'s'); return {ok:true, s, txt}; }
+      catch(e){ s.estado='✘ error'; s.resultado='ERROR: '+e.message; log('✘ ['+esc(s.motor)+'] subtarea '+(k+1)+': '+esc(e.message)); return {ok:false, s, txt:''}; }
+    }));
+    saveStaff(); renderStaff();
+    const buenas=results.filter(r=>r.ok);
+    if(!buenas.length) throw new Error('ninguna subtarea produjo resultado');
+    const p3=document.getElementById('swarm-'+i);
+    if(p3) p3.innerHTML='<div class="card mt"><b class="small">🐝 Hermes integrando '+buenas.length+' entregables…</b></div>';
+    const integPrompt='Eres el Director (Hermes). Integra los entregables de tu enjambre en UN unico resultado de fase, coherente y completo. Si dos entregables se contradicen, resuelvelo tu y dilo en una linea.\n\nFASE: '+f.titulo+'\nOBJETIVO DE LA FASE: '+f.tarea+'\n\n'+
+      buenas.map((r,k)=>'--- Entregable '+(k+1)+' ['+r.s.motor+'] '+r.s.tarea+' ---\n'+String(r.txt).slice(0,6000)).join('\n\n')+
+      '\n\nDevuelve: resultado integrado completo (con los bloques de codigo con su ruta, listos para guardar) + criterio de aceptacion en 1-3 puntos.';
+    const integrado=await swarmChatOnce('directml', integPrompt, undefined, []);
+    f.integrado=integrado; f.estado='hecha';
+    saveStaff(); renderStaff(); showSideColumn('staff');
+    addMsg('ai', md('🐝 **Fase '+(i+1)+' integrada por el Director** — '+f.titulo+'\n\n'+integrado), '🐝 Director · Hermes');
+    REAL.hist.push({role:'assistant', content:'Fase '+(i+1)+' integrada:\n'+integrado});
+    toast('🐝 Fase '+(i+1)+' completada por el enjambre e integrada por Hermes','ok');
+  }catch(e){
+    f.estado='en curso'; saveStaff(); renderStaff();
+    toast('Enjambre: '+e.message,'err');
+  }
+  btn.disabled=false;
+}
+
 /* ---------- Registro de agentes (APIs) del enjambre ---------- */
 let AGENTS_API=[]; try{ AGENTS_API=JSON.parse(localStorage.getItem('las-agents-v1')||'[]'); }catch(e){ AGENTS_API=[]; }
 let SWARM_BUILTINS={ollama:true, freeai:true}; try{ Object.assign(SWARM_BUILTINS, JSON.parse(localStorage.getItem('las-agents-builtins')||'{}')); }catch(e){}
@@ -2586,6 +2669,7 @@ async function staffGenerate(){
 'IDEA / PLAN DEL USUARIO:\n'+idea+'\n\n'+
 'PERFILES DISPONIBLES (usa ids exactos):\n'+cat.profileIds.join(', ')+'\n\n'+
 'SKILLS CANDIDATAS (usa ids exactos):\n'+cat.candSkills.join(', ')+'\n\n'+
+'ENJAMBRE ACTIVO: '+swarmActiveNames().join(', ')+'. En cada fase, si admite trabajo en paralelo, incluye "subtareas": [{"motor":"ollama|freeai|directml|api:<nombre exacto del agente>","perfil":"id o rol","skills":["ids"],"tarea":"...","entregable":"..."}] con subtareas INDEPENDIENTES y territorios (archivos) separados. Maximo 3 por fase.\n\n'+
 'Diseña el plan y el staff siguiendo tu formato obligatorio (resumen breve + bloque ```staff-json).';
     const model=(typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:document.getElementById('modelSel').value;
     const source='directml'; /* 🐝 El Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), local y sin censura */
@@ -2625,7 +2709,8 @@ function parseStaff(text){
     if(!Array.isArray(j.fases) || !j.fases.length) return false;
     STAFF={idea:document.getElementById('staffIdea').value.trim(),
       objetivo:j.objetivo||'', resumen:j.resumen||'',
-      fases:j.fases.map(f=>({titulo:f.titulo||'Fase', tarea:f.tarea||'', perfil:f.perfil||'', skills:Array.isArray(f.skills)?f.skills:[], entregable:f.entregable||'', riesgo:f.riesgo||'', estado:'pendiente', sugeridas:[]})),
+      fases:j.fases.map(f=>({titulo:f.titulo||'Fase', tarea:f.tarea||'', perfil:f.perfil||'', skills:Array.isArray(f.skills)?f.skills:[], entregable:f.entregable||'', riesgo:f.riesgo||'', estado:'pendiente', sugeridas:[],
+        subtareas:Array.isArray(f.subtareas)?f.subtareas.filter(s=>s&&s.tarea).map(s=>({motor:String(s.motor||'ollama').toLowerCase(), perfil:s.perfil||'', skills:Array.isArray(s.skills)?s.skills:[], tarea:s.tarea||'', entregable:s.entregable||'', estado:'pendiente', resultado:''})):[], integrado:''})),
       refuerzos:Array.isArray(j.refuerzos_sugeridos)?j.refuerzos_sugeridos:[]};
     saveStaff(); return true;
   }catch(e){ return false; }
@@ -2656,7 +2741,10 @@ function renderStaff(){
       (f.entregable?'<div class="tiny muted mt">📦 Entregable: '+esc(f.entregable)+'</div>':'')+
       (f.riesgo?'<div class="tiny mt" style="color:var(--red)">⚠ '+esc(f.riesgo)+'</div>':'')+
       '<div id="sugg-'+i+'">'+(f.sugeridas||[]).map(s=>'<span class="tag sugg-chip" title="Añadir esta skill a la fase" onclick="addSkillToFase('+i+',\''+esc(s)+'\')">➕ '+esc(s)+'</span>').join(' ')+'</div>'+
-      '<div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="activateFase('+i+')">▶ Activar esta fase</button>'+
+      (f.subtareas&&f.subtareas.length?'<div class="mt"><b class="tiny">🐝 Subtareas del enjambre ('+f.subtareas.length+')</b>'+f.subtareas.map(s=>'<div class="tiny mt">🔹 <span class="tag cyan">'+esc(s.motor)+'</span> '+esc(s.tarea)+(s.perfil?' · 🎭 '+esc(s.perfil):'')+' <span class="tag">'+esc(s.estado||'pendiente')+'</span></div>').join('')+'</div>':'')+
+      '<div id="swarm-'+i+'"></div>'+
+      (f.integrado?'<details class="mt"><summary class="tiny">📦 Resultado integrado por el Director</summary><div class="tiny mt">'+md(f.integrado)+'</div></details>':'')+
+      '<div class="flex wrap mt" style="gap:6px">'+((f.subtareas&&f.subtareas.length)?'<button class="btn sm primary" onclick="runSwarmPhase('+i+',this)">🐝 Ejecutar fase en enjambre</button>':'')+'<button class="btn sm primary" onclick="activateFase('+i+')">▶ Activar esta fase</button>'+
       '<button class="btn sm" onclick="suggestSkills('+i+',this)">💡 Sugerir refuerzos</button>'+
       '<button class="btn sm" onclick="unblockFase('+i+')" title="Pedir ayuda al Orquestador para desbloquear esta fase">🆘 Bloqueado</button>'+
       '<button class="btn sm" onclick="deleteFase('+i+')" title="Eliminar esta fase del plan">🗑</button></div>'+

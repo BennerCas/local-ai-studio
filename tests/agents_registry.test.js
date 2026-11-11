@@ -26,3 +26,11 @@ test('servidor: proxy /api/agents/test y /api/agents/chat', () => {
   if (!srv.includes('"/api/agents/chat"')) throw new Error('falta chat');
   if (!srv.includes('/chat/completions')) throw new Error('sin destino OpenAI');
 });
+
+test('ejecutor del enjambre: paralelo + integracion del Director', () => {
+  for (const s of ['async function runSwarmPhase', 'Promise.all(f.subtareas.map', 'async function swarmAgentOnce', "api:", 'swarmChatOnce']) {
+    if (!html.includes(s)) throw new Error('falta ' + s);
+  }
+  if (!html.includes('Ejecutar fase en enjambre')) throw new Error('falta boton de enjambre');
+  if (!html.includes('INDEPENDIENTES')) throw new Error('el prompt no pide subtareas independientes');
+});
