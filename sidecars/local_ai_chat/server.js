@@ -233,7 +233,8 @@ function sanitizeProfilesList(rawProfiles) {
     emoji: p.emoji || "",
     color: p.color || "",
     isBundle: Boolean(p.isBundle),
-    skillsCount: p.skillsCount || 0
+    skillsCount: p.skillsCount || (Array.isArray(p.skillsSugeridas) ? p.skillsSugeridas.length : 0),
+    skillsSugeridas: Array.isArray(p.skillsSugeridas) ? p.skillsSugeridas : []
   }));
 }
 

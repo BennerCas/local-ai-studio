@@ -384,6 +384,7 @@ function loadProfiles(forceRefresh = false) {
       }
 
       const meta = parseProfileFrontmatter(raw, slug);
+      const skillsSugeridas = suggestSkillsForProfile(slug, category, meta.name || slug);
       profiles.push({
         id,
         slug,
@@ -392,6 +393,7 @@ function loadProfiles(forceRefresh = false) {
         description: meta.description || "",
         vibe: meta.vibe || "",
         emoji: meta.emoji || "",
+        skillsSugeridas,
         color: meta.color || "",
         relPath: f.relPath,
         fullPath: f.fullPath
@@ -417,6 +419,31 @@ function loadProfiles(forceRefresh = false) {
   profilesCacheKey = cacheKey;
   lastProfilesLoadTime = now;
   return profiles;
+}
+
+const PROFILE_SKILL_STOPWORDS = new Set(["the", "and", "for", "with", "engineer", "engineering", "specialist", "expert", "agent", "ai", "pro", "senior", "lead", "master", "chief", "head", "de", "la", "el", "en", "y"]);
+function suggestSkillsForProfile(slug, category, name) {
+  try {
+    const tokens = new Set();
+    const addWords = (txt) => String(txt || "").toLowerCase().split(/[^a-z0-9]+/).forEach((w) => { if (w.length >= 3 && !PROFILE_SKILL_STOPWORDS.has(w)) tokens.add(w); });
+    addWords(slug); addWords(name); addWords(String(category || "").replace(/-/g, " "));
+    if (!tokens.size) return [];
+    const scored = [];
+    for (const s of loadSkillsIndex()) {
+      if (!s) continue;
+      const nm = String(s.name || s.id || "").toLowerCase(), idl = String(s.id || "").toLowerCase(),
+        cat = String(s.category || "").toLowerCase(), desc = String(s.description || "").toLowerCase();
+      let score = 0;
+      for (const t of tokens) {
+        if (nm.includes(t) || idl.includes(t)) score += 3;
+        else if (cat.includes(t)) score += 2;
+        else if (desc.includes(t)) score += 1;
+      }
+      if (score > 0) scored.push({ id: s.id, name: s.name || s.id, category: s.category || "general", score });
+    }
+    scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    return scored.slice(0, 8).map(({ id, name, category: c }) => ({ id, name, category: c }));
+  } catch (_e) { return []; }
 }
 
 function findProfileEntry(profileId) {

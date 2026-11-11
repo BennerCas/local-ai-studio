@@ -317,6 +317,17 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 
 /* ===== PERFILES | SKILLS en columnas ===== */
 .cols-ps{display:grid;grid-template-columns:minmax(270px,1fr) minmax(0,1.7fr);gap:18px;align-items:start}
+#view-skills .cols-ps{grid-template-columns:minmax(230px,.85fr) minmax(300px,1.25fr) minmax(300px,1.4fr)}
+#view-skills .tree-cat{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
+#view-skills .tree-cat>summary{cursor:pointer;padding:9px 11px;font-weight:800;font-size:12.5px;list-style:none;background:var(--card)}
+#view-skills .tree-cat>summary::-webkit-details-marker{display:none}
+#view-skills .tree-item{display:block;width:100%;text-align:left;padding:7px 11px 7px 20px;font-size:12px;background:none;border:none;border-top:1px solid var(--line);color:var(--text);cursor:pointer}
+#view-skills .tree-item:hover{background:var(--card)}
+#view-skills .tree-item.sel{background:var(--card);box-shadow:inset 3px 0 0 var(--vio,#8b7bff);font-weight:700}
+#view-skills .pstats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+#view-skills .pstats .stat{flex:1;min-width:130px}
+#profileDetail .masterbox{max-height:260px;overflow:auto;scrollbar-width:none;white-space:pre-wrap;font-size:11.5px}
+#profileDetail .masterbox::-webkit-scrollbar{width:0;display:none}
 .cols-ps .col-head{font-size:14px;font-weight:800;margin:2px 0 10px}
 #profileGrid{grid-template-columns:minmax(0,1fr)!important;max-height:72vh;overflow:auto;padding-right:4px}
 #skillGrid{grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))!important;max-height:72vh;overflow:auto;padding-right:4px}
@@ -1040,11 +1051,17 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
       <p class="sect-sub">Fuente: <a href="https://github.com/sickn33/agentic-awesome-skills" target="_blank" rel="noopener">antigravity-awesome-skills</a> · Activa varias a la vez o fusiona las tuyas; el perfil define el “rol” del asistente.</p>
       <div class="flex wrap mb"><input class="input grow" placeholder="🔎 Buscar skill… ej. backend, react, seo" oninput="filterSkills(this.value)">
         <div class="seg" id="skillCats"><button class="sel">Todas</button><button>Backend</button><button>Frontend</button><button>DevOps</button><button>Datos</button></div></div>
+      <div class="pstats" id="psStats"></div>
       <div class="cols-ps">
         <div>
-          <div class="col-head">🎭 Perfiles y bundles</div>
-          <p class="tiny muted" style="margin:-4px 0 10px">Entran como Perfil Cognitivo en el prompt · jerarquía superior a las skills</p>
-          <div class="grid" id="profileGrid"></div>
+          <div class="col-head">🗂 Clasificación de perfiles</div>
+          <p class="tiny muted" style="margin:-4px 0 10px">Esquema jerárquico: cada clasificación despliega los perfiles que la componen. Clic en un perfil para verlo al detalle.</p>
+          <div id="profileTree"><p class="muted tiny">Cargando clasificación…</p></div>
+        </div>
+        <div>
+          <div class="col-head">🎭 Perfil cognitivo · detalle</div>
+          <div id="profileDetail"><p class="muted tiny">Elige un perfil en el esquema de la izquierda: aquí verás su descripción cognitiva, sus skills propias y su Master Prompt.</p></div>
+          <div class="grid" id="profileGrid" style="display:none"></div>
         </div>
         <div>
           <div class="col-head">🧩 Skills</div>
@@ -1864,8 +1881,64 @@ async function loadProfilesReal(){
     if(grid){
       grid.innerHTML=profiles.map(p=>'<div class="card"><div class="flex between"><h3>'+(p.isBundle?'🧩':'🎭')+' '+esc(p.name)+'</h3><span class="tag '+(p.isBundle?'cyan':'green')+'">'+(p.isBundle?(p.skillsCount+' skills'):'perfil')+'</span></div><p class="desc mt">'+esc(p.description||p.vibe||'')+'</p><button class="btn sm primary mt" onclick="useProfile(\''+esc(p.id)+'\')">Usar en el chat</button></div>').join('')||'<p class="muted">Sin perfiles.</p>';
     }
+    renderProfileTree(profiles, r);
   }catch(e){ /* el selector queda en Sin perfil */ }
 }
+/* ----- Esquema jerarquico de perfiles + detalle (descripcion, skills, Master Prompt) ----- */
+let PROFILES_CACHE=[];
+function renderProfileTree(profiles, meta){
+  PROFILES_CACHE=profiles||[];
+  const tree=document.getElementById('profileTree');
+  const stats=document.getElementById('psStats');
+  const byCat={};
+  PROFILES_CACHE.forEach(pf=>{ (byCat[pf.category||'general']=byCat[pf.category||'general']||[]).push(pf); });
+  const cats=Object.keys(byCat).sort((a,b)=>byCat[b].length-byCat[a].length || a.localeCompare(b));
+  const conSkills=PROFILES_CACHE.filter(pf=>(pf.skillsSugeridas||[]).length).length;
+  if(stats){
+    const totalSkills=(meta&&meta.totalCount)||((REAL.skills||[]).length)||0;
+    const nCatsSkills=(meta&&meta.categories)?meta.categories.length:0;
+    stats.innerHTML=
+      '<div class="stat"><div class="k">🎭 Perfiles cognitivos</div><div class="v">'+PROFILES_CACHE.length+'</div><div class="s">en '+cats.length+' clasificaciones</div></div>'+
+      '<div class="stat"><div class="k">🧩 Skills</div><div class="v">'+Number(totalSkills).toLocaleString('es')+'</div><div class="s">en '+nCatsSkills+' categorías</div></div>'+
+      '<div class="stat"><div class="k">🧬 Perfiles con skills propias</div><div class="v">'+conSkills+'</div><div class="s">cada perfil trae su set + su Master Prompt</div></div>';
+  }
+  if(!tree) return;
+  if(!PROFILES_CACHE.length){ tree.innerHTML='<p class="muted tiny">Sin perfiles cargados.</p>'; return; }
+  tree.innerHTML=cats.map((c,ci)=>{
+    const items=byCat[c].slice().sort((a,b)=>a.name.localeCompare(b.name)).map(pf=>
+      '<button class="tree-item" data-pid="'+esc(pf.id)+'" onclick="selectProfileDetail(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">'+(pf.emoji?esc(pf.emoji)+' ':'🎭 ')+esc(pf.name)+' <span class="tiny muted">· '+((pf.skillsSugeridas||[]).length)+' skills</span></button>').join('');
+    return '<details class="tree-cat" '+(ci===0?'open':'')+'><summary>📁 '+esc(c)+' <span class="tag">'+byCat[c].length+'</span></summary>'+items+'</details>';
+  }).join('');
+  const first=PROFILES_CACHE.find(pf=>pf.id==='specialized/director-staff-vibecoding')||PROFILES_CACHE[0];
+  if(first) selectProfileDetail(first.id);
+}
+async function selectProfileDetail(id){
+  const pf=PROFILES_CACHE.find(x=>x.id===id); if(!pf) return;
+  document.querySelectorAll('#profileTree .tree-item').forEach(b=>b.classList.toggle('sel', b.dataset.pid===id));
+  const el=document.getElementById('profileDetail'); if(!el) return;
+  const skills=pf.skillsSugeridas||[];
+  el.innerHTML='<div class="card"><div class="flex between"><h3>'+(pf.emoji?esc(pf.emoji):'🎭')+' '+esc(pf.name)+'</h3><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
+    '<p class="desc mt"><b>🧠 Descripción cognitiva</b></p><p class="desc">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
+    (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+
+    '<p class="desc mt"><b>🧩 Sus skills propias ('+skills.length+')</b></p>'+
+    (skills.length?'<div class="flex wrap" style="gap:5px">'+skills.map(s=>'<span class="tag sugg-chip" title="Clic: activar esta skill en el chat" onclick="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',true)">🧩 '+esc(s.name)+' · '+esc(s.category)+'</span>').join('')+'</div>' : '<p class="tiny muted">Este perfil aún no tiene skills asociadas.</p>')+
+    '<p class="desc mt"><b>🧠 Su Master Prompt</b></p><div class="masterbox card" id="pfMaster">Cargando su Master Prompt…</div>'+
+    '<div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="useProfile(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">Usar en el chat</button>'+
+    '<button class="btn sm" onclick="activateProfileSkills(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">🧩 Activar sus '+skills.length+' skills</button></div></div>';
+  try{
+    const r=await API.get('/api/profiles/content?id='+encodeURIComponent(id));
+    const box=document.getElementById('pfMaster');
+    if(box){ let c=String(r.content||''); c=c.replace(/^---[\s\S]*?---\s*/, ''); box.textContent=c.slice(0,6000)||'Su ficha no contiene cuerpo de Master Prompt.'; }
+  }catch(e){ const box=document.getElementById('pfMaster'); if(box) box.textContent='No se pudo leer su Master Prompt: '+e.message; }
+}
+function activateProfileSkills(id){
+  const pf=PROFILES_CACHE.find(x=>x.id===id); if(!pf) return;
+  (pf.skillsSugeridas||[]).forEach(s=>REAL.activeSkills.add(s.id));
+  localStorage.setItem('las-skills', JSON.stringify([...REAL.activeSkills]));
+  if(typeof renderSkills==='function') renderSkills('');
+  toast('🧩 Skills de '+pf.name+' activadas ('+(pf.skillsSugeridas||[]).length+')','ok');
+}
+
 function useProfile(id){
   REAL.profileId=id; localStorage.setItem('las-profile', id);
   const sel=document.getElementById('profileSel'); if(sel) sel.value=id;
