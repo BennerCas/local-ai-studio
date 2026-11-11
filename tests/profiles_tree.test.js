@@ -79,3 +79,10 @@ test('la seccion view-skills tiene los div balanceados', () => {
   const closes = (frag.match(/<\/div>/g) || []).length;
   if (opens !== closes) throw new Error('div desbalanceados: ' + opens + ' aperturas vs ' + closes + ' cierres');
 });
+
+test('prototipo C/B/A: diff, mesa y asistente por pasos', () => {
+  for (const id of ['npPowBefore', 'npPowBlocks', 'npFuseCanvas', 'npFuseChips', 'npStep1', 'npStep2', 'npStep3']) {
+    if (!html.includes(`id="${id}"`)) throw new Error('falta #' + id);
+  }
+  if (!html.includes('npStep')) throw new Error('sin navegacion por pasos');
+});
