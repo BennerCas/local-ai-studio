@@ -421,9 +421,36 @@ function loadProfiles(forceRefresh = false) {
   return profiles;
 }
 
-const PROFILE_SKILL_STOPWORDS = new Set(["the", "and", "for", "with", "engineer", "engineering", "specialist", "expert", "agent", "ai", "pro", "senior", "lead", "master", "chief", "head", "de", "la", "el", "en", "y"]);
+const PROFILE_SKILL_STOPWORDS = new Set(["the", "and", "for", "with", "engineer", "engineering", "specialist", "expert", "agent", "ai", "pro", "senior", "lead", "master", "chief", "head", "de", "la", "el", "en", "y", "staff", "directory", "people", "event", "events", "manager", "management", "director", "general", "global", "digital", "online", "content"]);
+const PROFILE_CAT_AFFINITY = {
+  engineering: ["development", "web-development", "frontend", "devops", "cloud", "data"],
+  specialized: ["ai-ml", "workflow", "automation", "development"],
+  security: ["security"],
+  marketing: ["marketing", "content", "business"],
+  design: ["design", "frontend", "content"],
+  testing: ["development", "devops", "workflow"],
+  "game-development": ["development", "design", "ai-ml"],
+  sales: ["business", "marketing", "productivity"],
+  finance: ["business", "data"],
+  product: ["business", "productivity", "workflow"],
+  "project-management": ["productivity", "workflow", "business"],
+  support: ["productivity", "workflow", "business"],
+  academic: ["content", "data", "productivity"],
+  "paid-media": ["marketing", "business"],
+  "spatial-computing": ["design", "development", "ai-ml"]
+};
+const PROFILE_SKILL_OVERRIDES = {
+  "director-staff-vibecoding": ["ai-agents-architect", "agent-orchestration-improve-agent", "autonomous-agent-patterns", "parallel-agents"],
+  "orquestador-enjambre": ["ai-agents-architect", "agent-orchestration-improve-agent", "autonomous-agent-patterns", "parallel-agents"]
+};
 function suggestSkillsForProfile(slug, category, name) {
   try {
+    const override = PROFILE_SKILL_OVERRIDES[String(slug || "").toLowerCase()];
+    if (override) {
+      const byId = new Map(loadSkillsIndex().filter(Boolean).map((s) => [s.id, s]));
+      const picked = override.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id).name || id, category: byId.get(id).category || "general" }));
+      if (picked.length) return picked;
+    }
     const tokens = new Set();
     const addWords = (txt) => String(txt || "").toLowerCase().split(/[^a-z0-9]+/).forEach((w) => { if (w.length >= 3 && !PROFILE_SKILL_STOPWORDS.has(w)) tokens.add(w); });
     addWords(slug); addWords(name); addWords(String(category || "").replace(/-/g, " "));
@@ -434,6 +461,7 @@ function suggestSkillsForProfile(slug, category, name) {
       const nm = String(s.name || s.id || "").toLowerCase(), idl = String(s.id || "").toLowerCase(),
         cat = String(s.category || "").toLowerCase(), desc = String(s.description || "").toLowerCase();
       let score = 0;
+      if ((PROFILE_CAT_AFFINITY[String(category || "").toLowerCase()] || []).includes(cat)) score += 2;
       for (const t of tokens) {
         if (nm.includes(t) || idl.includes(t)) score += 3;
         else if (cat.includes(t)) score += 2;
