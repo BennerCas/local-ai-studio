@@ -1047,11 +1047,8 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
 
     <!-- ======== SKILLS ======== -->
     <section class="view" id="view-skills">
-      <div class="sect-title">🧩 Skills y Perfiles Cognitivos</div>
-      <p class="sect-sub">Fuente: <a href="https://github.com/sickn33/agentic-awesome-skills" target="_blank" rel="noopener">antigravity-awesome-skills</a> · Activa varias a la vez o fusiona las tuyas; el perfil define el “rol” del asistente.</p>
-      <div class="flex wrap mb"><input class="input grow" placeholder="🔎 Buscar skill… ej. backend, react, seo" oninput="filterSkills(this.value)">
-        <div class="seg" id="skillCats"><button class="sel">Todas</button><button>Backend</button><button>Frontend</button><button>DevOps</button><button>Datos</button></div></div>
-      <div class="pstats" id="psStats"></div>
+      <div class="flex" style="align-items:baseline;gap:14px;flex-wrap:wrap"><div class="sect-title" style="margin:0">🧩 Skills y Perfiles Cognitivos</div><span class="tiny muted">Fuente: <a href="https://github.com/sickn33/agentic-awesome-skills" target="_blank" rel="noopener">antigravity-awesome-skills</a> · el perfil define el “rol” del asistente y trae sus skills propias</span></div>
+      <p class="sect-sub" id="psStats" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cargando cifras…</p>
       <div class="cols-ps">
         <div>
           <div class="col-head">🗂 Clasificación de perfiles</div>
@@ -1059,18 +1056,17 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <div id="profileTree"><p class="muted tiny">Cargando clasificación…</p></div>
         </div>
         <div>
-          <div class="col-head">🎭 Perfil cognitivo · detalle</div>
-          <div id="profileDetail"><p class="muted tiny">Elige un perfil en el esquema de la izquierda: aquí verás su descripción cognitiva, sus skills propias y su Master Prompt.</p></div>
+          <div class="col-head">🎭 Perfil cognitivo</div>
+          <div id="profileDetail"><p class="muted tiny">Elige un perfil en el esquema de la izquierda: aquí verás su descripción cognitiva y su Master Prompt.</p></div>
           <div class="grid" id="profileGrid" style="display:none"></div>
         </div>
         <div>
-          <div class="col-head">🧩 Skills</div>
-          <p class="tiny muted" style="margin:-4px 0 10px">Activa las que quieras: irán en tu próximo mensaje del chat</p>
-          <div class="grid" id="skillGrid"></div>
+          <div class="col-head">🧩 Sus 8 skills</div>
+          <p class="tiny muted" style="margin:-4px 0 10px">Las skills propias del perfil seleccionado · clic para activarlas en el chat</p>
+          <div id="profileSkillsCol"><p class="muted tiny">Sin perfil seleccionado.</p></div>
+          <div class="grid" id="skillGrid" style="display:none"></div>
         </div>
       </div>
-      <div class="card mt"><h3>🧬 Fusionar skills</h3><p class="desc">Crea una skill personal combinando las activas con tus propias reglas. Se guarda con versionado en Skills_Backup.</p>
-      <div class="flex mt wrap"><input class="input" style="max-width:260px" placeholder="Nombre de la fusión… ej. fullstack-pro"><button class="btn primary" onclick="toast('Fusión guardada con backup versionado','ok')">Guardar fusión</button></div></div>
     </section>
 
     <!-- ======== MEMORIA ======== -->
@@ -1897,10 +1893,7 @@ function renderProfileTree(profiles, meta){
   if(stats){
     const totalSkills=(meta&&meta.totalCount)||((REAL.skills||[]).length)||0;
     const nCatsSkills=(meta&&meta.categories)?meta.categories.length:0;
-    stats.innerHTML=
-      '<div class="stat"><div class="k">🎭 Perfiles cognitivos</div><div class="v">'+PROFILES_CACHE.length+'</div><div class="s">en '+cats.length+' clasificaciones</div></div>'+
-      '<div class="stat"><div class="k">🧩 Skills</div><div class="v">'+Number(totalSkills).toLocaleString('es')+'</div><div class="s">en '+nCatsSkills+' categorías</div></div>'+
-      '<div class="stat"><div class="k">🧬 Perfiles con skills propias</div><div class="v">'+conSkills+'</div><div class="s">cada perfil trae su set + su Master Prompt</div></div>';
+    stats.textContent='🎭 '+PROFILES_CACHE.length+' perfiles en '+cats.length+' clasificaciones · 🧩 '+Number(totalSkills).toLocaleString('es')+' skills en '+nCatsSkills+' categorías · 🧬 '+conSkills+' perfiles con skills propias y su Master Prompt';
   }
   if(!tree) return;
   if(!PROFILES_CACHE.length){ tree.innerHTML='<p class="muted tiny">Sin perfiles cargados.</p>'; return; }
@@ -1917,14 +1910,18 @@ async function selectProfileDetail(id){
   document.querySelectorAll('#profileTree .tree-item').forEach(b=>b.classList.toggle('sel', b.dataset.pid===id));
   const el=document.getElementById('profileDetail'); if(!el) return;
   const skills=pf.skillsSugeridas||[];
-  el.innerHTML='<div class="card"><div class="flex between"><h3>'+(pf.emoji?esc(pf.emoji):'🎭')+' '+esc(pf.name)+'</h3><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
+  el.innerHTML='<div class="flex between"><h3>'+(pf.emoji?esc(pf.emoji):'🎭')+' '+esc(pf.name)+'</h3><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
     '<p class="desc mt"><b>🧠 Descripción cognitiva</b></p><p class="desc">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
     (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+
-    '<p class="desc mt"><b>🧩 Sus skills propias ('+skills.length+')</b></p>'+
-    (skills.length?'<div class="flex wrap" style="gap:5px">'+skills.map(s=>'<span class="tag sugg-chip" title="Clic: activar esta skill en el chat" onclick="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',true)">🧩 '+esc(s.name)+' · '+esc(s.category)+'</span>').join('')+'</div>' : '<p class="tiny muted">Este perfil aún no tiene skills asociadas.</p>')+
-    '<p class="desc mt"><b>🧠 Su Master Prompt</b></p><div class="masterbox card" id="pfMaster">Cargando su Master Prompt…</div>'+
+    '<p class="desc mt"><b>🧠 Su Master Prompt</b></p><div class="masterbox" id="pfMaster">Cargando su Master Prompt…</div>'+
     '<div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="useProfile(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">Usar en el chat</button>'+
-    '<button class="btn sm" onclick="activateProfileSkills(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">🧩 Activar sus '+skills.length+' skills</button></div></div>';
+    '<button class="btn sm" onclick="activateProfileSkills(\''+esc(pf.id).replace(/'/g,"\\'")+'\')">🧩 Activar sus '+skills.length+' skills</button></div>';
+  const col3=document.getElementById('profileSkillsCol');
+  if(col3){
+    col3.innerHTML=skills.length
+      ? skills.map(s=>'<div class="card" style="margin-bottom:8px"><div class="flex between"><b class="small">🧩 '+esc(s.name)+'</b><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div><p class="tiny muted mt">'+esc(s.id)+' · '+esc(s.category)+'</p></div>').join('')
+      : '<p class="muted tiny">Este perfil aún no tiene skills asociadas.</p>';
+  }
   try{
     const r=await API.get('/api/profiles/content?id='+encodeURIComponent(id));
     const box=document.getElementById('pfMaster');
