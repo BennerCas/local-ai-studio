@@ -2802,11 +2802,17 @@ window.addEventListener('DOMContentLoaded', ()=>{ if(STAFF.fases.length) renderS
    COLUMNA 1 · Pestañas SETUP / PROJECT / STAFF AI + Ruta Vibe Coding
    ===================================================================== */
 function sideTab(name){
+  /* Definicion autosuficiente: maneja los 6 paneles y protege cada
+     cargador para que un fallo en uno nunca congele el cambio de pestana. */
   document.querySelectorAll('.side-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  ['setup','project','staff'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
-  if(name==='project') updateProjectTab();
-  if(name==='staff') renderVibeGuide();
-  localStorage.setItem('las-sidetab', name);
+  ['setup','project','staff','history','gallery','code'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
+  const safe=(fn)=>{ try{ fn(); }catch(e){ console.warn('sideTab:', e); } };
+  if(name==='project') safe(()=>updateProjectTab());
+  if(name==='staff') safe(()=>renderVibeGuide());
+  if(name==='history' && typeof loadHistoryTab==='function') safe(()=>loadHistoryTab());
+  if(name==='gallery' && typeof loadGalleryTab==='function') safe(()=>loadGalleryTab());
+  if(name==='code' && typeof loadCodeTab==='function') safe(()=>loadCodeTab());
+  safe(()=>localStorage.setItem('las-sidetab', name));
 }
 /* El panel 🐝 vive ahora dentro de la pestaña STAFF AI de la columna 1 */
 function mountStaffIntoSidebar(){
@@ -4513,8 +4519,13 @@ function saveDirectorExtra(){
 }
 const _sideTabStaff=sideTab;
 sideTab=function(name){
-  _sideTabStaff(name);
-  if(name==='staff') enterStaffMode(); else exitStaffMode();
+  try{ _sideTabStaff(name); }catch(e){ console.warn('sideTab staff:', e); }
+  /* Red de seguridad: sea lo que sea que haya pasado arriba, el panel
+     pedido queda visible y los demas ocultos. Nunca mas una columna
+     congelada por un eslabon roto de la cadena. */
+  ['setup','project','staff','history','gallery','code'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
+  document.querySelectorAll('.side-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  try{ if(name==='staff') enterStaffMode(); else exitStaffMode(); }catch(e){ console.warn('staff mode:', e); }
 };
 /* 🗣 Traducción vibe coding: lo que el Director envía al modelo con tu petición */
 function staffTranslatePayload(hist){
