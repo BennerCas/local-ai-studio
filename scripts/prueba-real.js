@@ -123,7 +123,8 @@ async function serverAlive() {
   const promptCorto = 'Responde en una sola frase: ¿qué modelo eres y estás listo para dirigir un staff de vibe coding?';
   try {
     const r = await chatOnce({ source: 'directml', model: DIRECTOR, prompt: promptCorto });
-    log('🐝', 'CHAT Director · Hermes DirectML', r.text.length > 3, r.text.slice(0, 160) || 'sin texto', r.ms);
+    const esError = /\[DirectML Error|\[Streaming Error|\[Inference Error|DXGI_ERROR|dml_command_recorder/i.test(r.text);
+    log('🐝', 'CHAT Director · Hermes DirectML', r.text.length > 3 && !esError, esError ? ('el backend devolvió un error como texto: ' + r.text.slice(0, 160)) : (r.text.slice(0, 160) || 'sin texto'), r.ms);
   } catch (e) { log('🐝', 'CHAT Director · Hermes DirectML', false, e.message); }
 
   const candidatos = (tags.localModels || [])

@@ -1735,6 +1735,10 @@ function createStudioServer(options = {}) {
           }
           if (typeof content !== "string") content = "";
           if (content) {
+            if (/\[DirectML Error|\[Streaming Error|\[Inference Error/.test(content) || /\[DirectML Error|\[Streaming Error|\[Inference Error/.test(accumulated + content)) {
+              doneReject("El backend DirectML falló al generar: " + String(content).slice(0, 220));
+              return;
+            }
             accumulated += content;
             onToken(content);
           }
