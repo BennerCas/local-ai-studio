@@ -359,6 +359,8 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #psCreate .cols-ps{flex:none}
 #psCreate .cols-ps>div{height:auto}
 #npHelp{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);margin-bottom:12px;line-height:1.6}
+#npPowDiagram{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px;margin-bottom:12px}
+#npPowDiagram svg{max-width:100%;height:auto}
 #profileMasterCol .master-edit{width:100%;height:100%;min-height:380px;resize:vertical;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font:12.5px/1.6 ui-monospace,Consolas,monospace}
 #treeUseBtn,#activateSkillsBtn{text-align:center;justify-content:center}
 #view-skills .ps-body::-webkit-scrollbar{width:0;height:0;display:none}
@@ -1127,7 +1129,10 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <div class="cols-ps" style="grid-template-columns:1fr 1fr">
             <div class="ps-col">
               <div class="col-head">📄 Antes · Master Prompt actual</div>
-              <div class="ps-body"><div id="npPowBefore"><p class="muted tiny">Cargando…</p></div></div>
+              <div class="ps-body">
+                <div class="np-field"><label>🗺️ Mapa del perfil</label><div id="npPowDiagram"><p class="muted tiny">Carga un perfil para ver su mapa radial.</p></div></div>
+                <div id="npPowBefore"><p class="muted tiny">Cargando…</p></div>
+              </div>
             </div>
             <div class="ps-col">
               <div class="col-head">🚀 Después · mejoras por bloque</div>
@@ -2206,6 +2211,7 @@ function npPowDiagnose(){
   if(diag) diag.innerHTML='<span class="tiny"><b>Diagnóstico:</b> '+miss.length+' huecos de '+cs.length+'</span> '+cs.map(c=>'<span class="tag '+(c.ok?'green':'')+'" style="margin-left:5px">'+(c.ok?'✓':'＋')+' '+c.t+'</span>').join('');
   if(blocks) blocks.innerHTML=miss.length?miss.map(c=>'<div class="np-pow-block"><label class="tiny" style="display:flex;gap:7px;align-items:center;font-weight:700"><input type="checkbox" class="np-pow-chk" data-title="'+esc(c.t)+'" checked onchange="npPowPreviewUpdate()"> Añadir · '+esc(c.t)+'</label><textarea class="np-sec np-pow-txt" oninput="npPowPreviewUpdate()">'+esc(npPowGenText(c.t))+'</textarea></div>').join(''):'<p class="tiny">✅ Este perfil ya cubre todas las comprobaciones: nada que añadir.</p>';
   npPowPreviewUpdate();
+  npPowDiagram();
 }
 function npPowPreviewUpdate(){
   const prev=document.getElementById('npPowPreview'); if(!prev||!window._powBody) return;
@@ -2215,6 +2221,45 @@ function npPowPreviewUpdate(){
     if(chk&&chk.checked&&txt&&txt.value.trim()){ out+='\n\n## '+chk.dataset.title+'\n\n'+txt.value.trim(); n++; }
   });
   prev.innerHTML='<div class="masterbox">'+md(out.slice(0,9000))+'</div><p class="tiny muted" style="margin-top:8px">'+n+' bloques aceptados · '+out.length+' caracteres (antes '+window._powBody.length+')</p>';
+}
+let _mermaidLoading=null;
+function npEnsureMermaid(){
+  if(window.mermaid) return Promise.resolve();
+  if(_mermaidLoading) return _mermaidLoading;
+  _mermaidLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script'); s.src='assets/mermaid.min.js';
+    s.onload=()=>{ try{ mermaid.initialize({startOnLoad:false, theme:'dark'}); }catch(e){} res(); };
+    s.onerror=()=>rej(new Error('mermaid.min.js no cargo'));
+    document.head.appendChild(s);
+  });
+  return _mermaidLoading;
+}
+function npCleanNode(t){ return String(t||'').replace(/[\[\]{}()#<>:";`]/g,' ').replace(/\s+/g,' ').trim().slice(0,42)||'—'; }
+function npProfileMindmap(){
+  const pf=PROFILES_CACHE.find(x=>x.id===window._powFor); const b=window._powBody||'';
+  const lines=['mindmap','  root(('+npCleanNode(pf?pf.name:'Perfil')+'))'];
+  b.split(/^##\s+/m).slice(1,7).forEach(part=>{
+    const seg=part.split('\n'); const title=npCleanNode(seg[0].replace(/#+\s*/,''));
+    if(!title||title==='—') return;
+    lines.push('    '+title);
+    seg.slice(1).map(l=>l.trim()).filter(l=>/^[-*]|^\d+[.)]/.test(l)).slice(0,4).forEach(l=>lines.push('      '+npCleanNode(l.replace(/^[-*\d.)\s]+/,''))));
+  });
+  const sk=(pf&&pf.skillsSugeridas)||[];
+  if(sk.length){ lines.push('    Skills asociadas'); sk.slice(0,8).forEach(s=>lines.push('      '+npCleanNode(s.name))); }
+  if(pf) lines.push('    Clasificación '+npCleanNode(pf.category));
+  return lines.join('\n');
+}
+async function npPowDiagram(){
+  const box=document.getElementById('npPowDiagram'); if(!box) return;
+  if(!window._powBody){ box.innerHTML='<p class="muted tiny">Carga un perfil para ver su mapa radial.</p>'; return; }
+  box.innerHTML='<p class="tiny muted">Dibujando el mapa…</p>';
+  try{
+    await npEnsureMermaid();
+    const out=await mermaid.render('npPowSvg'+Date.now(), npProfileMindmap());
+    box.innerHTML=out.svg;
+  }catch(e){
+    box.innerHTML='<pre class="tiny" style="white-space:pre-wrap">'+esc(npProfileMindmap())+'</pre><p class="tiny muted">Mermaid no pudo dibujar; arriba va el código del diagrama.</p>';
+  }
 }
 function npPowSavePrototype(){
   if(!window._powFor){ toast('Elige primero un perfil','err'); return; }

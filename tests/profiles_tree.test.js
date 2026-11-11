@@ -92,3 +92,12 @@ test('prototipo: volver visible, instrucciones y scroll hasta el fondo', () => {
   if (!html.includes('id="npHelp"')) throw new Error('sin instrucciones');
   if (!html.includes('#psCreate{flex:1;min-height:0;overflow-y:auto')) throw new Error('sin scroll propio');
 });
+
+test('mapa radial del perfil con Mermaid local en Potenciar', () => {
+  const fs2 = require('fs');
+  if (!fs2.existsSync('sidecars/local_ai_chat/assets/mermaid.min.js')) throw new Error('falta mermaid vendorizado');
+  if (!html.includes('id="npPowDiagram"')) throw new Error('sin contenedor del mapa');
+  if (!html.includes('npProfileMindmap') || !html.includes('mindmap')) throw new Error('sin generador del diagrama');
+  const server = fs2.readFileSync('sidecars/local_ai_chat/server.js', 'utf8');
+  if (!server.includes('".js": "text/javascript')) throw new Error('assets sin MIME js');
+});

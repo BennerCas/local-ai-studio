@@ -41,7 +41,8 @@ const ASSET_MIME_TYPES = {
   ".webp": "image/webp",
   ".ico": "image/x-icon",
   ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg"
+  ".jpeg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8"
 };
 
 let directMlProcess = null;
