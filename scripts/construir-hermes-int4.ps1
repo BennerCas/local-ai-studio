@@ -20,7 +20,8 @@
 param(
     [string]$ModelosDir = "C:\antigravityAS\Modelos -ai-brains",
     [string]$Fuente = "mlabonne/Hermes-3-Llama-3.1-8B-lorablated",
-    [switch]$SinPrueba
+    [switch]$SinPrueba,
+    [switch]$UsarToken
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,6 +83,18 @@ try {
     } else {
         New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
         Write-Host "Esto descarga ~16 GB (bf16) y convierte. Paciencia, es lo lento."
+        if (-not $UsarToken) {
+            # La fuente es publica. Si hay un HF_TOKEN caducado en el entorno,
+            # Hugging Face responde 401 "Repository Not Found" incluso para
+            # repos publicos (visto en vivo: token "antigravity" expired).
+            # Construimos en anonimo salvo -UsarToken.
+            foreach ($v in @("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN")) {
+                if (Test-Path "Env:$v") {
+                    Remove-Item "Env:$v"
+                    Write-Host "Token $v retirado de esta sesion (descarga publica en anonimo)." -ForegroundColor Yellow
+                }
+            }
+        }
         $argsBuilder = @(
             "-m", "onnxruntime_genai.models.builder",
             "-m", $Fuente,
