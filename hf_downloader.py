@@ -17,9 +17,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from huggingface_hub import HfApi, snapshot_download
-from huggingface_hub.hf_api import RepoFile
-from huggingface_hub.utils.tqdm import tqdm as hf_tqdm
+try:  # Import perezoso: la validación de argumentos debe funcionar sin la librería instalada
+    from huggingface_hub import HfApi, snapshot_download
+    from huggingface_hub.hf_api import RepoFile
+    from huggingface_hub.utils.tqdm import tqdm as hf_tqdm
+except Exception:  # pragma: no cover - entorno sin huggingface_hub
+    HfApi = snapshot_download = RepoFile = hf_tqdm = None
 
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -315,6 +318,8 @@ def main(argv: list[str] | None = None) -> int:
         revision = args.revision.strip() if isinstance(args.revision, str) and args.revision.strip() else None
         target_path = validate_target_dir(args.target_dir)
 
+        if HfApi is None or snapshot_download is None:
+            raise RuntimeError("Falta la dependencia 'huggingface_hub'. Instálala con: pip install huggingface_hub")
         api = HfApi(token=token)
         files_total, total_bytes = inspect_repo_stats(api, repo_id, repo_type, revision)
 

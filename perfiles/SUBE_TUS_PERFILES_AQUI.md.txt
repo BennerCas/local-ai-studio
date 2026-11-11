@@ -1,0 +1,7 @@
+Tus perfiles cognitivos van en ESTA carpeta (archivos .md, se aceptan subcarpetas).
+Ejemplo de estructura:
+  perfiles/
+    engineering/engineering-software-architect.md
+    Pirata.md
+Esta nota tiene extensión .md.txt a propósito: la app solo carga archivos .md,
+así que este archivo NO aparecerá como perfil. Puedes borrarlo al subir los tuyos.

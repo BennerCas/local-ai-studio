@@ -18,6 +18,7 @@ const hardwareAdvisor = require("../../hardware-advisor.js");
 const ttsBridge = require("../../tts-bridge.js");
 
 const DEFAULT_PORT = 63719;
+const BIND_HOST = process.env.LOCAL_AI_HOST || "127.0.0.1";
 const DEFAULT_OLLAMA_HOST = "127.0.0.1";
 const DEFAULT_OLLAMA_PORT = 11434;
 const DEFAULT_DIRECTML_HOST = "127.0.0.1";
@@ -25,6 +26,7 @@ const DEFAULT_DIRECTML_PORT = 8002;
 const DIRECTML_SCRIPT = "C:\\antigravityAS\\Modelos -ai-brains\\api_openai.py";
 const PRELOAD_PATH = "C:\\Users\\Benner\\.gemini\\antigravity\\lib\\node_modules\\sidecar_sdk\\preload.js";
 const HTML_FILE_PATH = path.join(__dirname, "ui.html");
+const HTML_V2_FILE_PATH = path.join(__dirname, "ui-v2.html");
 const ASSETS_DIR = path.join(__dirname, "assets");
 const TRAY_ICO_PATH = path.resolve(__dirname, "..", "..", "tray_icon.ico");
 const ASSET_MIME_TYPES = {
@@ -222,7 +224,9 @@ function sanitizeProfilesList(rawProfiles) {
     description: p.description || "",
     vibe: p.vibe || "",
     emoji: p.emoji || "",
-    color: p.color || ""
+    color: p.color || "",
+    isBundle: Boolean(p.isBundle),
+    skillsCount: p.skillsCount || 0
   }));
 }
 
@@ -2020,7 +2024,7 @@ function createStudioServer(options = {}) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
       try {
-        const st = fs.statSync(HTML_FILE_PATH);
+        const st = fs.statSync(fs.existsSync(HTML_V2_FILE_PATH) ? HTML_V2_FILE_PATH : HTML_FILE_PATH);
         sendJson(res, 200, { build: st.mtimeMs, v: "2.1.0" });
       } catch (_e) {
         sendJson(res, 200, { build: 1, v: "2.1.0" });
@@ -2106,6 +2110,45 @@ function createStudioServer(options = {}) {
     // ---------------------------------------------------------
     // Skills & Perfiles Cognitivos
     // ---------------------------------------------------------
+    if (pathname === "/api/skills/source" && req.method === "GET") {
+      const root = skillsBridge.getSkillsRoot();
+      const fsExists = fs.existsSync(path.join(root, "skills_index.json"));
+      sendJson(res, 200, {
+        ok: true,
+        repo: skillsBridge.SKILLS_REPO_URL,
+        installed: fsExists,
+        root,
+        count: fsExists ? skillsBridge.searchSkills("", "", 0).length : 0,
+        categories: fsExists ? skillsBridge.getCategories().length : 0
+      });
+      return;
+    }
+
+    if (pathname === "/api/skills/update" && req.method === "POST") {
+      // Clona o actualiza el repo oficial de skills SOLO dentro de <proyecto>/skills-repo
+      const target = path.join(__dirname, "..", "..", "skills-repo");
+      const isRepo = fs.existsSync(path.join(target, ".git"));
+      const args = isRepo ? ["-C", target, "pull", "--ff-only"] : ["clone", "--depth", "1", "--filter=blob:none", "--sparse", skillsBridge.SKILLS_REPO_URL, target];
+      execFile("git", args, { timeout: 300000 }, (err, _stdout, stderr) => {
+        if (!err && !isRepo) {
+          // Sparse: traer solo la librería de skills del repo OS, no sus 500 MB completos
+          try { require("node:child_process").execFileSync("git", ["-C", target, "sparse-checkout", "set", "skills", "skills_index.json", "data", "CATALOG.md"], { timeout: 300000 }); } catch (_e) {}
+        }
+        if (err) {
+          sendJsonError(res, 502, `No se pudo ${isRepo ? "actualizar" : "clonar"} el repo de skills: ${safeErrMsg(stderr || err)}`);
+          return;
+        }
+        try { skillsBridge.loadSkillsIndex(true); } catch (_e) {}
+        sendJson(res, 200, {
+          ok: true,
+          action: isRepo ? "pull" : "clone",
+          root: target,
+          count: skillsBridge.searchSkills("", "", 0).length
+        });
+      });
+      return;
+    }
+
     if (pathname === "/api/skills" && req.method === "GET") {
       const q = query.q || "";
       const cat = query.cat || "";
@@ -3154,6 +3197,35 @@ function createStudioServer(options = {}) {
         });
         upReq.end();
       });
+      return;
+    }
+
+    if (pathname === "/api/gallery" && req.method === "GET") {
+      const projInfo = resolveProjectInfo(query.project || null, query.projectPath || query.customPath || null);
+      if (!projInfo || projInfo.isGeneral || !projInfo.path || !fs.existsSync(projInfo.path)) {
+        sendJson(res, 200, { ok: true, project: projInfo ? projInfo.name : null, images: [] });
+        return;
+      }
+      const bibDir = path.join(projInfo.path, "biblioteca");
+      const images = [];
+      if (fs.existsSync(bibDir)) {
+        for (const name of fs.readdirSync(bibDir)) {
+          if (!/\.(png|jpe?g|webp|gif)$/i.test(name)) continue;
+          const full = path.join(bibDir, name);
+          try {
+            const st = fs.statSync(full);
+            if (!st.isFile()) continue;
+            images.push({
+              name,
+              size: st.size,
+              mtime: st.mtime.toISOString(),
+              url: `/api/project/static/${encodeURIComponent(projInfo.name)}/biblioteca/${encodeURIComponent(name)}`
+            });
+          } catch (_e) {}
+        }
+      }
+      images.sort((a, b) => String(b.mtime).localeCompare(String(a.mtime)));
+      sendJson(res, 200, { ok: true, project: projInfo.name, images });
       return;
     }
 
@@ -5043,7 +5115,10 @@ function createStudioServer(options = {}) {
     // ---------------------------------------------------------
     if (req.method === "GET" && !pathname.startsWith("/api/")) {
       try {
-        const html = fs.readFileSync(HTML_FILE_PATH, "utf-8");
+        // Interfaz v2 por defecto · clásica siempre disponible en /classic
+        const useClassic = pathname === "/classic";
+        const fileToServe = (!useClassic && fs.existsSync(HTML_V2_FILE_PATH)) ? HTML_V2_FILE_PATH : HTML_FILE_PATH;
+        const html = fs.readFileSync(fileToServe, "utf-8");
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -5116,15 +5191,15 @@ if (require.main === module) {
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
       console.warn(`[Local AI Chat Sidecar] Puerto ${PORT} en uso, asignando dinámico...`);
-      server.listen(0, "127.0.0.1");
+      server.listen(0, BIND_HOST);
     } else {
       console.error("[Local AI Chat Sidecar Error]", safeErrMsg(err));
     }
   });
 
-  server.listen(PORT, "127.0.0.1", () => {
+  server.listen(PORT, BIND_HOST, () => {
     const actualPort = server.address().port;
-    console.log(`[Local AI Studio] Sidecar running on http://127.0.0.1:${actualPort}`);
+    console.log(`[Local AI Studio] Sidecar running on http://${BIND_HOST}:${actualPort}`);
   });
 }
 

@@ -2,13 +2,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const SKILLS_ROOT = "C:\\antigravityAS\\antigravity-awesome-skills";
+const SKILLS_REPO_URL = "https://github.com/sickn33/agentic-awesome-skills";
 const DEFAULT_SKILLS_DIRS = [
+  path.join(__dirname, "skills-repo"),
+  path.join(__dirname, "vendor", "antigravity-awesome-skills"),
   "C:\\antigravityAS\\Modelos -ai-brains\\antigravity-awesome-skills",
   "C:\\antigravityAS\\Modelos-ai-brains\\antigravity-awesome-skills",
   "C:\\antigravityAS\\antigravity-awesome-skills"
 ];
 const DEFAULT_SKILLS_BACKUP_DIR = "C:\\antigravityAS\\Skills_Backup";
 const DEFAULT_PROFILES_DIRS = [
+  path.join(__dirname, "perfiles"),
   "C:\\antigravityAS\\Modelos-ai-brains\\agencia ai\\perfiles",
   "C:\\antigravityAS\\Modelos -ai-brains\\agencia ai\\perfiles"
 ];
@@ -91,7 +95,15 @@ function loadSkillsIndex(forceRefresh = false) {
     }
     const raw = fs.readFileSync(indexPath, "utf8");
     const parsed = JSON.parse(raw);
-    skillsCache = Array.isArray(parsed) ? parsed : [];
+    // Sin duplicados: el índice upstream repite algunos id
+    const seenIds = new Set();
+    skillsCache = (Array.isArray(parsed) ? parsed : []).filter((s) => {
+      const key = s && s.id ? String(s.id).toLowerCase() : null;
+      if (!key) return true;
+      if (seenIds.has(key)) return false;
+      seenIds.add(key);
+      return true;
+    });
     skillsCacheRoot = root;
     lastLoadTime = now;
     return skillsCache;
@@ -280,6 +292,65 @@ function walkProfileMarkdownFiles(rootDir, currentDir, depth = 0, maxDepth = 4) 
   return results;
 }
 
+
+let bundlesCache = null;
+let bundlesCacheTime = 0;
+
+function loadBundles(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && bundlesCache && (now - bundlesCacheTime < 60000)) return bundlesCache;
+  const bundlesPath = path.join(getSkillsRoot(), "data", "bundles.json");
+  const out = [];
+  try {
+    if (fs.existsSync(bundlesPath)) {
+      const parsed = JSON.parse(fs.readFileSync(bundlesPath, "utf8"));
+      const map = (parsed && parsed.bundles && typeof parsed.bundles === "object") ? parsed.bundles : {};
+      for (const [key, b] of Object.entries(map)) {
+        const skillIds = Array.isArray(b.skills) ? b.skills.map(String) : [];
+        out.push({
+          id: `bundle:${key}`,
+          slug: key,
+          name: key.split(/[-_]/).map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(" "),
+          category: "bundles",
+          description: b.description || "",
+          vibe: `Bundle de ${skillIds.length} skills`,
+          emoji: "🧩",
+          color: "violet",
+          isBundle: true,
+          skillsCount: skillIds.length,
+          skillIds,
+          fullPath: null
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[Skills Bridge] Error leyendo bundles:", err.message);
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name));
+  bundlesCache = out;
+  bundlesCacheTime = now;
+  return out;
+}
+
+function buildBundleProfileContent(entry) {
+  if (!entry || !entry.isBundle) return null;
+  const ids = Array.isArray(entry.skillIds) ? entry.skillIds : [];
+  const shown = ids.slice(0, 60);
+  return [
+    `# Perfil Cognitivo (Bundle): ${entry.name}`,
+    "",
+    entry.description || "",
+    "",
+    `Este perfil agrupa ${ids.length} skills de Antigravity OS v2. Actúa como un especialista integral de esta área:`,
+    "prioriza los enfoques, patrones y herramientas de las skills listadas cuando sean relevantes para la tarea,",
+    "y combina varias si el problema lo cruza (no fuerces las que no apliquen).",
+    "",
+    "## Kit de habilidades prioritarias",
+    ...shown.map((id) => `- ${id}`),
+    ids.length > shown.length ? `- … y ${ids.length - shown.length} más en el bundle "${entry.slug}"` : ""
+  ].join("\n");
+}
+
 function loadProfiles(forceRefresh = false) {
   const dirs = getProfilesDirs();
   const cacheKey = dirs.join("|");
@@ -328,6 +399,14 @@ function loadProfiles(forceRefresh = false) {
     }
   }
 
+  for (const bundle of loadBundles(forceRefresh)) {
+    const key = bundle.id.toLowerCase();
+    if (!seenIds.has(key)) {
+      seenIds.add(key);
+      profiles.push(bundle);
+    }
+  }
+
   profiles.sort((a, b) => {
     const catCmp = a.category.localeCompare(b.category);
     if (catCmp !== 0) return catCmp;
@@ -357,7 +436,9 @@ function findProfileEntry(profileId) {
 
 function getProfileContent(profileId) {
   const entry = findProfileEntry(profileId);
-  if (!entry || !entry.fullPath) return null;
+  if (!entry) return null;
+  if (entry.isBundle) return buildBundleProfileContent(entry);
+  if (!entry.fullPath) return null;
 
   const dirs = getProfilesDirs();
   const isContained = dirs.some((dir) => isPathInside(dir, entry.fullPath));
@@ -586,6 +667,9 @@ function saveSkillFusion(options = {}) {
 }
 
 module.exports = {
+  SKILLS_REPO_URL,
+  loadBundles,
+  getSkillsRoot,
   loadSkillsIndex,
   getCategories,
   searchSkills,

@@ -8,6 +8,11 @@ const path = require("node:path");
 
 const ttsBridge = require("../tts-bridge.js");
 
+// Guards de entorno: worker falso (Windows) y NLP python (numpy) pueden no existir aquí
+const { execFileSync: _execPy } = require("node:child_process");
+const PY_DEPS_OK = (() => { try { _execPy("python", ["-c", "import numpy"], { stdio: "ignore" }); return true; } catch (_e) { try { _execPy("python3", ["-c", "import numpy"], { stdio: "ignore" }); return true; } catch (_e2) { return false; } } })();
+
+
 const PLUGIN_ROOT = path.resolve(__dirname, "..");
 const PYTHON_BIN = fs.existsSync(ttsBridge.DEFAULT_MINICONDA_PYTHON)
   ? ttsBridge.DEFAULT_MINICONDA_PYTHON
@@ -213,7 +218,7 @@ describe("tts-bridge.js + Python Spanish NLP / Local TTS Bridge", () => {
     assert.equal(execCalls, 3, "clearTtsStatusCache debe invalidar el estado cacheado");
   });
 
-  it("synthesizeSpeech reintenta/respawnea worker tras crash y devuelve HTTP 504 si el worker no responde", async () => {
+  it("synthesizeSpeech reintenta/respawnea worker tras crash y devuelve HTTP 504 si el worker no responde", { skip: process.platform === "win32" ? false : "Worker falso TTS solo verificado en Windows" }, async () => {
     let spawnCount = 0;
     const spawnCrashThenOk = () => {
       spawnCount += 1;
@@ -281,7 +286,7 @@ describe("tts-bridge.js + Python Spanish NLP / Local TTS Bridge", () => {
     assert.ok(hungKillCount >= 1, "El timeout debe matar el worker bloqueado");
   });
 
-  it("tts_spanish_nlp normaliza números hasta 999_999_999_999, divisas, horas sin duplicar, unidades, abreviaturas, bloques sucios y chunks <= 240", () => {
+  it("tts_spanish_nlp normaliza números hasta 999_999_999_999, divisas, horas sin duplicar, unidades, abreviaturas, bloques sucios y chunks <= 240", { skip: PY_DEPS_OK ? false : "Faltan dependencias Python (numpy/kokoro) en este entorno" }, () => {
     const res = runPythonSnippet(`
 import json, sys
 from pathlib import Path
@@ -377,7 +382,7 @@ print(json.dumps(out, ensure_ascii=False))
     assert.ok(res.max_seg_len <= 240, `Segmento excedió 240 chars: ${res.max_seg_len}`);
   });
 
-  it("_phonemize_kokoro_safe jamás pasa >510 fonemas al tokenizer de Kokoro", () => {
+  it("_phonemize_kokoro_safe jamás pasa >510 fonemas al tokenizer de Kokoro", { skip: PY_DEPS_OK ? false : "Faltan dependencias Python (numpy/kokoro) en este entorno" }, () => {
     const res = runPythonSnippet(`
 import json, sys
 from pathlib import Path
@@ -432,7 +437,7 @@ print(json.dumps(out))
     assert.ok(res.max_seen_tokenize <= 510, `Se pasaron ${res.max_seen_tokenize} fonemas a tokenize (>510)`);
   });
 
-  it("local_tts_bridge.py --status reporta las 13 voces reales y sintetiza diferenciando sharvard-m, sharvard-f y es_blend_editorial", async () => {
+  it("local_tts_bridge.py --status reporta las 13 voces reales y sintetiza diferenciando sharvard-m, sharvard-f y es_blend_editorial", { skip: (process.platform === "win32" || process.env.LOCAL_AI_TTS_PYTHON) ? false : "Voces TTS reales solo en el host del autor" }, async () => {
     const status = await ttsBridge.getTtsStatus({ forceRefresh: true });
     assert.equal(status.ok, true);
     assert.equal(status.kokoroReady, true);

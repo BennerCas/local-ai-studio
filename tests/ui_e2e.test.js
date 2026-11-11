@@ -5,7 +5,12 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { chromium } = require("C:/Users/Benner/node_modules/playwright");
+let chromium = null;
+try { ({ chromium } = require("playwright")); }
+catch (_e) {
+  try { ({ chromium } = require(process.env.PLAYWRIGHT_PATH || "C:/Users/Benner/node_modules/playwright")); }
+  catch (_e2) { chromium = null; }
+}
 const envLoader = require("../env-loader.js");
 const memoryStore = require("../memory-store.js");
 const hardwareAdvisor = require("../hardware-advisor.js");
@@ -355,7 +360,7 @@ function createMockAiEngineServer() {
   });
 }
 
-describe("Local AI Studio UI E2E (Playwright Chromium)", () => {
+describe("Local AI Studio UI E2E (Playwright Chromium)", { skip: chromium ? false : "Playwright no disponible en este entorno" }, () => {
   beforeEach(async () => {
     savedEnvValues = {};
     for (const k of ENV_BACKUP_KEYS) savedEnvValues[k] = process.env[k];

@@ -7,3 +7,9 @@
 memory/
 __pycache__/
 node_modules/
+skills-repo/
+vendor/
+respaldos/
+
+# Artefactos de tests en sandbox (rutas Windows literales)
+C:\\*

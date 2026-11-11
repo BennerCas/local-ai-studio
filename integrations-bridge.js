@@ -1544,6 +1544,13 @@ function validateTargetDirPath(rawTargetDir) {
     throw err;
   }
 
+  if (/^[A-Za-z]:[\\/]?$/.test(trimmed) || trimmed === "/" || trimmed === "\\\\") {
+    const err = new Error("No se permite descargar directamente en la raíz del disco.");
+    err.code = "INVALID_TARGET_DIR";
+    err.statusCode = 400;
+    throw err;
+  }
+
   const resolved = path.resolve(trimmed);
   const parsed = path.parse(resolved);
   if (resolved === parsed.root) {

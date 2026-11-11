@@ -688,10 +688,17 @@ function getProjectStatesPath() {
   return path.join(getMemoryDir(), "project_states.json");
 }
 
+function baseNameAnyPlatform(p) {
+  // path.basename solo entiende el separador del SO anfitrión; normalizamos \ y /
+  const clean = String(p || "").replace(/[\\/]+$/, "");
+  const parts = clean.split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "";
+}
+
 function normalizeProjectKeyAndMeta(projectKeyOrPath) {
   if (projectKeyOrPath && typeof projectKeyOrPath === "object") {
     const pPath = projectKeyOrPath.projectPath ? path.resolve(String(projectKeyOrPath.projectPath)) : "";
-    const pName = String(projectKeyOrPath.project || projectKeyOrPath.name || (pPath ? path.basename(pPath) : "General"));
+    const pName = String(projectKeyOrPath.project || projectKeyOrPath.name || (pPath ? baseNameAnyPlatform(pPath) : "General"));
     return { project: pName, projectPath: pPath };
   }
   const raw = String(projectKeyOrPath || "General").trim();
@@ -699,7 +706,7 @@ function normalizeProjectKeyAndMeta(projectKeyOrPath) {
   const looksLikePath = raw.includes("\\") || raw.includes("/") || /^[a-zA-Z]:/.test(raw);
   if (looksLikePath) {
     const resolved = path.resolve(raw);
-    return { project: path.basename(resolved) || "General", projectPath: resolved };
+    return { project: baseNameAnyPlatform(raw) || "General", projectPath: resolved };
   }
   return { project: raw, projectPath: "" };
 }

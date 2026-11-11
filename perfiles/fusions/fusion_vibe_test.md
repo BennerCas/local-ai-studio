@@ -1,0 +1,400 @@
+---
+name: "Fusion_Vibe_Test"
+description: "Fusión de prueba E2E"
+vibe: "Fusión Infinita (react-patterns + tdd-workflow)"
+emoji: "🧬"
+color: "cyan"
+---
+
+# Fusion_Vibe_Test
+
+> **Fusión de Roles y Habilidades (SKILLS.md)** — Generado el 2026-11-11T10:59:08.196Z
+> **Jerarquía:** Perfil Base (Ninguno) > Habilidades Técnicas (react-patterns, tdd-workflow)
+
+## Habilidad Fusionada: react-patterns
+
+---
+name: react-patterns
+description: "Modern React patterns and principles. Hooks, composition, performance, TypeScript best practices."
+risk: safe
+source: community
+date_added: "2026-02-27"
+---
+
+# React Patterns
+
+> Principles for building production-ready React applications.
+
+---
+
+## 1. Component Design Principles
+
+### Component Types
+
+| Type | Use | State |
+|------|-----|-------|
+| **Server** | Data fetching, static | None |
+| **Client** | Interactivity | useState, effects |
+| **Presentational** | UI display | Props only |
+| **Container** | Logic/state | Heavy state |
+
+### Design Rules
+
+- One responsibility per component
+- Props down, events up
+- Composition over inheritance
+- Prefer small, focused components
+
+---
+
+## 2. Hook Patterns
+
+### When to Extract Hooks
+
+| Pattern | Extract When |
+|---------|-------------|
+| **useLocalStorage** | Same storage logic needed |
+| **useDebounce** | Multiple debounced values |
+| **useFetch** | Repeated fetch patterns |
+| **useForm** | Complex form state |
+
+### Hook Rules
+
+- Hooks at top level only; React’s `use` API is an exception that can be called in loops/conditions inside a component or Hook (not in try/catch); see [use](https://react.dev/reference/react/use)
+- Same order every render
+- Custom hooks start with "use"
+- Clean up effects on unmount
+
+---
+
+## 3. State Management Selection
+
+| Complexity | Solution |
+|------------|----------|
+| Simple | useState, useReducer |
+| Shared local | Context |
+| Server state | React Query, SWR |
+| Complex global | Zustand, Redux Toolkit |
+
+### State Placement
+
+| Scope | Where |
+|-------|-------|
+| Single component | useState |
+| Parent-child | Lift state up |
+| Subtree | Context |
+| App-wide | Global store |
+
+---
+
+## 4. React 19 Patterns
+
+### New Hooks
+
+| Hook | Purpose |
+|------|---------|
+| **useActionState** | Form submission state |
+| **useOptimistic** | Optimistic UI updates |
+| **use** | Read resources in render |
+
+### Compiler Benefits
+
+These apply when React Compiler is installed and enabled in the build, not automatically on upgrading to React 19; see [installation](https://react.dev/learn/react-compiler/installation).
+
+- Automatic memoization
+- Less manual useMemo/useCallback
+- Focus on pure components
+
+---
+
+## 5. Composition Patterns
+
+### Compound Components
+
+- Parent provides context
+- Children consume context
+- Flexible slot-based composition
+- Example: Tabs, Accordion, Dropdown
+
+### Render Props vs Hooks
+
+| Use Case | Prefer |
+|----------|--------|
+| Reusable logic | Custom hook |
+| Render flexibility | Render props |
+| Cross-cutting | Higher-order component |
+
+---
+
+## 6. Performance Principles
+
+### When to Optimize
+
+| Signal | Action |
+|--------|--------|
+| Slow renders | Profile first |
+| Large lists | Virtualize |
+| Expensive calc | useMemo |
+| Stable callbacks | useCallback |
+
+### Optimization Order
+
+1. Check if actually slow
+2. Profile with DevTools
+3. Identify bottleneck
+4. Apply targeted fix
+
+---
+
+## 7. Error Handling
+
+### Error Boundary Usage
+
+| Scope | Placement |
+|-------|-----------|
+| App-wide | Root level |
+| Feature | Route/feature level |
+| Component | Around risky component |
+
+### Error Recovery
+
+- Show fallback UI
+- Log error
+- Offer retry option
+- Preserve user data
+
+---
+
+## 8. TypeScript Patterns
+
+### Props Typing
+
+| Pattern | Use |
+|---------|-----|
+| Interface | Component props |
+| Type | Unions, complex |
+| Generic | Reusable components |
+
+### Common Types
+
+| Need | Type |
+|------|------|
+| Children | ReactNode |
+| Event handler | MouseEventHandler |
+| Ref | RefObject<Element> |
+
+---
+
+## 9. Testing Principles
+
+| Level | Focus |
+|-------|-------|
+| Unit | Pure functions, hooks |
+| Integration | Component behavior |
+| E2E | User flows |
+
+### Test Priorities
+
+- User-visible behavior
+- Edge cases
+- Error states
+- Accessibility
+
+---
+
+## 10. Anti-Patterns
+
+| ❌ Don't | ✅ Do |
+|----------|-------|
+| Prop drilling deep | Use context |
+| Giant components | Split smaller |
+| useEffect for everything | Derive values during render; reserve effects for external synchronization and use server components only in a supporting framework |
+| Premature optimization | Profile first |
+| Index as key | Stable unique ID |
+
+---
+
+## 11. File Structure
+
+<img width="1150" height="1438" alt="image" src="https://github.com/user-attachments/assets/10369698-472c-4695-a494-2c0672103aa1" />
+
+Use this image as a reference for a better file structure of the project
+
+---
+
+> **Remember:** React is about composition. Build small, combine thoughtfully.
+
+## When to Use
+This skill is applicable to execute the workflow or actions described in the overview.
+
+## Example
+
+**User request:**
+
+> Use @react-patterns for this task: Modern React patterns and principles.
+
+## Limitations
+- Use this skill only when the task clearly matches the scope described above.
+- Do not treat the output as a substitute for environment-specific validation, testing, or expert review.
+- Stop and ask for clarification if required inputs, permissions, safety boundaries, or success criteria are missing.
+## Habilidad Fusionada: tdd-workflow
+
+---
+name: tdd-workflow
+description: "Test-Driven Development workflow principles. RED-GREEN-REFACTOR cycle."
+risk: critical
+source: community
+date_added: "2026-02-27"
+---
+
+# TDD Workflow
+
+> Write tests first, code second.
+
+---
+
+## 1. The TDD Cycle
+
+```
+🔴 RED → Write failing test
+    ↓
+🟢 GREEN → Write minimal code to pass
+    ↓
+🔵 REFACTOR → Improve code quality
+    ↓
+   Repeat...
+```
+
+---
+
+## 2. The Three Laws of TDD
+
+1. Write production code only to make a failing test pass
+2. Write only enough test to demonstrate failure
+3. Write only enough code to make the test pass
+
+---
+
+## 3. RED Phase Principles
+
+### What to Write
+
+| Focus | Example |
+|-------|---------|
+| Behavior | "should add two numbers" |
+| Edge cases | "should handle empty input" |
+| Error states | "should throw for invalid data" |
+
+### RED Phase Rules
+
+- Test must fail first
+- Test name describes expected behavior
+- One assertion per test (ideally)
+
+---
+
+## 4. GREEN Phase Principles
+
+### Minimum Code
+
+| Principle | Meaning |
+|-----------|---------|
+| **YAGNI** | You Aren't Gonna Need It |
+| **Simplest thing** | Write the minimum to pass |
+| **No optimization** | Just make it work |
+
+### GREEN Phase Rules
+
+- Don't write unneeded code
+- Don't optimize yet
+- Pass the test, nothing more
+
+---
+
+## 5. REFACTOR Phase Principles
+
+### What to Improve
+
+| Area | Action |
+|------|--------|
+| Duplication | Extract common code |
+| Naming | Make intent clear |
+| Structure | Improve organization |
+| Complexity | Simplify logic |
+
+### REFACTOR Rules
+
+- All tests must stay green
+- Small incremental changes
+- Commit after each refactor
+
+---
+
+## 6. AAA Pattern
+
+Every test follows:
+
+| Step | Purpose |
+|------|---------|
+| **Arrange** | Set up test data |
+| **Act** | Execute code under test |
+| **Assert** | Verify expected outcome |
+
+---
+
+## 7. When to Use TDD
+
+| Scenario | TDD Value |
+|----------|-----------|
+| New feature | High |
+| Bug fix | High (write test first) |
+| Complex logic | High |
+| Exploratory | Low (spike, then TDD) |
+| UI layout | Low |
+
+---
+
+## 8. Test Prioritization
+
+| Priority | Test Type |
+|----------|-----------|
+| 1 | Happy path |
+| 2 | Error cases |
+| 3 | Edge cases |
+| 4 | Performance |
+
+---
+
+## 9. Anti-Patterns
+
+| ❌ Don't | ✅ Do |
+|----------|-------|
+| Skip the RED phase | Watch test fail first |
+| Write tests after | Write tests before |
+| Over-engineer initial | Keep it simple |
+| Multiple asserts | One behavior per test |
+| Test implementation | Test behavior |
+
+---
+
+## 10. AI-Augmented TDD
+
+### Multi-Agent Pattern
+
+| Agent | Role |
+|-------|------|
+| Agent A | Write failing tests (RED) |
+| Agent B | Implement to pass (GREEN) |
+| Agent C | Optimize (REFACTOR) |
+
+---
+
+> **Remember:** The test is the specification. If you can't write a test, you don't understand the requirement.
+
+## When to Use
+This skill is applicable to execute the workflow or actions described in the overview.
+
+## Limitations
+- Use this skill only when the task clearly matches the scope described above.
+- Do not treat the output as a substitute for environment-specific validation, testing, or expert review.
+- Stop and ask for clarification if required inputs, permissions, safety boundaries, or success criteria are missing.

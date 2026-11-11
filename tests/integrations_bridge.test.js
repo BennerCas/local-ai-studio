@@ -327,7 +327,8 @@ test("listHfDownloads, getHfDownload, and cancelHfDownload integrate cleanly wit
   assert.equal(cancelRes.cancelled, false);
 });
 
-test("Read-only smoke test: getGitHubStatusAndRepos returns ok: true without leaking tokens", async () => {
+test("Read-only smoke test: getGitHubStatusAndRepos returns ok: true without leaking tokens", async (t) => {
+  if (process.env.LOCAL_AI_OFFLINE_TESTS === "1" || (!process.env.GITHUB_TOKEN && !process.env.GH_TOKEN)) return t.skip("Smoke test con red/credenciales deshabilitado en este entorno");
   const res1 = await bridge.getGitHubStatusAndRepos(path.join(__dirname, ".."), true);
   assert.equal(res1.ok, true);
   assert.equal(res1.configured, true);
@@ -341,7 +342,8 @@ test("Read-only smoke test: getGitHubStatusAndRepos returns ok: true without lea
   assertNoSecretsInJson(res2);
 });
 
-test("Read-only smoke test: getNetlifyStatusAndSites returns ok: true without leaking tokens", async () => {
+test("Read-only smoke test: getNetlifyStatusAndSites returns ok: true without leaking tokens", async (t) => {
+  if (process.env.LOCAL_AI_OFFLINE_TESTS === "1" || (!process.env.NETLIFY_AUTH_TOKEN && !process.env.NETLIFY_PERSONAL_ACCESS_TOKEN && !process.env.NETLIFY_TOKEN)) return t.skip("Smoke test con red/credenciales deshabilitado en este entorno");
   const res1 = await bridge.getNetlifyStatusAndSites(null, true);
   assert.equal(res1.ok, true);
   assert.equal(res1.configured, true);
@@ -355,7 +357,8 @@ test("Read-only smoke test: getNetlifyStatusAndSites returns ok: true without le
   assertNoSecretsInJson(res2);
 });
 
-test("Read-only smoke test: searchHuggingFace returns ok: true and valid mapped fields", async () => {
+test("Read-only smoke test: searchHuggingFace returns ok: true and valid mapped fields", async (t) => {
+  if (process.env.LOCAL_AI_OFFLINE_TESTS === "1") return t.skip("Red deshabilitada en este entorno");
   const resModels = await bridge.searchHuggingFace({ query: "onnx", type: "model", limit: 3 });
   assert.equal(resModels.ok, true);
   assert.equal(resModels.type, "model");

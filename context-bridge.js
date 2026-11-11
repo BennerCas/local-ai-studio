@@ -211,6 +211,11 @@ function resolveSafeProjectPath(projectRoot, relPath) {
     return { ok: false, error: "Ruta protegida o fuera del proyecto" };
   }
 
+  // Bloquear rutas absolutas de cualquier SO (C:\\..., \\UNC, /etc/...) aunque el host sea otro
+  if (/^[a-zA-Z]:[\\/]/.test(trimmedRel) || trimmedRel.startsWith("/") || trimmedRel.startsWith("\\\\")) {
+    return { ok: false, error: "Ruta protegida o fuera del proyecto" };
+  }
+
   const rootResolved = path.resolve(projectRoot);
   const candidateResolved = path.resolve(rootResolved, trimmedRel);
 

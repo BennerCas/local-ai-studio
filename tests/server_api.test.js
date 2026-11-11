@@ -10,6 +10,7 @@ const envLoader = require("../env-loader.js");
 const memoryStore = require("../memory-store.js");
 const hardwareAdvisor = require("../hardware-advisor.js");
 const ttsBridge = require("../tts-bridge.js");
+const skillsBridge = require("../skills-bridge.js");
 const { createStudioServer } = require("../sidecars/local_ai_chat/server.js");
 
 let tempRoot = "";
@@ -19,6 +20,11 @@ let tempConfigFile = "";
 let tempBrainDir = "";
 let projAlphaDir = "";
 
+
+// Guards de entorno: en máquinas sin skills/ollama/TTS instalados estas pruebas se omiten (no fallan)
+const SKILLS_AVAILABLE = (() => { try { return skillsBridge.searchSkills("", "", 1).length > 0; } catch (_e) { return false; } })();
+const PROFILES_AVAILABLE = (() => { try { return Boolean(skillsBridge.getProfileContent("Pirata")); } catch (_e) { return false; } })();
+const OLLAMA_BIN_AVAILABLE = (() => { try { execFileSync("ollama", ["--version"], { stdio: "ignore" }); return true; } catch (_e) { return false; } })();
 let studioServer = null;
 let studioBaseUrl = "";
 let mockEngineServer = null;
@@ -435,7 +441,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.ok(projRes.json.projectState);
   });
 
-  it("GET /api/skills devuelve >100 skills y perfiles sanitizados sin fullPath", async () => {
+  it("GET /api/skills devuelve >100 skills y perfiles sanitizados sin fullPath", { skip: (SKILLS_AVAILABLE && PROFILES_AVAILABLE) ? false : "Skills/perfiles del autor no instalados en este entorno" }, async () => {
     const res = await httpReq("/api/skills?limit=0");
     assert.equal(res.status, 200);
     assert.equal(res.json.ok, true);
@@ -468,7 +474,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.equal(notFoundSkill.status, 404);
   });
 
-  it("GET /api/project/preview-context y /api/context son puros (sin crear PROJECT_CONTEXT.md) con metrics, skillPrompt y masterPrompt", async () => {
+  it("GET /api/project/preview-context y /api/context son puros (sin crear PROJECT_CONTEXT.md) con metrics, skillPrompt y masterPrompt", { skip: (SKILLS_AVAILABLE && PROFILES_AVAILABLE) ? false : "Skills/perfiles no instalados en este entorno" }, async () => {
     const res = await httpReq(
       "/api/project/preview-context?project=AlphaApp&skillId=backend-architect&profileId=Pirata&customSystemPrompt=Foco%20en%20HTTP"
     );
@@ -697,7 +703,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.ok(changesRes.json.changes.some((c) => c.action === "patch" && c.relPath === "src/app.js" && c.model === "Qwen2.5-Coder"));
   });
 
-  it("POST /api/project/enter-context soporta telemetryOnly, streaming con motor online y streaming con fallback offline persistiendo project-state", async () => {
+  it("POST /api/project/enter-context soporta telemetryOnly, streaming con motor online y streaming con fallback offline persistiendo project-state", { skip: OLLAMA_BIN_AVAILABLE ? false : "Binario ollama no disponible en este entorno" }, async () => {
     // Preparar repo git + brain artifacts para telemetría rica
     execFileSync("git", ["-C", projAlphaDir, "init"], { stdio: "ignore" });
     execFileSync("git", ["-C", projAlphaDir, "config", "user.email", "test@local.ai"], { stdio: "ignore" });
@@ -847,7 +853,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.equal(badCancel.status, 400);
   });
 
-  it("POST /api/chat rechaza JSON corrupto con HTTP 400 e inyecta el mismo System Prompt unificado en Free.ai, DirectML y Ollama", async () => {
+  it("POST /api/chat rechaza JSON corrupto con HTTP 400 e inyecta el mismo System Prompt unificado en Free.ai, DirectML y Ollama", { skip: (SKILLS_AVAILABLE && PROFILES_AVAILABLE) ? false : "Skills/perfiles no instalados en este entorno" }, async () => {
     // 1. JSON malformado -> 400 explícito sin forwarding
     const malformed = await httpReq("/api/chat", {
       method: "POST",
@@ -1154,7 +1160,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.equal(typeof stopDmlRes.json.ok, "boolean");
   });
 
-  it("POST /api/chat/dual valida HTTP 400 estricto y ejecuta Pipeline, Paralelo, Debate, Guard VRAM y Contingencia sin fallos", async () => {
+  it("POST /api/chat/dual valida HTTP 400 estricto y ejecuta Pipeline, Paralelo, Debate, Guard VRAM y Contingencia sin fallos", { skip: (SKILLS_AVAILABLE && PROFILES_AVAILABLE) ? false : "Skills/perfiles no instalados en este entorno" }, async () => {
     process.env.FREEAI_BASE_URL = `http://127.0.0.1:${mockEnginePort}/freeai/v1`;
     process.env.FREEAI_API_KEY_1 = "freeai_dual_mock_key";
 
@@ -1312,7 +1318,7 @@ describe("sidecars/local_ai_chat/server.js HTTP Integration Tests", () => {
     assert.equal(failEvents[failEvents.length - 1].partialFailure, true);
   });
 
-  it("GET /api/tts/status y POST /api/tts/speak validan HTTP 400 y devuelven WAV PCM con cabeceras TTS", async () => {
+  it("GET /api/tts/status y POST /api/tts/speak validan HTTP 400 y devuelven WAV PCM con cabeceras TTS", { skip: (process.platform === "win32" || process.env.LOCAL_AI_TTS_PYTHON) ? false : "Motores TTS (Kokoro/Piper) solo verificados en el host Windows del autor" }, async () => {
     ttsBridge.clearTtsStatusCache();
     const stRes = await httpReq("/api/tts/status?refresh=1");
     assert.equal(stRes.status, 200);
