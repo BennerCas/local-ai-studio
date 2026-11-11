@@ -2109,6 +2109,49 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    // ---------------------------------------------------------
+    // Agentes externos (APIs compatibles con OpenAI): el registro vive
+    // en el navegador (localStorage); aqui solo actuamos de proxy para
+    // evitar CORS y poder probar/hablar con cualquier endpoint.
+    // ---------------------------------------------------------
+    if (pathname === "/api/agents/test" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const base = String(payload.baseUrl || "").replace(/\/+$/, "");
+      if (!/^https?:\/\//i.test(base)) { sendJsonError(res, 400, "La URL base debe empezar por http:// o https://"); return; }
+      try {
+        const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 20000);
+        const r = await fetch(base + "/models", { headers: payload.apiKey ? { Authorization: `Bearer ${payload.apiKey}` } : {}, signal: ctl.signal });
+        clearTimeout(to);
+        const txt = await r.text();
+        let count = null;
+        try { const j = JSON.parse(txt); if (Array.isArray(j.data)) count = j.data.length; } catch (_e) {}
+        sendJson(res, 200, { ok: r.ok, status: r.status, models: count, detail: r.ok ? "" : txt.slice(0, 200) });
+      } catch (e) { sendJson(res, 200, { ok: false, status: 0, detail: String(e && e.message || e).slice(0, 200) }); }
+      return;
+    }
+    if (pathname === "/api/agents/chat" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const base = String(payload.baseUrl || "").replace(/\/+$/, "");
+      if (!/^https?:\/\//i.test(base)) { sendJsonError(res, 400, "La URL base debe empezar por http:// o https://"); return; }
+      if (!Array.isArray(payload.messages) || !payload.messages.length) { sendJsonError(res, 400, "Faltan messages"); return; }
+      try {
+        const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 240000);
+        const r = await fetch(base + "/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(payload.apiKey ? { Authorization: `Bearer ${payload.apiKey}` } : {}) },
+          body: JSON.stringify({ model: payload.model || undefined, messages: payload.messages, stream: false, temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3, max_tokens: Number(payload.max_tokens) || 2048 }),
+          signal: ctl.signal
+        });
+        clearTimeout(to);
+        const txt = await r.text();
+        if (!r.ok) { sendJsonError(res, 502, `El agente respondio HTTP ${r.status}: ${txt.slice(0, 240)}`); return; }
+        let text = "";
+        try { const j = JSON.parse(txt); text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch (_e) {}
+        sendJson(res, 200, { ok: true, text });
+      } catch (e) { sendJsonError(res, 502, `Sin contacto con el agente: ${String(e && e.message || e).slice(0, 200)}`); }
+      return;
+    }
+
     if (pathname.startsWith("/assets/") && (req.method === "GET" || req.method === "HEAD")) {
       const relAsset = pathname.slice("/assets/".length);
       if (!/^[a-zA-Z0-9._-]+$/.test(relAsset) || relAsset.includes("..")) {

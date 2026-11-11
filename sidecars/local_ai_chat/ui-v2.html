@@ -817,6 +817,13 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
                   </select>
                   <p class="tiny muted mt" id="staffMotorState">Comprobando Free.ai…</p></div>
                 <div class="sw-box"><b>🧩 Skills activas</b><p id="swSkills">—</p></div>
+                <div class="sw-box"><b>🐝 Enjambre activo</b><p id="swAgents">Director 🐝 Hermes + …</p>
+                  <div class="flex wrap mt" style="gap:10px">
+                    <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgOllama" onchange="swarmBuiltinChanged()"> 🦙 Ollama</label>
+                    <label class="tiny" style="cursor:pointer"><input type="checkbox" id="swAgFreeai" onchange="swarmBuiltinChanged()"> ☁️ Free.ai</label>
+                    <button class="btn sm" onclick="go('agentes')">➕ Añadir APIs</button>
+                  </div>
+                  <p class="tiny muted mt" id="swAgentsMode">Modo: —</p></div>
                 <div class="sw-box"><b>🧭 Cómo interactuar</b><ul>
                   <li>Escribe tu idea o petición tal cual la piensas, aquí o en la caja de STAFF AI.</li>
                   <li>Yo la traduzco: 🎯 Entendido como… → trabajo SOLO en la fase activa.</li>
@@ -1335,6 +1342,18 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
     <section class="view" id="view-agentes">
       <div class="sect-title">🤖 Agentes y Hubs</div>
       <p class="sect-sub">Los demás paneles que viven junto a Local AI Studio dentro de Antigravity.</p>
+      <div class="card mb"><div class="flex between"><h3>🐝 Enjambre del Staff · Registro de APIs de agentes</h3><span class="tag green">Director fijo: 🐝 Hermes (DirectML)</span></div>
+        <p class="desc mt">Añade cualquier API compatible con el formato OpenAI y Hermes podrá asignarle subtareas en las fases: OpenRouter, Groq, Together, un Ollama de otro PC (su URL <span class="mono">/v1</span>), LM Studio, llama.cpp server… La clave vive solo en tu navegador (localStorage), nunca sale en logs.</p>
+        <div class="grid g2 mt">
+          <label class="small">Nombre del agente<input class="input mt" id="agName" placeholder="ej. Groq · Llama 3.3 70B"></label>
+          <label class="small">Modelo<input class="input mt" id="agModel" placeholder="ej. llama-3.3-70b-versatile"></label>
+          <label class="small">URL base (termina en /v1)<input class="input mt" id="agUrl" placeholder="ej. https://api.groq.com/openai/v1"></label>
+          <label class="small">API key (opcional en local)<input class="input mt" id="agKey" type="password" placeholder="sk-… · vacío si es un servidor local" autocomplete="off"></label>
+        </div>
+        <label class="small mt" style="display:block">Capacidades · qué se le da bien (Hermes asigna con esto)<input class="input mt" id="agCaps" placeholder="ej. código rápido, revisión, documentación, razonamiento largo…"></label>
+        <div class="flex wrap mt" style="gap:6px"><button class="btn primary sm" onclick="saveAgentApi()">➕ Registrar agente</button><button class="btn sm" onclick="testAgentForm(this)">🔌 Probar conexión</button><span class="tiny muted" id="agFormState"></span></div>
+        <div id="agList" class="mt"></div>
+      </div>
       <div class="grid g3">
         <div class="card"><div class="big" style="font-size:30px">🛠️</div><h3 class="mt">Cline Agent</h3><p class="desc">Agente autónomo de código (CLI y Desktop), local y cloud, con su propia consola.</p><span class="tag mt">● sidecar externo · no se gestiona desde esta vista</span><div class="mt"><button class="btn primary" onclick="window.open('https://github.com/cline/cline','_blank')">Ver Cline en GitHub ↗</button></div></div>
         <div class="card"><div class="big" style="font-size:30px">🌍</div><h3 class="mt">Open WebUI</h3><p class="desc">Hub web completo para tus modelos locales, con herramientas y RAG.</p><span class="tag mt">● sidecar externo · no se gestiona desde esta vista</span><div class="mt"><button class="btn" onclick="window.open('https://github.com/open-webui/open-webui','_blank')">Ver Open WebUI en GitHub ↗</button></div></div>
@@ -2341,6 +2360,82 @@ async function rollbackReal(changeId){
   try{ await API.post('/api/project/rollback',{changeId}); toast('↩ Rollback aplicado','ok'); loadMemoryReal(); }
   catch(e){ toast('Rollback: '+e.message,'err'); }
 }
+
+/* ---------- Registro de agentes (APIs) del enjambre ---------- */
+let AGENTS_API=[]; try{ AGENTS_API=JSON.parse(localStorage.getItem('las-agents-v1')||'[]'); }catch(e){ AGENTS_API=[]; }
+let SWARM_BUILTINS={ollama:true, freeai:true}; try{ Object.assign(SWARM_BUILTINS, JSON.parse(localStorage.getItem('las-agents-builtins')||'{}')); }catch(e){}
+function swarmActiveNames(){
+  const names=['🐝 Hermes · Director (DirectML)'];
+  if(SWARM_BUILTINS.ollama) names.push('🦙 Ollama');
+  if(SWARM_BUILTINS.freeai) names.push('☁️ Free.ai');
+  (AGENTS_API||[]).filter(a=>a.active).forEach(a=>names.push('🔌 '+a.name));
+  return names;
+}
+function swarmModeLabel(){
+  const n=swarmActiveNames().length;
+  if(n<=1) return 'Modo: SOLO HERMES · él planifica, ejecuta y revisa en serie';
+  if(n===2) return 'Modo: DÚO · Hermes dirige + 1 agente ejecuta en la fase';
+  return 'Modo: ENJAMBRE ×'+n+' · subtareas distintas en paralelo dentro de la misma fase';
+}
+function renderSwarmSummary(){
+  const el=document.getElementById('swAgents'); if(el) el.textContent=swarmActiveNames().join('  ·  ');
+  const md=document.getElementById('swAgentsMode'); if(md) md.textContent=swarmModeLabel();
+  const o=document.getElementById('swAgOllama'); if(o) o.checked=!!SWARM_BUILTINS.ollama;
+  const f=document.getElementById('swAgFreeai'); if(f) f.checked=!!SWARM_BUILTINS.freeai;
+}
+function swarmBuiltinChanged(){
+  SWARM_BUILTINS.ollama=!!document.getElementById('swAgOllama').checked;
+  SWARM_BUILTINS.freeai=!!document.getElementById('swAgFreeai').checked;
+  localStorage.setItem('las-agents-builtins', JSON.stringify(SWARM_BUILTINS));
+  renderSwarmSummary();
+  toast('🐝 Enjambre: '+swarmModeLabel(),'ok');
+}
+function persistAgents(){ localStorage.setItem('las-agents-v1', JSON.stringify(AGENTS_API)); }
+function renderAgents(){
+  const el=document.getElementById('agList'); if(!el) return;
+  if(!AGENTS_API.length){ el.innerHTML='<p class="tiny muted">Sin agentes externos registrados. Ollama y Free.ai ya vienen de serie: actívalos en la tarjeta 🐝 Enjambre del chat.</p>'; return; }
+  el.innerHTML=AGENTS_API.map((a,i)=>'<div class="card" style="margin-top:8px"><div class="flex between"><b>🔌 '+esc(a.name)+'</b><span class="tag '+(a.active?'green':'')+'">'+(a.active?'activo en el enjambre':'inactivo')+'</span></div>'+
+    '<p class="tiny muted mt mono">'+esc(a.url)+' · '+esc(a.model||'sin modelo')+'</p>'+
+    (a.caps?'<p class="tiny mt">🎯 '+esc(a.caps)+'</p>':'')+
+    '<p class="tiny muted">'+(a.status?esc(a.status):'sin probar')+'</p>'+
+    '<div class="flex wrap mt" style="gap:6px"><label class="tiny" style="cursor:pointer"><input type="checkbox" '+(a.active?'checked':'')+' onchange="toggleAgentApi('+i+',this.checked)"> En el enjambre</label>'+
+    '<button class="btn sm" onclick="testAgentApi('+i+',this)">🔌 Probar</button>'+
+    '<button class="btn sm danger" onclick="delAgentApi('+i+')">🗑 Eliminar</button></div></div>').join('');
+}
+async function testAgentRequest(url, key){
+  const r=await fetch('/api/agents/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseUrl:url, apiKey:key||''})});
+  return r.json();
+}
+async function testAgentForm(btn){
+  const url=document.getElementById('agUrl').value.trim(), key=document.getElementById('agKey').value;
+  const st=document.getElementById('agFormState'); if(!url){ st.textContent='Escribe primero la URL base'; return; }
+  btn.disabled=true; st.textContent='Probando…';
+  try{ const j=await testAgentRequest(url,key); st.textContent=j.ok?('✔ Conecta · HTTP '+j.status+(j.models!=null?(' · '+j.models+' modelos'):'')):('✘ HTTP '+j.status+' '+(j.detail||'')); }
+  catch(e){ st.textContent='✘ '+e.message; }
+  btn.disabled=false;
+}
+async function testAgentApi(i, btn){
+  const a=AGENTS_API[i]; if(!a) return; btn.disabled=true;
+  try{ const j=await testAgentRequest(a.url, a.key||''); a.status=j.ok?('✔ probado · HTTP '+j.status+(j.models!=null?(' · '+j.models+' modelos'):'')):('✘ HTTP '+j.status+' '+(j.detail||'')); }
+  catch(e){ a.status='✘ '+e.message; }
+  persistAgents(); renderAgents(); renderSwarmSummary(); btn.disabled=false;
+}
+function saveAgentApi(){
+  const name=document.getElementById('agName').value.trim(), url=document.getElementById('agUrl').value.trim(),
+        model=document.getElementById('agModel').value.trim(), key=document.getElementById('agKey').value,
+        caps=document.getElementById('agCaps').value.trim();
+  const st=document.getElementById('agFormState');
+  if(!name||!url){ st.textContent='Faltan nombre y URL base'; return; }
+  if(!/^https?:\/\//i.test(url)){ st.textContent='La URL debe empezar por http:// o https://'; return; }
+  AGENTS_API.push({id:'ag-'+Date.now(), name, url:url.replace(/\/+$/,''), model, key, caps, active:true, status:''});
+  persistAgents(); renderAgents(); renderSwarmSummary();
+  ['agName','agUrl','agModel','agKey','agCaps'].forEach(id=>{ document.getElementById(id).value=''; });
+  st.textContent='✔ Agente registrado y activo en el enjambre';
+  toast('🔌 Agente "'+name+'" registrado: Hermes ya puede asignarle subtareas','ok');
+}
+function toggleAgentApi(i, on){ AGENTS_API[i].active=!!on; persistAgents(); renderAgents(); renderSwarmSummary(); }
+function delAgentApi(i){ const a=AGENTS_API[i]; AGENTS_API.splice(i,1); persistAgents(); renderAgents(); renderSwarmSummary(); toast('🗑 Agente "'+(a?a.name:'')+'" eliminado','ok'); }
+window.addEventListener('DOMContentLoaded', ()=>{ renderAgents(); renderSwarmSummary(); });
 
 /* ---------- Integraciones: acciones reales ---------- */
 function wireIntegraciones(){
