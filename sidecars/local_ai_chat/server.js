@@ -982,9 +982,19 @@ function createStudioServer(options = {}) {
     }
 
     try {
+      // El backend DirectML deja su salida (incluidas las trazas de error 500)
+      // en datos/pruebas/directml-backend.log: sin esto, sus fallos son invisibles.
+      let dmlStdio = "ignore";
+      try {
+        const logDir = path.resolve(__dirname, "../../datos/pruebas");
+        fs.mkdirSync(logDir, { recursive: true });
+        const logFd = fs.openSync(path.join(logDir, "directml-backend.log"), "a");
+        fs.writeSync(logFd, `\n===== arranque DirectML ${new Date().toISOString()} =====\n`);
+        dmlStdio = ["ignore", logFd, logFd];
+      } catch (_e) {}
       const child = spawn("python", [DIRECTML_SCRIPT], {
         detached: true,
-        stdio: "ignore",
+        stdio: dmlStdio,
         windowsHide: true,
         env: {
           ...process.env,

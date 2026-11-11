@@ -203,6 +203,15 @@ async function serverAlive() {
   try { const t = await getJson('/api/tts/status'); log('🔊', 'TTS local', t.ok !== false, `${(t.voices || []).length} voces`); }
   catch (e) { log('🔊', 'TTS local', false, e.message); }
 
+  /* Cola del log del backend DirectML (la traza del error vive ahí) */
+  try {
+    const logPath = path.join(ROOT, 'datos', 'pruebas', 'directml-backend.log');
+    if (fs.existsSync(logPath)) {
+      const tail = fs.readFileSync(logPath, 'utf8').split('\n').slice(-25).join('\n').trim();
+      log('📜', 'Log backend DirectML', tail.length > 0, tail.slice(-500) || '(vacío)');
+    } else log('📜', 'Log backend DirectML', false, 'aún no existe: se crea cuando el Studio arranca el backend (reinicia el Studio tras git pull)');
+  } catch (e) { log('📜', 'Log backend DirectML', false, e.message); }
+
   /* ---------- Informe ---------- */
   const dir = path.join(ROOT, 'datos', 'pruebas');
   fs.mkdirSync(dir, { recursive: true });
