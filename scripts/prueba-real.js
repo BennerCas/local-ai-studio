@@ -76,6 +76,12 @@ async function chatOnce({ source, model, prompt, profileId, timeoutMs = 240000 }
   }
   return { text: full.trim(), ms: Date.now() - t0 };
 }
+async function getJson8002(p) {
+  const r = await fetchT('http://127.0.0.1:8002' + p, {}, 30000);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || j.error?.message || ('HTTP ' + r.status));
+  return j;
+}
 async function serverAlive() {
   try { await getJson('/api/version', 4000); return true; } catch (_e) { return false; }
 }
@@ -134,19 +140,34 @@ async function serverAlive() {
         if (hecho) break;
       } catch (e) { log('🦙', 'CHAT Ollama · ' + name, false, e.message); }
     }
-    if (!hecho) log('🦙', 'CHAT Ollama (resumen)', false, 'ningún candidato local respondió texto; si solo tienes modelos cloud de Ollama, necesitas créditos o un modelo local (ollama pull)');
+    if (!hecho) log('🦙', 'CHAT Ollama (resumen)', false, 'ningún candidato local respondió. Si el error menciona ROCm/kernel image: tu RX 7600 (gfx1102) necesita HSA_OVERRIDE_GFX_VERSION=11.0.0 y reiniciar Ollama. Si menciona créditos: eran modelos cloud. Detalle en las líneas anteriores.');
   } else log('🦙', 'CHAT Ollama', false, 'sin modelos locales en el catálogo (solo cloud o ninguno; omitido, no es fallo de la app)');
 
-  /* Respuesta CRUDA de DirectML: la verdad del backend si el chat sale vacío */
+  /* Sonda DirectML: qué modelos anuncia y qué variante de llamada produce texto */
   try {
+    const r = await getJson8002('/v1/models');
+    const ids = (r.data || r.models || []).map(m => m.id || m.name || m);
+    log('🔬', 'DirectML /v1/models', ids.length > 0, ids.join(', ') || JSON.stringify(r).slice(0, 200));
+  } catch (e) { log('🔬', 'DirectML /v1/models', false, e.message); }
+  async function probeDml(label, body) {
     const t0 = Date.now();
-    const r = await fetchT('http://127.0.0.1:8002/v1/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify({ model: DIRECTOR, messages: [{ role: 'user', content: 'Di solo: HERMES OK' }], stream: true, max_tokens: 64, temperature: 0.3 })
-    }, 180000);
-    const raw = await r.text();
-    log('🔬', 'DirectML crudo (8002)', r.ok && raw.length > 0, `HTTP ${r.status} · ${raw.length} bytes · ${raw.slice(0, 400).replace(/\n/g, ' ')}`, Date.now() - t0);
-  } catch (e) { log('🔬', 'DirectML crudo (8002)', false, e.message); }
+    try {
+      const r = await fetchT('http://127.0.0.1:8002/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+        body: JSON.stringify(body)
+      }, 180000);
+      const raw = await r.text();
+      let text = '';
+      try { const j = JSON.parse(raw); text = (j.choices && j.choices[0] && (j.choices[0].message?.content || j.choices[0].text)) || ''; } catch (_e) {}
+      if (!text) { const m = [...raw.matchAll(/"content"\s*:\s*"((?:\\.|[^"\\])*)"/g)]; text = m.map(x => x[1]).join('').slice(0, 120); }
+      log('🔬', 'Sonda ' + label, raw.length > 0 && !!text, `HTTP ${r.status} · ${raw.length} bytes · texto: ${text || '(vacío)'} · crudo: ${raw.slice(0, 220).replace(/\n/g, ' ')}`, Date.now() - t0);
+      return !!text;
+    } catch (e) { log('🔬', 'Sonda ' + label, false, e.message); return false; }
+  }
+  const sondaMsg = [{ role: 'user', content: 'Di solo: HERMES OK' }];
+  await probeDml('stream con id exacto', { model: DIRECTOR, messages: sondaMsg, stream: true, max_tokens: 64, temperature: 0.3 });
+  await probeDml('SIN stream con id exacto', { model: DIRECTOR, messages: sondaMsg, stream: false, max_tokens: 64, temperature: 0.3 });
+  await probeDml('SIN stream sin campo model', { messages: sondaMsg, stream: false, max_tokens: 64, temperature: 0.3 });
 
   try {
     const r = await chatOnce({ source: 'freeai', model: undefined, prompt: promptCorto, timeoutMs: 120000 });

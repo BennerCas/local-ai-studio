@@ -1816,10 +1816,12 @@ function createStudioServer(options = {}) {
 
       if (engine === "directml") {
         const cleanDmlModel = String(model || "Phi-3.5-mini-instruct-ONNX").replace(/^directml:/i, "").trim() || "Phi-3.5-mini-instruct-ONNX";
+        let dmlRetried = false;
+        const fireDml = (useStream) => {
         const bodyData = JSON.stringify({
           model: cleanDmlModel,
           messages,
-          stream: true,
+          stream: useStream,
           max_tokens: Number(payload.max_tokens) || 2048,
           temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3
         });
@@ -1884,6 +1886,12 @@ function createStudioServer(options = {}) {
                 if (frags) { accumulated += frags; onToken(frags); }
               }
             }
+            if (!accumulated && useStream && !dmlRetried) {
+              // Algunos backends ONNX devuelven 200 vacío en streaming: reintento sin stream
+              dmlRetried = true;
+              fireDml(false);
+              return;
+            }
             doneResolve();
           });
           upstreamRes.on("error", (err) => doneReject(err.message));
@@ -1899,6 +1907,8 @@ function createStudioServer(options = {}) {
         });
         req.write(bodyData);
         req.end();
+        };
+        fireDml(true);
         return;
       }
 
