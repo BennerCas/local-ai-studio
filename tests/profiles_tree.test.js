@@ -44,3 +44,12 @@ test('margenes laterales uniformes en las columnas de perfiles', () => {
   if (html.includes('.cols-ps>div{overflow-y:auto;min-height:0;height:100%;scrollbar-width:none;-ms-overflow-style:none;padding-right:2px}')) throw new Error('regla que pegaba el margen derecho');
   if (!html.includes('padding:16px 20px')) throw new Error('sin margen lateral uniforme');
 });
+
+test('columna 3: botones fijos Editar y Guardar del Master Prompt', () => {
+  if (!html.includes('id="masterEditBtn"') || !html.includes('id="masterSaveBtn"')) throw new Error('faltan botones');
+  if (!html.includes('editMasterPrompt') || !html.includes('saveMasterPrompt')) throw new Error('faltan funciones');
+  if (!html.includes("API.post('/api/profiles/content'")) throw new Error('guardar no llama al servidor');
+});
+test('tag de la columna 2 despues de la descripcion', () => {
+  if (!html.includes("el.innerHTML='<h3 class=\"pf-name\">'+esc(pf.name)+'</h3>'")) throw new Error('el tag sigue junto al nombre');
+});

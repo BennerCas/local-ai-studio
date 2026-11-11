@@ -509,6 +509,24 @@ function getProfileContent(profileId) {
   return null;
 }
 
+function saveProfileContent(profileId, content) {
+  const entry = findProfileEntry(profileId);
+  if (!entry) return { ok: false, error: 'Perfil no encontrado: ' + profileId };
+  if (entry.isBundle) return { ok: false, error: 'Los bundles no tienen un Master Prompt editable.' };
+  if (!entry.fullPath) return { ok: false, error: 'El perfil no tiene archivo asociado.' };
+  const text = String(content == null ? '' : content);
+  if (!text.trim()) return { ok: false, error: 'El contenido no puede quedar vacio.' };
+  if (text.length > 200000) return { ok: false, error: 'Contenido demasiado grande (max. 200000 caracteres).' };
+  const dirs = getProfilesDirs();
+  if (!dirs.some((dir) => isPathInside(dir, entry.fullPath))) return { ok: false, error: 'Ruta fuera de los directorios de perfiles.' };
+  try {
+    fs.writeFileSync(entry.fullPath, text, 'utf8');
+  } catch (err) {
+    return { ok: false, error: 'No se pudo guardar: ' + err.message };
+  }
+  return { ok: true, id: entry.id, bytes: Buffer.byteLength(text, 'utf8') };
+}
+
 function parseSkillIdsList(skillIdOrList) {
   if (!skillIdOrList) return [];
   const rawItems = Array.isArray(skillIdOrList)
@@ -731,6 +749,7 @@ module.exports = {
   getSkillContent,
   loadProfiles,
   getProfileContent,
+  saveProfileContent,
   parseSkillIdsList,
   buildSkillSystemPrompt,
   saveSkillFusion,
