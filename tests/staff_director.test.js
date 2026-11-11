@@ -34,7 +34,7 @@ test('motor del Staff: híbrido con degradación a solo local, y el Director sie
 test('el Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), fijo y sin censura', () => {
   assert.match(html, /const DIRECTOR_MODEL_ID='Hermes-3-8B-UNLOCKED-ONNX-DirectML'/);
   assert.match(html, /const source='directml'; \/\* 🐝 El Director es Hermes/);
-  assert.match(html, /STAFF_MOTOR==='solo-local'\)\{ source='directml'/);
+  assert.match(html, /!staffComboHas\('freeai'\) && source==='freeai'\)\{ source='directml'/);
 });
 
 test('sin botones sueltos: tarjetas Modo Híbrido y Perfil con edición en el panel del Director', () => {
@@ -49,4 +49,13 @@ test('cada mensaje en STAFF AI se traduce a vibe coding antes de enviarse', () =
   assert.match(html, /function staffTranslatePayload\(hist\)/);
   assert.match(html, /TRADUCCIÓN VIBE CODING/);
   assert.match(html, /staffTranslatePayload\(REAL\.hist\)/);
+});
+
+test('combo hibrido: los 4 combos con DirectML siempre de Director', () => {
+  for (const v of ['dml-ollama-freeai', 'dml-ollama', 'dml-freeai', 'dml-ollama-freeai-apis']) {
+    assert.match(html, new RegExp('value="' + v + '"'));
+  }
+  assert.match(html, /STAFF_COMBOS/);
+  assert.match(html, /staffComboMotors/);
+  assert.match(html, /las-staff-combo/);
 });

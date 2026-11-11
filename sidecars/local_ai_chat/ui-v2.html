@@ -882,9 +882,11 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
                 <div class="sw-box"><b>🎭 Perfil activo</b><p id="swPerfil">Director de Staff · Traductor Vibe Coding</p>
                   <div class="flex mt" style="gap:6px"><button class="btn sm" onclick="openDirectorEditor()">✏️ Editar perfil y Master Prompt</button><button class="btn sm" onclick="document.getElementById('profileSel').focus();toast('Cambia el perfil con el selector 🎭 bajo el cajón de texto','ok')">Cambiar</button></div></div>
                 <div class="sw-box"><b>🌐 Tarjeta del Modo Híbrido</b><p id="swMotor">Director: Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML) · comprobando Free.ai…</p>
-                  <select class="input mt" id="staffMotorSel" onchange="staffMotorChanged(this.value)" title="El Director siempre es Hermes-3-8B-UNLOCKED en tu PC (DirectML, sin censura). El modo solo decide quién ejecuta las fases.">
-                    <option value="hibrido">🌐 Híbrido · Hermes dirige (local) + Free.ai ejecuta fases</option>
-                    <option value="solo-local">🔌 Solo local / offline · todo con Hermes en tu PC</option>
+                  <select class="input mt" id="staffMotorSel" onchange="staffMotorChanged(this.value)" title="El Director siempre es Hermes-3-8B-UNLOCKED en tu PC (DirectML, sin censura). El combo decide qué motores ejecutan las fases y las subtareas del enjambre.">
+                    <option value="dml-ollama-freeai">🌐 Híbrido · DirectML + Ollama + Free.ai</option>
+                    <option value="dml-ollama">🔌 Híbrido local · DirectML + Ollama</option>
+                    <option value="dml-freeai">☁️ Híbrido nube · DirectML + Free.ai</option>
+                    <option value="dml-ollama-freeai-apis">🐝 Híbrido total · DirectML + Ollama + Free.ai + API 1…N</option>
                   </select>
                   <p class="tiny muted mt" id="staffMotorState">Comprobando Free.ai…</p></div>
                 <div class="sw-box"><b>🧩 Skills activas</b><p id="swSkills">—</p></div>
@@ -1947,7 +1949,7 @@ function sendMsg(){
   REAL.abort=new AbortController();
   const model=document.getElementById('modelSel').value;
   let source=engine==='directml'?'directml':(engine==='freeai'?'freeai':'ollama');
-  if(typeof STAFF_MODE!=='undefined' && STAFF_MODE && typeof STAFF_MOTOR!=='undefined' && STAFF_MOTOR==='solo-local'){ source='directml'; }
+  if(typeof STAFF_MODE!=='undefined' && STAFF_MODE && typeof staffComboHas==='function' && !staffComboHas('freeai') && source==='freeai'){ source='directml'; }
   let full='';
   (async()=>{
     try{
@@ -2972,9 +2974,16 @@ async function swarmAgentOnce(sub){
 }
 async function runSwarmPhase(i, btn){
   const f=STAFF.fases[i]; if(!f||!f.subtareas||!f.subtareas.length) return;
-  if(STAFF_MOTOR==='solo-local'){
-    f.subtareas.forEach(s=>{ if(String(s.motor).startsWith('freeai')||String(s.motor).startsWith('api:')) s.motor='ollama'; });
-    toast('🔌 Modo solo local: las subtareas remotas se reasignan a Ollama','ok');
+  {
+    const w=(typeof staffComboWorkers==='function')?staffComboWorkers():{ollama:true,freeai:true,apis:true};
+    let moved=0;
+    f.subtareas.forEach(s=>{
+      const m=String(s.motor||'ollama').toLowerCase();
+      if(m.startsWith('api:')&&!w.apis){ s.motor=w.freeai?'freeai':(w.ollama?'ollama':'directml'); moved++; }
+      else if(m==='freeai'&&!w.freeai){ s.motor=w.ollama?'ollama':'directml'; moved++; }
+      else if(m==='ollama'&&!w.ollama){ s.motor=w.freeai?'freeai':'directml'; moved++; }
+    });
+    if(moved) toast('🐝 Combo híbrido: '+moved+' subtareas reasignadas a motores del combo','ok');
   }
   btn.disabled=true;
   f.estado='en curso'; f.subtareas.forEach(s=>{ s.estado='▶ en curso'; s.resultado=''; });
@@ -3234,7 +3243,7 @@ async function staffGenerate(){
 'IDEA / PLAN DEL USUARIO:\n'+idea+'\n\n'+
 'PERFILES DISPONIBLES (usa ids exactos):\n'+cat.profileIds.join(', ')+'\n\n'+
 'SKILLS CANDIDATAS (usa ids exactos):\n'+cat.candSkills.join(', ')+'\n\n'+
-'ENJAMBRE ACTIVO: '+swarmActiveNames().join(', ')+'. En cada fase, si admite trabajo en paralelo, incluye "subtareas": [{"motor":"ollama|freeai|directml|api:<nombre exacto del agente>","perfil":"id o rol","skills":["ids"],"tarea":"...","entregable":"..."}] con subtareas INDEPENDIENTES y territorios (archivos) separados. Maximo 3 por fase.\n\n'+
+'COMBO HÍBRIDO ACTIVO: '+staffComboNames().join(', ')+' (el Director siempre es Hermes en DirectML). Motores permitidos para subtareas: '+staffComboMotors()+'. En cada fase, si admite trabajo en paralelo, incluye "subtareas": [{"motor":"ollama|freeai|directml|api:<nombre exacto del agente>","perfil":"id o rol","skills":["ids"],"tarea":"...","entregable":"..."}] con subtareas INDEPENDIENTES y territorios (archivos) separados. Maximo 3 por fase.\n\n'+
 'Diseña el plan y el staff siguiendo tu formato obligatorio (resumen breve + bloque ```staff-json).';
     const model=(typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:document.getElementById('modelSel').value;
     const source='directml'; /* 🐝 El Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), local y sin censura */
@@ -5014,7 +5023,31 @@ const DIRECTOR_MODEL_ID='Hermes-3-8B-UNLOCKED-ONNX-DirectML';
 const DIRECTOR_MODEL_LABEL='Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)';
 const DIRECTOR_SKILLS=['ai-agents-architect','agent-orchestration-improve-agent','autonomous-agent-patterns','parallel-agents'];
 let STAFF_MODE=false;
-let STAFF_MOTOR=(()=>{ try{ return localStorage.getItem('las-staff-motor')||'hibrido'; }catch(e){ return 'hibrido'; } })();
+let STAFF_COMBO=(()=>{ try{ const c=localStorage.getItem('las-staff-combo'); if(c) return c; return localStorage.getItem('las-staff-motor')==='solo-local'?'dml-ollama':'dml-ollama-freeai'; }catch(e){ return 'dml-ollama-freeai'; } })();
+let STAFF_MOTOR=(STAFF_COMBO==='dml-ollama')?'solo-local':'hibrido';
+const STAFF_COMBOS={
+  'dml-ollama':{label:'DirectML + Ollama', ollama:true, freeai:false, apis:false},
+  'dml-freeai':{label:'DirectML + Free.ai', ollama:false, freeai:true, apis:false},
+  'dml-ollama-freeai':{label:'DirectML + Ollama + Free.ai', ollama:true, freeai:true, apis:false},
+  'dml-ollama-freeai-apis':{label:'DirectML + Ollama + Free.ai + APIs', ollama:true, freeai:true, apis:true}
+};
+function staffComboWorkers(){ return STAFF_COMBOS[STAFF_COMBO]||STAFF_COMBOS['dml-ollama-freeai']; }
+function staffComboHas(w){ return !!staffComboWorkers()[w]; }
+function staffComboLabel(){ return staffComboWorkers().label; }
+function staffComboNames(){
+  const w=staffComboWorkers(); const names=['🐝 Hermes · Director (DirectML)'];
+  if(w.ollama) names.push('🦙 Ollama');
+  if(w.freeai) names.push('☁️ Free.ai');
+  if(w.apis) (typeof AGENTS_API!=='undefined'?AGENTS_API:[]).filter(a=>a.active).forEach(a=>names.push('🔌 '+a.name));
+  return names;
+}
+function staffComboMotors(){
+  const w=staffComboWorkers(); const ms=['directml'];
+  if(w.ollama) ms.push('ollama');
+  if(w.freeai) ms.push('freeai');
+  if(w.apis) (typeof AGENTS_API!=='undefined'?AGENTS_API:[]).filter(a=>a.active).forEach(a=>ms.push('api:'+a.name));
+  return ms.join(', ');
+}
 let FREEAI_ONLINE=null;
 
 async function checkFreeAi(){
@@ -5024,10 +5057,15 @@ async function checkFreeAi(){
   return FREEAI_ONLINE;
 }
 function staffMotorChanged(v){
-  STAFF_MOTOR=v||'hibrido';
-  try{ localStorage.setItem('las-staff-motor', STAFF_MOTOR); }catch(e){}
-  toast(STAFF_MOTOR==='hibrido' ? '🌐 Staff en modo HÍBRIDO: dirijo en local (sin censura) y las fases pueden ejecutarlas Free.ai' : '🔌 Staff en modo SOLO LOCAL (offline): dirección y ejecución en tu PC', 'ok');
-  checkFreeAi();
+  STAFF_COMBO=STAFF_COMBOS[v]?v:'dml-ollama-freeai';
+  STAFF_MOTOR=(STAFF_COMBO==='dml-ollama')?'solo-local':'hibrido';
+  try{ localStorage.setItem('las-staff-combo', STAFF_COMBO); localStorage.setItem('las-staff-motor', STAFF_MOTOR); }catch(e){}
+  const w=staffComboWorkers();
+  SWARM_BUILTINS.ollama=w.ollama; SWARM_BUILTINS.freeai=w.freeai;
+  try{ localStorage.setItem('las-agents-builtins', JSON.stringify(SWARM_BUILTINS)); }catch(e){}
+  if(typeof renderSwarmSummary==='function') renderSwarmSummary();
+  toast('🐝 Combo híbrido: '+staffComboLabel()+' · Hermes dirige desde DirectML','ok');
+  checkFreeAi(); renderStaffWelcome();
 }
 function renderStaffWelcome(){
   const panel=document.getElementById('staffWelcome'); if(!panel) return;
@@ -5041,15 +5079,11 @@ function renderStaffWelcome(){
   const mot=document.getElementById('swMotor');
   if(mot){
     const nube=FREEAI_ONLINE===null?'comprobando Free.ai…':(FREEAI_ONLINE?'Free.ai disponible ✔':'Free.ai NO responde ✘');
-    mot.textContent=STAFF_MOTOR==='hibrido'
-      ? ('Director: '+DIRECTOR_MODEL_LABEL+' · local, sin censura · Ejecución de fases: Free.ai ('+nube+')'+(FREEAI_ONLINE===false?' → degradado automático a SOLO LOCAL (Hermes)':''))
-      : 'Director y ejecución: '+DIRECTOR_MODEL_LABEL+' · todo en tu PC (offline)';
+    mot.textContent='Director: '+DIRECTOR_MODEL_LABEL+' · local, sin censura · Combo híbrido: '+staffComboLabel()+(staffComboHas('freeai')?(' · Free.ai ('+nube+')'+(FREEAI_ONLINE===false?' → sus subtareas pasan a Ollama/DirectML':'')):' · sin nube');
   }
   const st=document.getElementById('staffMotorState');
-  if(st) st.textContent=STAFF_MOTOR==='hibrido'
-    ? ('🌐 Híbrido activo · Director: Hermes-3-8B-UNLOCKED · Free.ai: '+(FREEAI_ONLINE===null?'comprobando…':FREEAI_ONLINE?'disponible ✔':'no responde → trabajo solo en local con Hermes'))
-    : '🔌 Solo local activo · Hermes-3-8B-UNLOCKED dirige y ejecuta; nada sale de tu PC';
-  const sel=document.getElementById('staffMotorSel'); if(sel) sel.value=STAFF_MOTOR;
+  if(st) st.textContent='🐝 Combo activo: '+staffComboNames().join(' · ')+(staffComboHas('freeai')?(' · Free.ai: '+(FREEAI_ONLINE===null?'comprobando…':FREEAI_ONLINE?'disponible ✔':'no responde → degradado a local')):'');
+  const sel=document.getElementById('staffMotorSel'); if(sel) sel.value=STAFF_COMBO;
 }
 function enterStaffMode(){
   STAFF_MODE=true;
@@ -5105,7 +5139,7 @@ function staffTranslatePayload(hist){
 '[DIRECTOR DE STAFF · TRADUCCIÓN VIBE CODING — aplica tu protocolo antes de responder]\n'+
 'Fase activa: '+(fase?((faseIdx+1)+' · '+fase.titulo+' · Tarea: '+fase.tarea+' · Entregable: '+(fase.entregable||'el de la tarea')):'sin plan todavía (si es idea nueva, propón primero el plan con el bloque staff-json; no escribas código suelto)')+'\n'+
 'Perfil que piensa: '+(REAL.profileId||DIRECTOR_PROFILE)+' · Skills que ejecutan: '+(skills||DIRECTOR_SKILLS.join(', '))+'\n'+
-'Proyecto: '+(REAL.project?(REAL.project.name||''):'ninguno')+' · Motor: '+(STAFF_MOTOR==='hibrido'?'híbrido (dirección local)':'solo local/offline')+'\n'+
+'Proyecto: '+(REAL.project?(REAL.project.name||''):'ninguno')+' · Combo híbrido: '+staffComboLabel()+' (Director: Hermes en DirectML)\n'+
 'Instrucciones extra del Director (del usuario, persistentes): '+((()=>{ try{ return localStorage.getItem('las-director-extra')||'ninguna'; }catch(e){ return 'ninguna'; } })())+'\n'+
 'Traduce la petición a una instrucción ejecutable: objetivo imperativo, alcance (qué toca y qué NO), entregable verificable, código COMPLETO en bloques con la ruta encima de cada bloque, criterio de aceptación en 1–3 comprobaciones. Si la petición era ambigua, abre con "🎯 Entendido como: …". Una sola fase; nada a medias.\n\n'+
 'PETICIÓN DEL USUARIO:\n'+out[i].content;
@@ -5118,7 +5152,7 @@ if(typeof activateFaseSilent==='function'){
   const _afs=activateFaseSilent;
   activateFaseSilent=function(i){ _afs(i); renderStaffWelcome(); };
 }
-window.addEventListener('DOMContentLoaded', ()=>{ const s=document.getElementById('staffMotorSel'); if(s) s.value=STAFF_MOTOR; });
+window.addEventListener('DOMContentLoaded', ()=>{ const s=document.getElementById('staffMotorSel'); if(s) s.value=STAFF_COMBO; });
 </script>
 </body>
 
