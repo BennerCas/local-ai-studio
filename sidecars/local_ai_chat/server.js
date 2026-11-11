@@ -1712,9 +1712,14 @@ function createStudioServer(options = {}) {
             doneReject(parsed.error.message || parsed.error);
             return;
           }
-          const content = (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content || parsed.choices[0].message?.content))
-            || (parsed.message && parsed.message.content)
-            || "";
+          let content = (parsed.choices && parsed.choices[0] && (parsed.choices[0].delta?.content ?? parsed.choices[0].message?.content ?? parsed.choices[0].text ?? parsed.choices[0].delta?.text))
+            ?? (parsed.message && parsed.message.content)
+            ?? parsed.text
+            ?? "";
+          if (Array.isArray(content)) {
+            content = content.map(part => (typeof part === "string" ? part : (part && (part.text || part.content)) || "")).join("");
+          }
+          if (typeof content !== "string") content = "";
           if (content) {
             accumulated += content;
             onToken(content);
@@ -1852,8 +1857,10 @@ function createStudioServer(options = {}) {
           }
 
           upstreamRes.setEncoding("utf8");
+          let rawAll = "";
           upstreamRes.on("data", (chunk) => {
             if (settled) return;
+            rawAll += chunk;
             buffer += chunk;
             const lines = buffer.split(/\r?\n/);
             buffer = lines.pop() || "";
@@ -1865,6 +1872,17 @@ function createStudioServer(options = {}) {
             if (buffer.trim()) {
               processSseLine(buffer);
               buffer = "";
+            }
+            if (!accumulated && rawAll.trim()) {
+              // Rescate: el backend respondió sin SSE estándar (JSON completo u otro sobre)
+              try {
+                const whole = JSON.parse(rawAll);
+                const rescued = (whole.choices && whole.choices[0] && (whole.choices[0].message?.content || whole.choices[0].text)) || whole.response || whole.text || "";
+                if (rescued) { accumulated += rescued; onToken(rescued); }
+              } catch (_e) {
+                const frags = [...rawAll.matchAll(/"content"\s*:\s*"((?:\\.|[^"\\])*)"/g)].map(m => { try { return JSON.parse('"' + m[1] + '"'); } catch (_e2) { return ""; } }).join("");
+                if (frags) { accumulated += frags; onToken(frags); }
+              }
             }
             doneResolve();
           });

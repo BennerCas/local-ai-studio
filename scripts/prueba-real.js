@@ -120,14 +120,33 @@ async function serverAlive() {
     log('🐝', 'CHAT Director · Hermes DirectML', r.text.length > 3, r.text.slice(0, 160) || 'sin texto', r.ms);
   } catch (e) { log('🐝', 'CHAT Director · Hermes DirectML', false, e.message); }
 
-  const ollamaModel = (tags.localModels || [])[0];
-  if (ollamaModel) {
-    try {
-      const name = ollamaModel.id || ollamaModel.name;
-      const r = await chatOnce({ source: 'ollama', model: name, prompt: promptCorto });
-      log('🦙', 'CHAT Ollama · ' + name, r.text.length > 3, r.text.slice(0, 160) || 'sin texto', r.ms);
-    } catch (e) { log('🦙', 'CHAT Ollama', false, e.message); }
-  } else log('🦙', 'CHAT Ollama', false, 'sin modelos locales en el catálogo (omitido, no es fallo de la app)');
+  const candidatos = (tags.localModels || [])
+    .map(m => m.id || m.name)
+    .filter(n => n && !/cloud/i.test(n))
+    .slice(0, 4);
+  if (candidatos.length) {
+    let hecho = false;
+    for (const name of candidatos) {
+      try {
+        const r = await chatOnce({ source: 'ollama', model: name, prompt: promptCorto, timeoutMs: 120000 });
+        log('🦙', 'CHAT Ollama · ' + name, r.text.length > 3, r.text.slice(0, 160) || 'sin texto', r.ms);
+        hecho = r.text.length > 3;
+        if (hecho) break;
+      } catch (e) { log('🦙', 'CHAT Ollama · ' + name, false, e.message); }
+    }
+    if (!hecho) log('🦙', 'CHAT Ollama (resumen)', false, 'ningún candidato local respondió texto; si solo tienes modelos cloud de Ollama, necesitas créditos o un modelo local (ollama pull)');
+  } else log('🦙', 'CHAT Ollama', false, 'sin modelos locales en el catálogo (solo cloud o ninguno; omitido, no es fallo de la app)');
+
+  /* Respuesta CRUDA de DirectML: la verdad del backend si el chat sale vacío */
+  try {
+    const t0 = Date.now();
+    const r = await fetchT('http://127.0.0.1:8002/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: JSON.stringify({ model: DIRECTOR, messages: [{ role: 'user', content: 'Di solo: HERMES OK' }], stream: true, max_tokens: 64, temperature: 0.3 })
+    }, 180000);
+    const raw = await r.text();
+    log('🔬', 'DirectML crudo (8002)', r.ok && raw.length > 0, `HTTP ${r.status} · ${raw.length} bytes · ${raw.slice(0, 400).replace(/\n/g, ' ')}`, Date.now() - t0);
+  } catch (e) { log('🔬', 'DirectML crudo (8002)', false, e.message); }
 
   try {
     const r = await chatOnce({ source: 'freeai', model: undefined, prompt: promptCorto, timeoutMs: 120000 });
