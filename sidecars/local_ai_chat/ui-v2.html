@@ -322,7 +322,15 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-skills .ps-col>.col-head{flex-shrink:0;font-size:13px;font-weight:800;letter-spacing:.02em;margin:0 0 4px;padding-bottom:9px;border-bottom:1px solid var(--line);text-align:center}
 #view-skills .ps-foot{flex-shrink:0;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 #view-skills .ps-foot .btn{width:100%}
-#view-skills .ps-body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding-top:10px}
+#view-skills .ps-body{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;padding:10px 2px 2px}
+#view-skills .ps-col:nth-child(2) .ps-body{overflow:hidden;display:flex;flex-direction:column}
+#profileDetail{display:flex;flex-direction:column;height:100%;min-height:0}
+#profileDetail .pf-desc{flex-shrink:0}
+#profileDetail .pf-name{font-size:19px;line-height:1.35;margin:0}
+#profileDetail .pf-name .tag{vertical-align:middle;margin-left:6px;white-space:nowrap}
+#profileSkillsCol{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;margin-top:14px;padding-right:2px}
+#profileSkillsCol::-webkit-scrollbar{width:0;height:0;display:none}
+#treeUseBtn,#activateSkillsBtn{text-align:center;justify-content:center}
 #view-skills .ps-body::-webkit-scrollbar{width:0;height:0;display:none}
 #view-skills .ps-sec{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:14px 0 7px}
 #view-skills .ps-sec:first-child{margin-top:0}
@@ -1963,12 +1971,12 @@ async function selectProfileDetail(id){
   const el=document.getElementById('profileDetail'); if(!el) return;
   const skills=pf.skillsSugeridas||[];
   window._selectedProfileId=id;
-  const useBtn=document.getElementById('treeUseBtn'); if(useBtn) useBtn.textContent='Usar en el chat · '+pf.name;
+  const useBtn=document.getElementById('treeUseBtn'); if(useBtn) useBtn.textContent='Usar en el chat';
   const actBtn=document.getElementById('activateSkillsBtn'); if(actBtn) actBtn.textContent='🧩 Activar sus '+skills.length+' skills';
-  el.innerHTML='<div class="flex" style="align-items:center;gap:8px"><h3 style="margin:0">'+esc(pf.name)+'</h3><span class="muted">|</span><span class="tag cyan">'+esc(pf.category)+'</span></div>'+
-    '<p class="desc mt">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
-    (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+
-    '<div id="profileSkillsCol" style="margin-top:14px">'+(skills.length
+  el.innerHTML='<h3 class="pf-name">'+esc(pf.name)+' <span class="tag cyan">'+esc(pf.category)+'</span></h3>'+
+    '<div class="pf-desc"><p class="desc mt">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
+    (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+'</div>'+
+    '<div id="profileSkillsCol">'+(skills.length
       ? skills.map(s=>'<div class="card" style="margin-bottom:8px" title="'+esc(s.description||s.id)+'"><div class="flex between"><b class="small">🧩 '+esc(s.name)+'</b><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div><p class="tiny muted mt">'+esc(s.id)+' · '+esc(s.category)+'</p></div>').join('')
       : '<p class="muted tiny">Este perfil aún no tiene skills asociadas.</p>')+'</div>';
   const mcol=document.getElementById('profileMasterCol');
