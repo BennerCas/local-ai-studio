@@ -61,3 +61,12 @@ test('prototipo temporal de crear perfil (navegable, sin guardar)', () => {
   if (!html.includes('psShowCreate') || !html.includes('npCreatePrototype')) throw new Error('sin navegacion del prototipo');
   if (!html.includes('PROTOTIPO-CREAR-PERFIL')) throw new Error('prototipo sin marca de retirada');
 });
+
+test('prototipo: pestanas Potenciar y Fusionar ademas de Desde cero', () => {
+  for (const id of ['npModePower', 'npModeFuse', 'npModeNew', 'npPowProfile', 'npPowPreview', 'npFuseList', 'npFusePreview']) {
+    if (!html.includes(`id="${id}"`)) throw new Error('falta #' + id);
+  }
+  for (const fn of ['psMode', 'npPowDiagnose', 'npFusePreviewUpdate', 'npPowSavePrototype', 'npFuseSavePrototype']) {
+    if (!html.includes(fn)) throw new Error('falta ' + fn);
+  }
+});
