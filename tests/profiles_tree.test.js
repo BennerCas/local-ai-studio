@@ -70,3 +70,12 @@ test('prototipo: pestanas Potenciar y Fusionar ademas de Desde cero', () => {
     if (!html.includes(fn)) throw new Error('falta ' + fn);
   }
 });
+
+test('la seccion view-skills tiene los div balanceados', () => {
+  const a = html.indexOf('id="view-skills"');
+  const b = html.indexOf('======== MEMORIA');
+  const frag = html.slice(a, b);
+  const opens = (frag.match(/<div(\s|>)/g) || []).length;
+  const closes = (frag.match(/<\/div>/g) || []).length;
+  if (opens !== closes) throw new Error('div desbalanceados: ' + opens + ' aperturas vs ' + closes + ' cierres');
+});
