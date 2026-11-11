@@ -1,0 +1,30 @@
+{
+  "nota": "Estado base versionado de Local AI Studio. Los datos vivos de uso (plan del Staff, masters editados, biblioteca de prompts, preferencias) se guardan en el navegador de cada PC (localStorage); este archivo fija los valores por defecto con los que arranca una instalación nueva. Para versionar TUS datos reales: exporta masterprompts.md desde ⚙ en el Estudio de Imagen y guárdalo en esta carpeta datos/.",
+  "staff": {
+    "motor": "hibrido",
+    "director": {
+      "perfil": "specialized/director-staff-vibecoding",
+      "modelo": "Hermes-3-8B-UNLOCKED-ONNX-DirectML",
+      "etiqueta": "Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)",
+      "skills": [
+        "ai-agents-architect",
+        "agent-orchestration-improve-agent",
+        "autonomous-agent-patterns",
+        "parallel-agents"
+      ]
+    },
+    "plan": {
+      "idea": "",
+      "fases": [],
+      "refuerzos": []
+    }
+  },
+  "imagen": {
+    "bibliotecaPrompts": [],
+    "masters": "datos/masterprompts.md"
+  },
+  "preferencias": {
+    "tema": "dark",
+    "motorStaff": "hibrido"
+  }
+}
