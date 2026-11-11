@@ -53,3 +53,11 @@ test('columna 3: botones fijos Editar y Guardar del Master Prompt', () => {
 test('tag de la columna 2 despues de la descripcion', () => {
   if (!html.includes("el.innerHTML='<h3 class=\"pf-name\">'+esc(pf.name)+'</h3>'")) throw new Error('el tag sigue junto al nombre');
 });
+
+test('prototipo temporal de crear perfil (navegable, sin guardar)', () => {
+  for (const id of ['psCreate', 'npName', 'npPurpose', 'npPreview', 'npSlug']) {
+    if (!html.includes(`id="${id}"`)) throw new Error('falta #' + id);
+  }
+  if (!html.includes('psShowCreate') || !html.includes('npCreatePrototype')) throw new Error('sin navegacion del prototipo');
+  if (!html.includes('PROTOTIPO-CREAR-PERFIL')) throw new Error('prototipo sin marca de retirada');
+});
