@@ -101,3 +101,11 @@ test('mapa radial del perfil con Mermaid local en Potenciar', () => {
   const server = fs2.readFileSync('sidecars/local_ai_chat/server.js', 'utf8');
   if (!server.includes('".js": "text/javascript')) throw new Error('assets sin MIME js');
 });
+
+test('el prototipo genera con el Hermes montado (Q8 DirectML)', () => {
+  if (!html.includes("swarmChatOnce('directml'")) throw new Error('sin llamada al Director');
+  if (!html.includes('Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)')) throw new Error('sin motor declarado');
+  for (const fn of ['npHermes', 'npPowHermes', 'npFuseHermes', 'npGenerateTemplate']) {
+    if (!html.includes(fn)) throw new Error('falta ' + fn);
+  }
+});

@@ -1110,7 +1110,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
       <p class="sect-sub" id="psStats" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cargando cifras…</p>
       <!-- PROTOTIPO-CREAR-PERFIL: vista crear (temporal) -->
       <div id="psCreate" style="display:none">
-        <div class="np-banner">🧪 <b>PROTOTIPO navegable</b> — no guarda archivos; la generación rellena plantillas localmente. Se retirará tras tu validación.</div>
+        <div class="np-banner">🧪 <b>PROTOTIPO navegable</b> — no guarda archivos. Motor montado: <b>Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML)</b>, el Director que ya tienes. <span id="npHermesState">Comprobando Hermes…</span></div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <button class="btn" id="npBackTop" onclick="psShowExplore()">← Explorar</button>
           <button class="btn primary" id="npTabPower" style="flex:1" onclick="psMode('power')">🚀 Potenciar perfil</button>
@@ -1137,6 +1137,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
             <div class="ps-col">
               <div class="col-head">🚀 Después · mejoras por bloque</div>
               <div class="ps-body">
+                <button class="btn primary" id="npPowHermesBtn" style="width:100%;margin-bottom:10px" onclick="npPowHermes()">🐝 Redactar mejoras con Hermes</button>
                 <div id="npPowBlocks"><p class="muted tiny">Diagnostica un perfil para generar los bloques de mejora.</p></div>
                 <div class="np-field" style="margin-top:12px"><label>Resultado compuesto</label><div id="npPowPreview"><p class="muted tiny">—</p></div></div>
               </div>
@@ -1170,6 +1171,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
                 <label class="tiny" style="display:flex;gap:7px;align-items:center;margin-bottom:8px"><input type="checkbox" id="npFuseSkills" checked onchange="npFusePreviewUpdate()"> Skills = unión depurada de los padres</label>
                 <label class="tiny" style="display:flex;gap:7px;align-items:center;margin-bottom:8px"><input type="checkbox" id="npFuseRouting" checked onchange="npFusePreviewUpdate()"> Tabla de enrutado por especialidad</label>
                 <label class="tiny" style="display:flex;gap:7px;align-items:center;margin-bottom:12px"><input type="checkbox" id="npFuseDefense" onchange="npFusePreviewUpdate()"> Cláusula anti-inyección de prompts</label>
+                <button class="btn primary" id="npFuseHermesBtn" style="width:100%;margin-bottom:10px" onclick="npFuseHermes()">🐝 Redactar fusión con Hermes</button>
                 <div id="npFusePreview"><p class="muted tiny">Lleva al menos 2 perfiles a la mesa.</p></div>
               </div>
               <div class="ps-foot" style="display:flex;gap:8px"><button class="btn" style="flex:1" onclick="psShowExplore()">← Volver</button><button class="btn primary" style="flex:1" onclick="npFuseSavePrototype()">💾 Crear fusión</button></div>
@@ -1199,7 +1201,7 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <div class="ps-col np-wstep" id="npStep2" style="display:none">
             <div class="col-head">🧩 Paso 2 · Generación</div>
             <div class="ps-body">
-              <button class="btn primary" style="width:100%;margin-bottom:12px" onclick="npGenerate()">🐝 Generar con Hermes (muestra)</button>
+              <button class="btn primary" style="width:100%;margin-bottom:12px" onclick="npGenerate()">🐝 Generar con Hermes</button>
               <div class="np-field"><label>Persona</label><textarea class="np-sec" id="npSecPersona" oninput="npPreviewUpdate()"></textarea></div>
               <div class="np-field"><label>Expertise</label><textarea class="np-sec" id="npSecExpertise" oninput="npPreviewUpdate()"></textarea></div>
               <div class="np-field"><label>Process</label><textarea class="np-sec" id="npSecProcess" oninput="npPreviewUpdate()"></textarea></div>
@@ -2142,7 +2144,7 @@ async function selectProfileDetail(id){
 }
 function useSelectedProfile(){ if(window._selectedProfileId) useProfile(window._selectedProfileId); else toast('Elige primero un perfil','err'); }
 /* PROTOTIPO-CREAR-PERFIL (temporal): navegacion y composicion de muestra, sin guardar */
-function psShowCreate(){ const c=document.getElementById('psCreate'), e=document.getElementById('psExploreCols'); if(c) c.style.display=''; if(e) e.style.display='none'; npFillPickers(); psMode(window._npMode||'power'); npPreviewUpdate(); }
+function psShowCreate(){ const c=document.getElementById('psCreate'), e=document.getElementById('psExploreCols'); if(c) c.style.display=''; if(e) e.style.display='none'; npFillPickers(); psMode(window._npMode||'power'); npPreviewUpdate(); npHermesState(); }
 function psMode(m){
   window._npMode=m;
   const map={power:'npModePower',fuse:'npModeFuse',new:'npModeNew'};
@@ -2304,7 +2306,61 @@ function npFuseSavePrototype(){
 function psShowExplore(){ const c=document.getElementById('psCreate'), e=document.getElementById('psExploreCols'); if(c) c.style.display='none'; if(e) e.style.display=''; }
 function npSlug(){ const n=(document.getElementById('npName')||{}).value||'mi-perfil'; const s=n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); return s||'mi-perfil'; }
 function npVal(id){ const el=document.getElementById(id); return el?el.value.trim():''; }
-function npGenerate(){
+async function npHermes(prompt){
+  return await swarmChatOnce('directml', prompt, 'specialized/director-staff-vibecoding', ['ai-agents-architect','agent-orchestration-improve-agent','autonomous-agent-patterns','parallel-agents']);
+}
+function npParseSections(text, titles){
+  const out={}; const parts=String(text||'').split(/^##\s+/m).slice(1);
+  for(const part of parts){
+    const seg=part.split('\n'); const title=seg[0].trim().replace(/[:.]$/,'');
+    const hit=titles.find(t=>title.toLowerCase().startsWith(t.toLowerCase().slice(0,10)));
+    if(hit) out[hit]=seg.slice(1).join('\n').trim();
+  }
+  return out;
+}
+async function npHermesState(){
+  const el=document.getElementById('npHermesState'); if(!el) return;
+  try{ const d=await API.get('/api/directml/status'); el.textContent=d.isAlive?'Hermes Q8: ● activo y listo.':'Hermes Q8: ● detenido — arráncalo en ⚡ Motores (la plantilla local cubre mientras tanto).'; }
+  catch(e){ el.textContent='Hermes Q8: sin contacto con el servidor.'; }
+}
+async function npPowHermes(){
+  const btn=document.getElementById('npPowHermesBtn');
+  const pf=PROFILES_CACHE.find(x=>x.id===window._powFor);
+  if(!pf||!window._powBody){ toast('Primero elige un perfil y diagnostícalo','err'); return; }
+  const miss=npPowChecks().filter(c=>!c.ok).map(c=>c.t);
+  if(!miss.length){ toast('Este perfil no tiene huecos que redactar','ok'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='🐝 Hermes está redactando…'; }
+  try{
+    const note=npVal('npPowNote');
+    const txt=await npHermes('Actúa como Director de Staff. Vas a POTENCIAR el perfil «'+pf.name+'» ('+pf.category+').\n\nMASTER PROMPT ACTUAL (extracto):\n'+window._powBody.slice(0,6000)+'\n\nRedacta SOLO estas secciones que le faltan: '+miss.join(', ')+'.'+(note?' Refuerzo pedido por el usuario: '+note+'.':'')+'\nFormato obligatorio: cada sección con su encabezado ## <titulo exacto de la lista>, en español, conciso y aplicable (sin relleno ni comentarios fuera de las secciones).');
+    const got=npParseSections(txt, miss);
+    let n=0;
+    document.querySelectorAll('.np-pow-block').forEach(bl=>{
+      const chk=bl.querySelector('.np-pow-chk'), ta=bl.querySelector('.np-pow-txt');
+      if(chk&&ta&&got[chk.dataset.title]){ ta.value=got[chk.dataset.title]; chk.checked=true; n++; }
+    });
+    if(n){ npPowPreviewUpdate(); toast('🐝 Hermes redactó '+n+' bloques de mejora','ok'); }
+    else toast('Hermes respondió sin las secciones pedidas: quedan las plantillas','err');
+  }catch(e){ toast('Hermes no respondió ('+e.message+'): quedan las plantillas locales','err'); }
+  if(btn){ btn.disabled=false; btn.textContent='🐝 Redactar mejoras con Hermes'; }
+}
+async function npFuseHermes(){
+  const btn=document.getElementById('npFuseHermesBtn'); const prev=document.getElementById('npFusePreview');
+  const sel=npFuseSelected();
+  if(sel.length<2){ toast('Lleva al menos 2 perfiles a la mesa','err'); return; }
+  const name=npVal('npFuseName'); if(!name){ toast('Ponle nombre a la fusión','err'); return; }
+  const leadSel=document.getElementById('npFuseLead'); const leadPf=sel.find(pf=>pf.id===(leadSel?leadSel.value:''))||sel[0];
+  if(btn){ btn.disabled=true; btn.textContent='🐝 Hermes está fusionando…'; }
+  try{
+    const padres=sel.map(pf=>'- '+pf.name+' ('+pf.category+'): '+(pf.description||pf.vibe||'')).join('\n');
+    const skills=[...new Set(sel.flatMap(pf=>(pf.skillsSugeridas||[]).map(s=>s.name)))].slice(0,12).join(', ');
+    const txt=await npHermes('Actúa como Director de Staff. FUSIONA estos perfiles en uno solo llamado «'+name+'». Manda '+leadPf.name+' cuando haya conflicto.\n\nPERFILES PADRE:\n'+padres+'\n\nSkills heredadas sugeridas: '+skills+'\n\nEscribe el Master Prompt completo de la fusión en español, con estas secciones: ## Identidad fundida, ## Expertise, ## Proceso por fases, ## Formato de salida, ## Restricciones, ## Checklist de calidad, ## Enrutado por especialidad. Sin comentarios fuera del documento.');
+    if(prev) prev.innerHTML='<div class="masterbox">'+md(txt.slice(0,12000))+'</div><p class="tiny muted" style="margin-top:8px">Redactado por Hermes · destino: perfiles/fusions/'+npSlugFrom(name)+'.md</p>';
+    toast('🐝 Hermes redactó la fusión','ok');
+  }catch(e){ toast('Hermes no respondió ('+e.message+'): queda la composición por plantilla','err'); }
+  if(btn){ btn.disabled=false; btn.textContent='🐝 Redactar fusión con Hermes'; }
+}
+function npGenerateTemplate(){
   const name=npVal('npName')||'Nuevo Perfil', purpose=npVal('npPurpose')||'su propósito declarado';
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('npSecPersona', 'Eres **'+name+'**, un agente especializado de Local AI Studio. Tu única misión: '+purpose+'. Trabajas por fases, con entregables verificables, y reportas al Director de Staff (Hermes).');
@@ -2314,7 +2370,23 @@ function npGenerate(){
   set('npSecConstraints', '- No realices acciones fuera del propósito declarado.\n- Respeta las reglas del proyecto y las decisiones del Director.');
   set('npSecChecklist', '- [ ] Entrada validada\n- [ ] Alcance de la fase respetado\n- [ ] Formato de salida cumplido\n- [ ] Sin tareas a medias');
   npPreviewUpdate();
-  toast('🧪 Prototipo: secciones rellenadas con la plantilla (Hermes aún no interviene)','ok');
+}
+async function npGenerate(){
+  const name=npVal('npName'); if(!name){ toast('Ponle nombre al perfil en el paso 1','err'); return; }
+  const btn=[...document.querySelectorAll('#npStep2 .btn.primary')][0];
+  if(btn){ btn.disabled=true; btn.textContent='🐝 Hermes está creando el perfil…'; }
+  try{
+    const purpose=npVal('npPurpose');
+    const txt=await npHermes('Actúa como Director de Staff. CREA el Master Prompt de un perfil nuevo llamado «'+name+'» (clasificación '+(npVal('npCategory')||'specialized')+'). Propósito: '+(purpose||'el que infieras del nombre')+'.\nEscribe en español estas secciones exactas: ## Persona, ## Expertise, ## Process, ## Output Format, ## Constraints, ## Quality Checklist. Conciso y aplicable, sin comentarios fuera de las secciones.');
+    const titles=['Persona','Expertise','Process','Output Format','Constraints','Quality Checklist'];
+    const got=npParseSections(txt, titles);
+    const ids={Persona:'npSecPersona',Expertise:'npSecExpertise',Process:'npSecProcess','Output Format':'npSecOutput',Constraints:'npSecConstraints','Quality Checklist':'npSecChecklist'};
+    let n=0;
+    for(const t of titles){ if(got[t]){ const el=document.getElementById(ids[t]); if(el){ el.value=got[t]; n++; } } }
+    if(n){ npPreviewUpdate(); toast('🐝 Hermes creó '+n+' secciones del perfil','ok'); }
+    else { npGenerateTemplate(); toast('Hermes respondió sin el formato: se usa la plantilla local','err'); }
+  }catch(e){ npGenerateTemplate(); toast('Hermes no respondió ('+e.message+'): se usa la plantilla local','err'); }
+  if(btn){ btn.disabled=false; btn.textContent='🐝 Generar con Hermes (muestra)'; }
 }
 function npCompose(){
   const name=npVal('npName')||'Nuevo Perfil', purpose=npVal('npPurpose');
