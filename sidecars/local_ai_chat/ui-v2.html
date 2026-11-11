@@ -318,7 +318,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 /* ===== PERFILES | SKILLS en columnas ===== */
 .cols-ps{display:grid;grid-template-columns:minmax(270px,1fr) minmax(0,1.7fr);gap:18px;align-items:start}
 #view-skills .cols-ps{grid-template-columns:minmax(230px,.85fr) minmax(300px,1.15fr) minmax(320px,1.35fr)}
-#view-skills .ps-col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#view-skills .ps-col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #view-skills .ps-col>.col-head{flex-shrink:0;font-size:13px;font-weight:800;letter-spacing:.02em;margin:0 0 4px;padding-bottom:9px;border-bottom:1px solid var(--line);text-align:center}
 #view-skills .ps-foot{flex-shrink:0;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 #view-skills .ps-foot .btn{width:100%}
@@ -329,15 +329,16 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #profileDetail .pf-name{font-size:19px;line-height:1.35;margin:0}
 #profileDetail .pf-name .tag{vertical-align:middle;margin-left:6px;white-space:nowrap}
 #profileSkillsCol{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;margin-top:14px;padding:2px}
-#profileSkillsCol{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
-#profileSkillsCol .skill-card{margin:0;text-align:center;padding:10px 8px;position:relative;cursor:help}
+#profileSkillsCol{display:flex;flex-direction:column;gap:8px}
+#profileSkillsCol .skill-card{margin:0;display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;position:relative;cursor:help}
+#profileSkillsCol .skill-card .sk-main{flex:1;min-width:0}
 #profileSkillsCol .skill-card .sk-name{display:block;font-size:12px;font-weight:800;line-height:1.3;word-break:break-word}
 #profileSkillsCol .skill-card .sk-meta{display:block;font-size:10px;margin-top:4px}
-#profileSkillsCol .skill-card .switch{display:inline-block;margin-top:7px}
+#profileSkillsCol .skill-card .switch{flex-shrink:0}
 #profileSkillsCol .skill-card::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%) translateY(3px);width:230px;max-width:80vw;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:11px;line-height:1.5;font-weight:400;text-align:left;color:var(--text);box-shadow:0 12px 32px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.15s;z-index:40;white-space:normal}
 #profileSkillsCol .skill-card:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
-#view-skills .ps-body{padding-left:6px;padding-right:6px}
-#profileDetail{padding-left:2px;padding-right:2px}
+#view-skills .ps-body{padding-left:2px;padding-right:2px}
+#profileDetail{padding-left:0;padding-right:0}
 #view-skills .tree-cat{margin-left:0;margin-right:0}
 #profileSkillsCol::-webkit-scrollbar{width:0;height:0;display:none}
 #treeUseBtn,#activateSkillsBtn{text-align:center;justify-content:center}
@@ -374,7 +375,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-skills.active{display:flex;flex-direction:column;height:100%;overflow:hidden}
 #view-skills>.sect-title,#view-skills>.sect-sub,#view-skills>.flex{flex-shrink:0}
 #view-skills .cols-ps{flex:1;min-height:0}
-#view-skills .cols-ps>div{overflow-y:auto;min-height:0;height:100%;scrollbar-width:none;-ms-overflow-style:none;padding-right:2px}
+#view-skills .cols-ps>div{overflow-y:auto;min-height:0;height:100%;scrollbar-width:none;-ms-overflow-style:none}
 #view-skills .cols-ps>div::-webkit-scrollbar{width:0;height:0;display:none}
 #view-skills #profileGrid,#view-skills #skillGrid{max-height:none;overflow:visible}
 #view-skills>.card{flex-shrink:0;margin-top:14px;box-shadow:0 -8px 24px rgba(0,0,0,.18)}
@@ -1955,10 +1956,12 @@ async function enrichProfilesSkillsIfNeeded(){
       scored.sort((a,b)=>b.sc-a.sc||a.name.localeCompare(b.name));
       pf.skillsSugeridas=scored.map(s=>({id:s.id, name:s.name, category:s.category, description:String((all.find(x=>x.id===s.id)||{}).description||'').slice(0,280)})).slice(0,8);
     });
-    renderProfileTree(PROFILES_CACHE, null);
+    renderProfileTree(PROFILES_CACHE, {totalCount: all.length, categories: [...new Set(all.map(s=>s.category).filter(Boolean))]});
   }catch(e){ /* sin indice completo: se queda como esta */ }
 }
 function renderProfileTree(profiles, meta){
+  if(meta&&(meta.totalCount||meta.categories)) window._psMeta=meta;
+  meta=meta||window._psMeta||null;
   PROFILES_CACHE=profiles||[];
   enrichProfilesSkillsIfNeeded();
   const tree=document.getElementById('profileTree');
@@ -1994,7 +1997,7 @@ async function selectProfileDetail(id){
     '<div class="pf-desc"><p class="desc mt">'+esc(pf.description||'Sin descripción en su ficha.')+'</p>'+
     (pf.vibe?'<p class="desc mt"><i>'+esc(pf.vibe)+'</i></p>':'')+'</div>'+
     '<div id="profileSkillsCol">'+(skills.length
-      ? skills.map(s=>'<div class="card skill-card" data-tip="'+esc(s.description||s.id)+'"><span class="sk-name">🧩 '+esc(s.name)+'</span><span class="sk-meta muted">'+esc(s.id)+' · '+esc(s.category)+'</span><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div>').join('')
+      ? skills.map(s=>'<div class="card skill-card" data-tip="'+esc(s.description||s.id)+'"><div class="sk-main"><span class="sk-name">🧩 '+esc(s.name)+'</span><span class="sk-meta muted">'+esc(s.id)+' · '+esc(s.category)+'</span></div><label class="switch"><input type="checkbox" '+(REAL.activeSkills&&REAL.activeSkills.has(s.id)?'checked':'')+' onchange="toggleSkillActive(\''+esc(s.id).replace(/'/g,"")+'\',this.checked)"><i></i></label></div>').join('')
       : '<p class="muted tiny">Este perfil aún no tiene skills asociadas.</p>')+'</div>';
   const mcol=document.getElementById('profileMasterCol');
   if(mcol) mcol.innerHTML='<p class="muted tiny">Cargando su Master Prompt…</p>';

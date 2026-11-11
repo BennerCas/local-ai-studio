@@ -34,7 +34,13 @@ test('reparto 3 columnas estilo estudio: perfiles | descripcion+skills | master 
   if (!html.includes('ps-col')) throw new Error('sin estilo de columna del estudio');
 });
 
-test('skills en rejilla 2x4 con tooltip propio', () => {
-  if (!html.includes('grid-template-columns:1fr 1fr')) throw new Error('sin rejilla');
+test('skills en lista de una columna con tooltip propio', () => {
+  if (!html.includes('#profileSkillsCol{display:flex;flex-direction:column')) throw new Error('sin lista');
+  if (html.includes('#profileSkillsCol{display:grid')) throw new Error('sigue en rejilla');
   if (!html.includes('data-tip=')) throw new Error('sin tooltip');
+  if (!html.includes('sk-main')) throw new Error('sin estructura de lista');
+});
+test('margenes laterales uniformes en las columnas de perfiles', () => {
+  if (html.includes('.cols-ps>div{overflow-y:auto;min-height:0;height:100%;scrollbar-width:none;-ms-overflow-style:none;padding-right:2px}')) throw new Error('regla que pegaba el margen derecho');
+  if (!html.includes('padding:16px 20px')) throw new Error('sin margen lateral uniforme');
 });
