@@ -60,7 +60,7 @@ test('combo hibrido: los 4 combos con DirectML siempre de Director', () => {
 });
 
 test('barra superior: selector de Modo y Swarm activo sincronizados en tiempo real', () => {
-  assert.match(html, /id="topSwarm"/);
+  if (html.includes('id="topSwarm"')) throw new Error('Swarm sigue en la barra superior');
   assert.match(html, /function syncComboUI\(\)/);
   assert.match(html, /function staffComboFromBuiltins\(\)/);
   if (html.includes('id="dotOllama"')) throw new Error('pildoras viejas presentes');
@@ -73,4 +73,14 @@ test('saludo de Staff sin tarjetas: logo, pregunta y clima de Piura', () => {
   assert.match(html, /latitude=-5\.1945&longitude=-80\.6328/);
   assert.match(html, /staff-on #chatEmpty/);
   assert.match(html, /¿En qué trabajamos hoy\?/);
+});
+
+test('cabecera del chat: proyecto activo y nombre del chat', () => {
+  assert.match(html, /function updateTopContext\(\)/);
+  assert.match(html, /function renameChat\(\)/);
+  assert.match(html, /CURRENT_CHAT_NAME/);
+});
+test('saludo de Staff centrado con el logo del splash y texto grande', () => {
+  assert.match(html, /class="splash-logo"/);
+  assert.match(html, /#staffWelcome\.show\{display:flex/);
 });

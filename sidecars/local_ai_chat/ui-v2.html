@@ -725,7 +725,10 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 /* ===== Panel inicial del Director de Staff (en el chat) ===== */
 #staffWelcome .sw-logo{width:52px;height:52px;border-radius:14px}
 body.staff-on #chatEmpty{display:none!important}
-#staffWelcome{display:none;padding:18px 4px 6px;margin:0 0 14px;text-align:left}
+#staffWelcome{display:none;padding:26px 4px 8px;margin:0 0 18px;text-align:center}
+#staffWelcome.show{display:flex;flex-direction:column;align-items:center}
+#staffWelcome .sw-big{font-size:15px}
+#staffGreeting{font-size:30px!important}
 #staffWelcome.show{display:block}
 #staffWelcome .sw-head{display:flex;gap:13px;align-items:center}
 #staffWelcome .sw-head img{width:46px;height:46px;border-radius:12px}
@@ -852,7 +855,7 @@ body.staff-on #chatEmpty{display:none!important}
   <div class="main">
     <header class="topbar">
       <button class="icon-btn" id="menuBtn" style="display:none" onclick="toggleMenu()">☰</button>
-      <div><h2 id="topTitle">Chat</h2><div class="sub" id="topSub">Motor local · sin consumo de cuota de nube</div></div>
+      <div><h2 id="topTitle">Sin proyecto</h2><div class="sub" id="topSub" title="Clic para ponerle nombre a este chat" style="cursor:pointer" onclick="renameChat()">Chat nuevo</div></div>
       <div class="health">
         <select class="input" id="staffMotorSel" style="width:auto;max-width:320px" onchange="staffMotorChanged(this.value)" title="Modo híbrido: el Director siempre es Hermes-3-8B-UNLOCKED en tu PC (DirectML, sin censura). El combo decide qué motores ejecutan las fases y las subtareas.">
           <option value="dml-ollama-freeai">🌐 DirectML + Ollama + Free.ai</option>
@@ -860,7 +863,6 @@ body.staff-on #chatEmpty{display:none!important}
           <option value="dml-freeai">☁️ DirectML + Free.ai</option>
           <option value="dml-ollama-freeai-apis">🐝 DirectML + Ollama + Free.ai + API 1…N</option>
         </select>
-        <span class="health-pill" id="topSwarm" title="Swarm activo: se edita con el Modo (aquí arriba) o en la vista Agentes; ambos quedan sincronizados">🐝 Swarm: —</span>
         <button class="health-pill pill-hw" onclick="go('hardware')">🎛️ RX 7600 · 8 GB</button>
         <select class="input" id="themeSel" title="Tema de la app" style="width:auto;max-width:168px;padding:7px 9px" onchange="setTheme(this.value)">
           <option value="dark">🌙 Oscuro</option>
@@ -878,10 +880,10 @@ body.staff-on #chatEmpty{display:none!important}
         <div class="chat-main">
           <div class="chat-scroll" id="chatScroll">
             <div id="staffWelcome">
-              <img class="sw-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
-              <h3 id="staffGreeting" style="margin:10px 0 2px;font-size:20px">Buenas tardes, Benner</h3>
-              <p style="margin:0 0 4px;font-size:14px;color:var(--muted)">¿En qué trabajamos hoy?</p>
-              <p class="tiny muted" style="margin:0"><span id="staffClock">--:--</span> · <span id="staffDate">—</span> · <span id="mwEmoji">🌤️</span> <span id="mwTemp">Piura · —°</span><span id="mwDesc"></span></p>
+              <img class="splash-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
+              <h3 id="staffGreeting" style="margin:14px 0 4px">Buenas tardes, Benner</h3>
+              <p style="margin:0 0 6px;font-size:17px;color:var(--muted)">¿En qué trabajamos hoy?</p>
+              <p style="margin:0;font-size:13px;color:var(--muted)"><span id="staffClock">--:--</span> · <span id="staffDate">—</span> · <span id="mwEmoji">🌤️</span> <span id="mwTemp">Piura · —°</span><span id="mwDesc"></span></p>
             </div>
             <div id="chatEmpty" class="empty-hero">
               <img class="hero-logo" src="assets/local-ai-studio-icon.png" alt="Local AI Studio">
@@ -1616,12 +1618,23 @@ const TITLES={
  descargas:["Descargas HF","Modelos con destino siempre confirmado"],
  agentes:["Agentes y Hubs","Cline · Open WebUI · Bandeja"],
  ajustes:["Ajustes y Diagnóstico","Preferencias y salud del sistema"]};
+let CURRENT_CHAT_NAME='Chat nuevo';
+function updateTopContext(){
+  const t=document.getElementById('topTitle'), s=document.getElementById('topSub'); if(!t||!s) return;
+  const proj=(typeof REAL!=='undefined'&&REAL&&REAL.project)?(REAL.project.name||REAL.project.title||''):''; 
+  t.textContent=proj?('📁 '+proj):'Sin proyecto';
+  s.textContent='💬 '+CURRENT_CHAT_NAME;
+}
+function renameChat(){
+  const n=prompt('Nombre de este chat (un proyecto puede tener varios chats):', CURRENT_CHAT_NAME);
+  if(n&&n.trim()){ CURRENT_CHAT_NAME=n.trim().slice(0,80); updateTopContext(); toast('💬 Chat: '+CURRENT_CHAT_NAME,'ok'); }
+}
 function go(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  document.getElementById('topTitle').textContent=TITLES[view][0];
-  document.getElementById('topSub').textContent=TITLES[view][1];
+  if(view==='chat'){ updateTopContext(); }
+  else { document.getElementById('topTitle').textContent=TITLES[view][0]; document.getElementById('topSub').textContent=TITLES[view][1]; }
   document.getElementById('sidebar').classList.remove('open'); var _sc=document.getElementById('scrim'); if(_sc) _sc.classList.remove('show');
   location.hash=view;
   window.scrollTo(0,0);
@@ -1716,6 +1729,7 @@ function stopStream(){
 }
 function ask(text){ document.getElementById('composer').value=text; sendMsg(); }
 function resetChat(){
+  CURRENT_CHAT_NAME='Chat nuevo'; updateTopContext();
   document.getElementById('chatMsgs').innerHTML='';
   document.getElementById('chatEmpty').style.display='';
 }
@@ -1915,6 +1929,7 @@ async function loadChatsReal(){
 function sendMsg(){
   const ta=document.getElementById('composer');
   const text=(ta.value||'').trim(); if(!text) return;
+  if(CURRENT_CHAT_NAME==='Chat nuevo'){ CURRENT_CHAT_NAME=text.slice(0,42)+(text.length>42?'…':''); updateTopContext(); }
   ta.value='';
   addMsg('user', md(text));
   REAL.hist.push({role:'user', content:text});
@@ -3521,6 +3536,7 @@ async function openChatFromHistory(id){
       REAL.hist.push({role:m.role==='user'?'user':'assistant', content});
     });
     document.getElementById('chatEmpty').style.display='none';
+    CURRENT_CHAT_NAME=chat.title||id; updateTopContext();
     toast('💬 Conversación restaurada: '+(chat.title||id),'ok');
   }catch(e){ toast('Abrir chat: '+e.message,'err'); }
 }
@@ -4969,6 +4985,7 @@ async function openChatReal(id, title){
       addMsg(role, md(content), role==='ai'?(title||'Historial'):'');
       REAL.hist.push({role:m.role==='user'?'user':'assistant', content});
     }
+    CURRENT_CHAT_NAME=title||id; updateTopContext();
     toast('💬 Conversación restaurada: '+(title||id),'ok');
   }catch(e){ toast('Abrir conversación: '+e.message,'err'); }
 }
