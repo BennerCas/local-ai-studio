@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const http = require("node:http");
 const https = require("node:https");
 const envLoader = require("./env-loader.js");
+const apiUsage = require("./api-usage.js");
 
 const DEFAULT_FREEAI_BASE_URL = "https://api.free.ai/v1";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
@@ -1557,6 +1558,22 @@ async function saveImageToBiblioteca(options = {}) {
 }
 
 function streamChat(payload, res, systemPrompt = null, options = {}) {
+  const reservation = apiUsage.begin("freeai", "chat");
+  if (!reservation.allowed) {
+    const message = reservation.reason === "max_calls" ? "Límite local de llamadas alcanzado" : "Espera mínima local entre solicitudes";
+    if (!res.headersSent && !res.writableEnded) {
+      res.writeHead(429, { "Content-Type": "application/json; charset=utf-8", "Retry-After": String(Math.ceil((reservation.retryAfterMs || 1000) / 1000)) });
+      res.end(JSON.stringify({ ok: false, error: message, localLimit: true, retryAfterMs: reservation.retryAfterMs || 1000 }));
+    }
+    return Promise.reject(new Error(message));
+  }
+  const trackedOptions = { ...options, timeoutMs: apiUsage.getTimeout("freeai", 45000) };
+  return streamChatRaw(payload, res, systemPrompt, trackedOptions)
+    .then((value) => { apiUsage.finish("freeai", reservation, { status: 200 }); return value; })
+    .catch((error) => { apiUsage.finish("freeai", reservation, { status: Number(error && error.status) || 0, timeout: /timeout/i.test(String(error && error.message || "")), errorKind: /429|rate.?limit/i.test(String(error && error.message || "")) ? "rate_limited" : "network" }); throw error; });
+}
+
+function streamChatRaw(payload, res, systemPrompt = null, options = {}) {
   return new Promise((resolve, reject) => {
     const key = getKey();
     const baseUrl = getBaseUrl();
@@ -1654,7 +1671,7 @@ function streamChat(payload, res, systemPrompt = null, options = {}) {
         "Content-Length": Buffer.byteLength(bodyData, "utf8"),
         "User-Agent": "Antigravity/1.0"
       },
-      timeout: 45000
+      timeout: Math.max(1000, Math.min(10 * 60 * 1000, Number(options.timeoutMs) || 45000))
     }, (proxyRes) => {
       upstreamRes = proxyRes;
       if (aborted) {

@@ -7,6 +7,7 @@ const { execFile, execFileSync, spawn } = require("node:child_process");
 const { promisify } = require("node:util");
 
 const envLoader = require("./env-loader.js");
+const apiUsage = require("./api-usage.js");
 
 const execFileAsync = promisify(execFile);
 
@@ -279,7 +280,17 @@ function parseGitHubRepoFromRemote(remoteUrl) {
 }
 
 async function fetchJson(url, options = {}) {
-  const { headers = {}, method = "GET", body = undefined, timeoutMs = HTTP_TIMEOUT_MS, secrets = [] } = options;
+  const { headers = {}, method = "GET", body = undefined, secrets = [] } = options;
+  const providerId = providerForUrl(url);
+  const reservation = apiUsage.begin(providerId, `${method} ${new URL(url).pathname}`);
+  if (!reservation.allowed) {
+    const blocked = new Error(reservation.reason === "max_calls" ? "Límite local de llamadas alcanzado" : "Espera mínima local entre solicitudes");
+    blocked.status = 429;
+    blocked.localLimit = true;
+    blocked.retryAfterMs = reservation.retryAfterMs || 1000;
+    throw blocked;
+  }
+  const timeoutMs = providerId ? apiUsage.getTimeout(providerId, HTTP_TIMEOUT_MS) : (options.timeoutMs || HTTP_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       method,
@@ -308,14 +319,28 @@ async function fetchJson(url, options = {}) {
       const err = new Error(sanitizeSecrets(`HTTP ${res.status}: ${detail}`, secrets));
       err.status = res.status;
       err.data = data;
+      apiUsage.finish(providerId, reservation, { status: res.status, errorKind: res.status === 429 ? "rate_limited" : "http" });
       throw err;
     }
 
+    apiUsage.finish(providerId, reservation, { status: res.status });
     return data;
   } catch (err) {
     if (err && err.status) throw err;
+    apiUsage.finish(providerId, reservation, { status: 0, timeout: err && err.name === "AbortError", errorKind: err && err.name === "AbortError" ? "timeout" : "network" });
     throw new Error(sanitizeSecrets(err, secrets));
   }
+}
+
+function providerForUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === "api.github.com" || host.endsWith(".github.com")) return "github";
+    if (host === "api.netlify.com" || host.endsWith(".netlify.com")) return "netlify";
+    if (host === "huggingface.co" || host.endsWith(".huggingface.co")) return "huggingface";
+    if (host === "serpapi.com" || host.endsWith(".serpapi.com")) return "serpapi";
+  } catch (_e) {}
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -2308,6 +2333,26 @@ function buildSerpContextBlock(query, engine, results = [], maxChars = SERPAPI_C
 }
 
 async function callSerpApiWithImpl(fetchImpl, requestUrl, timeoutMs, secrets = []) {
+  const reservation = apiUsage.begin("serpapi", "search");
+  if (!reservation.allowed) {
+    const blocked = new Error(reservation.reason === "max_calls" ? "Límite local de llamadas alcanzado" : "Espera mínima local entre solicitudes");
+    blocked.status = 429;
+    blocked.localLimit = true;
+    blocked.retryAfterMs = reservation.retryAfterMs || 1000;
+    throw blocked;
+  }
+  const effectiveTimeout = apiUsage.getTimeout("serpapi", timeoutMs);
+  try {
+    const data = await callSerpApiWithImplRaw(fetchImpl, requestUrl, effectiveTimeout, secrets);
+    apiUsage.finish("serpapi", reservation, { status: 200 });
+    return data;
+  } catch (err) {
+    apiUsage.finish("serpapi", reservation, { status: Number(err && err.status) || 0, timeout: err && err.name === "AbortError", errorKind: Number(err && err.status) === 429 ? "rate_limited" : "network" });
+    throw err;
+  }
+}
+
+async function callSerpApiWithImplRaw(fetchImpl, requestUrl, timeoutMs, secrets = []) {
   if (typeof fetchImpl !== "function") {
     return await httpsGetJson(requestUrl, { timeoutMs, secrets });
   }

@@ -16,6 +16,7 @@ const freeai = require("../../freeai-bridge.js");
 const integrations = require("../../integrations-bridge.js");
 const hardwareAdvisor = require("../../hardware-advisor.js");
 const ttsBridge = require("../../tts-bridge.js");
+const apiUsage = require("../../api-usage.js");
 
 const DEFAULT_PORT = 63719;
 const BIND_HOST = process.env.LOCAL_AI_HOST || "127.0.0.1";
@@ -23,6 +24,7 @@ const DEFAULT_OLLAMA_HOST = "127.0.0.1";
 const DEFAULT_OLLAMA_PORT = 11434;
 const DEFAULT_DIRECTML_HOST = "127.0.0.1";
 const DEFAULT_DIRECTML_PORT = 8002;
+const DIRECTML_DEFAULT_MODEL = "Hermes-3-8B-UNLOCKED-ONNX-DirectML";
 // Backend DirectML: se prefiere la copia versionada en el repo
 // (sidecars/directml/api_openai.py) para que sus correcciones lleguen con
 // git pull; DIRECTML_SCRIPT permite forzar otra ruta (legado por defecto).
@@ -66,6 +68,67 @@ function sendJsonError(res, statusCode, errOrMsg, extra = {}) {
     ...extra,
     error: safeErrMsg(errOrMsg)
   });
+}
+
+async function fetchProviderRequest(provider, url, options = {}, kind = "request") {
+  const reservation = apiUsage.begin(provider && provider.id, kind);
+  if (!reservation.allowed) {
+    return {
+      ok: false,
+      status: 429,
+      text: "",
+      detail: reservation.reason === "max_calls" ? "Límite local de llamadas alcanzado" : "Espera mínima local entre solicitudes",
+      localLimit: true,
+      retryAfterMs: reservation.retryAfterMs || 1000
+    };
+  }
+  const controller = new AbortController();
+  const timeoutMs = provider ? apiUsage.getTimeout(provider.id, 120000) : 20000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    apiUsage.finish(provider && provider.id, reservation, { status: response.status, errorKind: response.status === 429 ? "rate_limited" : undefined });
+    return { ok: response.ok, status: response.status, text, timeoutMs };
+  } catch (error) {
+    const timeoutError = error && error.name === "AbortError";
+    apiUsage.finish(provider && provider.id, reservation, { status: 0, timeout: timeoutError, errorKind: timeoutError ? "timeout" : "network" });
+    return { ok: false, status: 0, text: "", detail: timeoutError ? `Tiempo de espera agotado (${timeoutMs} ms)` : String(error && error.message || error).slice(0, 200), timeout: timeoutError };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchAgentModels(provider) {
+  if (!provider || !provider.configured) {
+    return { ok: false, status: 0, models: [], detail: "Proveedor sin clave configurada" };
+  }
+  let last = { ok: false, status: 0, models: [], detail: "Sin respuesta" };
+  for (const apiKey of provider.keys) {
+    const response = await fetchProviderRequest(provider, provider.baseUrl + "/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }, "models");
+    let models = [];
+    try {
+      const body = JSON.parse(response.text || "{}");
+      if (Array.isArray(body.data)) models = body.data.map((item) => String(item.id || "")).filter(Boolean);
+    } catch (_e) {}
+    last = { ok: response.ok, status: response.status, models, detail: response.localLimit ? response.detail : (response.ok ? "" : (response.text || response.detail || "").slice(0, 200)), localLimit: response.localLimit, retryAfterMs: response.retryAfterMs };
+    if (response.localLimit || response.ok || ![401, 403, 429].includes(response.status)) return last;
+  }
+  return last;
+}
+
+function agentModelFor(provider, models) {
+  const list = Array.isArray(models) ? models : [];
+  if (list.includes(provider.defaultModel)) return provider.defaultModel;
+  const usable = list.filter((id) => !/(prompt-guard|safeguard|whisper|embed|moderation|transcri|ocr|tts|audio)/i.test(id));
+  const preferred = usable.find((id) => /gpt|llama|mistral|mixtral|qwen/i.test(id));
+  return preferred || usable[0] || list[0] || provider.defaultModel;
+}
+
+function agentChatModels(models) {
+  return (Array.isArray(models) ? models : []).filter((id) => !/(prompt-guard|safeguard|whisper|embed|moderation|transcri|ocr|tts|audio|voxtral)/i.test(id));
 }
 
 function buildProjectCompatibilitySummary(opts = {}) {
@@ -1025,6 +1088,7 @@ function createStudioServer(options = {}) {
           OLIVE_GPU_MEMORY_LIMIT: process.env.OLIVE_GPU_MEMORY_LIMIT || "25",
           OLIVE_CPU_THREADS: process.env.OLIVE_CPU_THREADS || "12",
           ORT_DML_DEVICE_ID: process.env.ORT_DML_DEVICE_ID || "0",
+          DIRECTML_DEFAULT_MODEL: process.env.DIRECTML_DEFAULT_MODEL || DIRECTML_DEFAULT_MODEL,
           ...activeDirectmlEnv
         }
       });
@@ -1173,6 +1237,53 @@ function createStudioServer(options = {}) {
       req.on("timeout", () => {
         req.destroy();
         resolve({ ok: false, model: cleanModel, statusCode: 0, timeout: true });
+      });
+      req.write(bodyBuf);
+      req.end();
+    });
+  }
+
+  function loadOllamaModel(modelName, loadOptions = {}) {
+    const cleanModel = String(modelName || "").replace(/^ollama:/i, "").trim();
+    if (!cleanModel) {
+      return Promise.resolve({ ok: false, model: "", skipped: true, error: "Modelo Ollama vacío." });
+    }
+    return new Promise((resolve) => {
+      const bodyBuf = Buffer.from(JSON.stringify({
+        model: cleanModel,
+        prompt: "",
+        stream: false,
+        keep_alive: -1,
+        options: { num_predict: 1, ...loadOptions }
+      }), "utf8");
+      const req = http.request({
+        hostname: config.ollamaHost,
+        port: config.ollamaPort,
+        path: "/api/generate",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": bodyBuf.length
+        },
+        timeout: 180000
+      }, (uRes) => {
+        let data = "";
+        uRes.on("data", (chunk) => { data += chunk; });
+        uRes.on("end", () => {
+          let parsed = {};
+          try { parsed = JSON.parse(data || "{}"); } catch (_e) {}
+          resolve({
+            ok: uRes.statusCode === 200,
+            model: cleanModel,
+            statusCode: uRes.statusCode,
+            error: uRes.statusCode === 200 ? "" : String(parsed.error || data || "Ollama rechazó la carga.")
+          });
+        });
+      });
+      req.on("error", (err) => resolve({ ok: false, model: cleanModel, statusCode: 0, error: safeErrMsg(err) }));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve({ ok: false, model: cleanModel, statusCode: 0, timeout: true, error: "Tiempo agotado cargando el modelo en Ollama." });
       });
       req.write(bodyBuf);
       req.end();
@@ -2116,8 +2227,82 @@ function createStudioServer(options = {}) {
     // en el navegador (localStorage); aqui solo actuamos de proxy para
     // evitar CORS y poder probar/hablar con cualquier endpoint.
     // ---------------------------------------------------------
+    if (pathname === "/api/agents/created" && req.method === "GET") {
+      sendJson(res, 200, { ok: true, agents: skillsBridge.loadCreatedAgents() });
+      return;
+    }
+    if (pathname === "/api/agents/create" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const result = skillsBridge.createAgentManifest(payload);
+      if (!result.ok) {
+        sendJsonError(res, 400, result.error || "No se pudo crear el agente.");
+        return;
+      }
+      sendJson(res, 201, result);
+      return;
+    }
+    if (pathname === "/api/agents/created/delete" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const result = skillsBridge.deleteCreatedAgent(payload.id || payload.agentId || "");
+      if (!result.ok) {
+        sendJsonError(res, 404, result.error || "Agente no encontrado.");
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+    if (pathname === "/api/agents/catalog" && req.method === "GET") {
+      const providers = [];
+      for (const definition of envLoader.getAgentProviderCatalog()) {
+        const provider = envLoader.getAgentProvider(definition.id);
+        const probe = await fetchAgentModels(provider);
+        providers.push({
+          ...definition,
+          ready: Boolean(probe.ok),
+          status: probe.status,
+          detail: probe.detail || "",
+          models: probe.models,
+          chatModels: agentChatModels(probe.models),
+          model: agentModelFor(provider, probe.models)
+        });
+      }
+      const envStatus = envLoader.getEnvStatus();
+      sendJson(res, 200, {
+        ok: true,
+        providers,
+        usage: apiUsage.getState(),
+        hubs: [
+          { id: "huggingface", name: "Hugging Face", configured: Boolean(envStatus.hfConfigured), kind: "modelos" },
+          { id: "serpapi", name: "SerpApi", configured: Boolean(envStatus.serpApiConfigured), kind: "web" },
+          { id: "pexels", name: "Pexels", configured: Boolean(envStatus.pexelsConfigured), kind: "media" },
+          { id: "pixabay", name: "Pixabay", configured: Boolean(envStatus.pixabayConfigured), kind: "media" }
+        ]
+      });
+      return;
+    }
+    if (pathname === "/api/agents/limits" && req.method === "GET") {
+      sendJson(res, 200, { ok: true, ...apiUsage.getState() });
+      return;
+    }
+    if (pathname === "/api/agents/limits" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      sendJson(res, 200, { ok: true, ...apiUsage.updateSettings(payload) });
+      return;
+    }
+    if (pathname === "/api/agents/limits/reset" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      sendJson(res, 200, { ok: true, ...apiUsage.reset(payload.providerId || null) });
+      return;
+    }
     if (pathname === "/api/agents/test" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
+      const provider = payload.providerId ? envLoader.getAgentProvider(payload.providerId) : null;
+      if (payload.providerId && !provider) { sendJsonError(res, 400, "Proveedor de agente no reconocido"); return; }
+      if (provider) {
+        const probe = await fetchAgentModels(provider);
+        sendJson(res, 200, { ok: probe.ok, status: probe.status, models: probe.models.length, detail: probe.detail || "" });
+        return;
+      }
       const base = String(payload.baseUrl || "").replace(/\/+$/, "");
       if (!/^https?:\/\//i.test(base)) { sendJsonError(res, 400, "La URL base debe empezar por http:// o https://"); return; }
       try {
@@ -2133,23 +2318,38 @@ function createStudioServer(options = {}) {
     }
     if (pathname === "/api/agents/chat" && req.method === "POST") {
       const payload = ensurePlainObject(await readJsonBody(req));
-      const base = String(payload.baseUrl || "").replace(/\/+$/, "");
+      const provider = payload.providerId ? envLoader.getAgentProvider(payload.providerId) : null;
+      if (payload.providerId && !provider) { sendJsonError(res, 400, "Proveedor de agente no reconocido"); return; }
+      const base = String((provider && provider.baseUrl) || payload.baseUrl || "").replace(/\/+$/, "");
       if (!/^https?:\/\//i.test(base)) { sendJsonError(res, 400, "La URL base debe empezar por http:// o https://"); return; }
       if (!Array.isArray(payload.messages) || !payload.messages.length) { sendJsonError(res, 400, "Faltan messages"); return; }
       try {
-        const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 240000);
-        const r = await fetch(base + "/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(payload.apiKey ? { Authorization: `Bearer ${payload.apiKey}` } : {}) },
-          body: JSON.stringify({ model: payload.model || undefined, messages: payload.messages, stream: false, temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3, max_tokens: Number(payload.max_tokens) || 2048 }),
-          signal: ctl.signal
-        });
-        clearTimeout(to);
-        const txt = await r.text();
-        if (!r.ok) { sendJsonError(res, 502, `El agente respondio HTTP ${r.status}: ${txt.slice(0, 240)}`); return; }
-        let text = "";
-        try { const j = JSON.parse(txt); text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch (_e) {}
-        sendJson(res, 200, { ok: true, text });
+        const keys = provider ? provider.keys : [String(payload.apiKey || "")];
+        let lastStatus = 502;
+        let lastText = "Sin respuesta del agente";
+        for (const apiKey of keys) {
+          const response = await fetchProviderRequest(provider, base + "/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+            body: JSON.stringify({ model: payload.model || undefined, messages: payload.messages, stream: false, temperature: payload.temperature !== undefined ? Number(payload.temperature) : 0.3, max_tokens: Number(payload.max_tokens) || 2048 }),
+          });
+          if (!response.ok) {
+            lastStatus = response.status || 502;
+            lastText = response.localLimit ? response.detail : (response.text || response.detail || "").slice(0, 240);
+            if (response.localLimit) {
+              sendJsonError(res, 429, lastText, { retryAfterMs: response.retryAfterMs || 1000, localLimit: true });
+              return;
+            }
+            if (provider && [401, 403, 429].includes(response.status)) continue;
+            sendJsonError(res, response.status === 0 ? 504 : 502, `El agente respondio HTTP ${response.status || 0}: ${lastText}`);
+            return;
+          }
+          let text = "";
+          try { const j = JSON.parse(response.text || "{}"); text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch (_e) {}
+          sendJson(res, 200, { ok: true, text });
+          return;
+        }
+        sendJsonError(res, 502, `El proveedor agotó sus claves (HTTP ${lastStatus}): ${lastText}`);
       } catch (e) { sendJsonError(res, 502, `Sin contacto con el agente: ${String(e && e.message || e).slice(0, 200)}`); }
       return;
     }
@@ -3989,6 +4189,35 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    if (pathname === "/api/ollama/load" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const model = String(payload.model || "").trim();
+      if (!model) {
+        sendJsonError(res, 400, "Parámetro 'model' requerido.");
+        return;
+      }
+      const started = await ensureOllamaRunning();
+      if (!started.ok) {
+        sendJson(res, 503, { ok: false, model, error: "Ollama no está disponible para cargar el modelo.", detail: started.error || "sin conexión" });
+        return;
+      }
+      const residentBefore = await getOllamaPs();
+      const unloaded = [];
+      for (const residentModel of residentBefore) {
+        const residentName = String(residentModel && (residentModel.name || residentModel.model) || "").trim();
+        if (residentName && residentName !== model) unloaded.push(await unloadOllamaModel(residentName));
+      }
+      let loaded = await loadOllamaModel(model);
+      let fallbackUsed = false;
+      if (!loaded.ok && /ROCm|device kernel image|llama-server process terminated/i.test(loaded.error || "")) {
+        loaded = await loadOllamaModel(model, { num_gpu: 0 });
+        fallbackUsed = loaded.ok;
+      }
+      const resident = loaded.ok ? await getOllamaPs() : [];
+      sendJson(res, loaded.ok ? 200 : 502, { ...loaded, fallbackUsed, unloaded, resident });
+      return;
+    }
+
     // ---------------------------------------------------------
     // Hardware Advisor & Safe Tuning (/api/system/*)
     // ---------------------------------------------------------
@@ -4439,13 +4668,24 @@ function createStudioServer(options = {}) {
 
       const rawProjIdentifier = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
       const convId = payload.conversationId || null;
+      const createdAgent = payload.agentId ? skillsBridge.getCreatedAgent(payload.agentId) : null;
+      if (payload.agentId && !createdAgent) {
+        sendJsonError(res, 404, "Agente creado no encontrado: " + String(payload.agentId));
+        return;
+      }
+      const effectiveProfileId = (createdAgent && createdAgent.profileId) || payload.profileId || null;
+      const effectiveSkillIds = (createdAgent && createdAgent.skillIds && createdAgent.skillIds.length)
+        ? createdAgent.skillIds
+        : (payload.skillIds || payload.skillId || null);
+      const agentSystemPrompt = createdAgent ? skillsBridge.buildAgentSystemPrompt(createdAgent) : "";
+      const effectiveCustomPrompt = [payload.customSystemPrompt, agentSystemPrompt].filter(Boolean).join("\n\n");
       const ctx = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
         writeToDisk: false,
         skillId: payload.skillId || null,
-        skillIds: payload.skillIds || payload.skillId || null,
-        profileId: payload.profileId || null,
+        skillIds: effectiveSkillIds,
+        profileId: effectiveProfileId,
         mentionedFiles,
-        customSystemPrompt: payload.customSystemPrompt || null,
+        customSystemPrompt: effectiveCustomPrompt || null,
         modelOverridesPrompt: payload.modelSystemPrompt || null
       });
 

@@ -130,7 +130,70 @@ function getNetlifyToken() {
 
 function getHfToken() {
   loadAllEnv();
-  return process.env.HF_TOKEN || process.env.HUGGINGFACE_HUB_TOKEN || process.env.HUGGINGFACE_API_KEY || "";
+  return process.env.HF_TOKEN || process.env.HF_API_KEY || process.env.HUGGINGFACE_HUB_TOKEN || process.env.HUGGINGFACE_API_KEY || "";
+}
+
+const AGENT_PROVIDER_DEFS = {
+  groq: {
+    id: "groq",
+    name: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    keyNames: ["GROQ_API_KEY", "GROQ_API_KEY_1", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"],
+    defaultModel: "llama-3.3-70b-versatile",
+    caps: "Inferencias cloud rápidas; modelos OpenAI-compatible"
+  },
+  mistral: {
+    id: "mistral",
+    name: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    keyNames: ["MISTRAL_API_KEY", "MISTRAL_API_KEY_1", "MISTRAL_API_KEY_2", "MISTRAL_API_KEY_3"],
+    defaultModel: "mistral-small-latest",
+    caps: "Modelos Mistral; inferencia cloud OpenAI-compatible"
+  },
+  openrouter: {
+    id: "openrouter",
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    keyNames: ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_1"],
+    defaultModel: "openai/gpt-4o-mini",
+    caps: "Hub multi-proveedor; modelos OpenAI-compatible"
+  }
+};
+
+function getKeyPool(names) {
+  loadAllEnv();
+  const seen = new Set();
+  const keys = [];
+  for (const name of names || []) {
+    const value = String(process.env[name] || "").trim();
+    if (value && !seen.has(value)) {
+      seen.add(value);
+      keys.push(value);
+    }
+  }
+  return keys;
+}
+
+function getAgentProvider(providerId) {
+  const def = AGENT_PROVIDER_DEFS[String(providerId || "").trim().toLowerCase()];
+  if (!def) return null;
+  const keys = getKeyPool(def.keyNames);
+  return { ...def, keys, keyCount: keys.length, configured: keys.length > 0 };
+}
+
+function getAgentProviderCatalog() {
+  return Object.keys(AGENT_PROVIDER_DEFS).map((id) => {
+    const provider = getAgentProvider(id);
+    return {
+      id: provider.id,
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      defaultModel: provider.defaultModel,
+      caps: provider.caps,
+      configured: provider.configured,
+      keyCount: provider.keyCount
+    };
+  });
 }
 
 function getSerpApiKeyPools() {
@@ -181,14 +244,25 @@ function getSerpApiKey() {
 
 function getEnvStatus() {
   const { webKeys, jobsKeys, allKeys } = getSerpApiKeyPools();
+  const groqKeyNames = ["GROQ_API_KEY", "GROQ_API_KEY_1", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"];
+  const mistralKeyNames = ["MISTRAL_API_KEY", "MISTRAL_API_KEY_1", "MISTRAL_API_KEY_2", "MISTRAL_API_KEY_3"];
+  const openrouterKeyNames = ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_1"];
   return {
     githubConfigured: Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_PERSONAL_ACCESS_TOKEN),
     netlifyConfigured: Boolean(process.env.NETLIFY_AUTH_TOKEN || process.env.NETLIFY_PERSONAL_ACCESS_TOKEN || process.env.NETLIFY_TOKEN),
-    hfConfigured: Boolean(process.env.HF_TOKEN || process.env.HUGGINGFACE_HUB_TOKEN || process.env.HUGGINGFACE_API_KEY),
+    hfConfigured: Boolean(process.env.HF_TOKEN || process.env.HF_API_KEY || process.env.HUGGINGFACE_HUB_TOKEN || process.env.HUGGINGFACE_API_KEY),
     freeaiConfigured: Boolean(process.env.FREEAI_API_KEY_1 || process.env.FREEAI_API_KEY_2 || process.env.FREE_AI_API_KEY),
     serpApiConfigured: allKeys.length > 0,
     serpApiWebKeysCount: webKeys.length,
-    serpApiJobsKeysCount: jobsKeys.length
+    serpApiJobsKeysCount: jobsKeys.length,
+    groqConfigured: groqKeyNames.some((key) => Boolean(process.env[key])),
+    groqKeyCount: groqKeyNames.filter((key) => Boolean(process.env[key])).length,
+    mistralConfigured: mistralKeyNames.some((key) => Boolean(process.env[key])),
+    mistralKeyCount: mistralKeyNames.filter((key) => Boolean(process.env[key])).length,
+    openrouterConfigured: openrouterKeyNames.some((key) => Boolean(process.env[key])),
+    openrouterKeyCount: openrouterKeyNames.filter((key) => Boolean(process.env[key])).length,
+    pexelsConfigured: Boolean(process.env.PEXELS_API_KEY),
+    pixabayConfigured: Boolean(process.env.PIXABAY_API_KEY)
   };
 }
 
@@ -199,6 +273,8 @@ module.exports = {
   getGithubToken,
   getNetlifyToken,
   getHfToken,
+  getAgentProvider,
+  getAgentProviderCatalog,
   getSerpApiKey,
   getSerpApiKeyPools,
   getEnvStatus

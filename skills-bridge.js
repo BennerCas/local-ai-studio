@@ -764,6 +764,188 @@ function saveSkillFusion(options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Agentes creados por el usuario
+// ---------------------------------------------------------------------------
+// Un perfil/fusion describe como piensa un agente; este manifiesto añade la
+// parte operativa: modelo preferido, herramientas autorizadas, permisos y
+// limite de pasos. Se guarda separado del registro de APIs externas.
+const AGENT_TOOL_IDS = new Set([
+  "read_file", "search_code", "write_file", "patch_file", "preview_web",
+  "run_tests", "rollback", "delegate"
+]);
+const AGENT_PERMISSION_KEYS = ["read", "write", "preview", "test", "execute", "network"];
+
+function getCreatedAgentsDirs() {
+  return getProfilesDirs()
+    .map((dir) => path.join(dir, "agentes"))
+    .filter((dir, index, all) => dir && all.indexOf(dir) === index);
+}
+
+function normalizeAgentManifest(raw, fallbackPath = null) {
+  const input = (raw && typeof raw === "object") ? raw : {};
+  const tools = Array.isArray(input.tools)
+    ? input.tools.map((tool) => String(tool || "").trim()).filter((tool, index, list) => AGENT_TOOL_IDS.has(tool) && list.indexOf(tool) === index)
+    : [];
+  const sourcePermissions = (input.permissions && typeof input.permissions === "object") ? input.permissions : {};
+  const permissions = {};
+  for (const key of AGENT_PERMISSION_KEYS) permissions[key] = sourcePermissions[key] === true;
+  const modelPolicy = (input.modelPolicy && typeof input.modelPolicy === "object")
+    ? { provider: String(input.modelPolicy.provider || "auto").trim() || "auto", model: String(input.modelPolicy.model || "").trim() }
+    : { provider: String(input.modelProvider || "auto").trim() || "auto", model: String(input.model || "").trim() };
+  return {
+    id: String(input.id || "").trim(),
+    slug: String(input.slug || "").trim(),
+    name: String(input.name || input.slug || "Agente").trim(),
+    description: String(input.description || "").trim(),
+    profileId: String(input.profileId || "").trim(),
+    skillIds: parseSkillIdsList(input.skillIds || input.skills || []),
+    tools,
+    modelPolicy,
+    permissions,
+    maxSteps: Math.max(1, Math.min(100, Number(input.maxSteps) || 12)),
+    createdAt: String(input.createdAt || new Date().toISOString()),
+    updatedAt: String(input.updatedAt || input.createdAt || new Date().toISOString()),
+    manifestPath: fallbackPath || String(input.manifestPath || "")
+  };
+}
+
+function loadCreatedAgents(forceRefresh = false) {
+  const result = [];
+  const seen = new Set();
+  for (const dir of getCreatedAgentsDirs()) {
+    if (!fs.existsSync(dir)) continue;
+    let files = [];
+    try { files = fs.readdirSync(dir).filter((name) => name.toLowerCase().endsWith(".json")); } catch (_) { continue; }
+    for (const name of files) {
+      const fullPath = path.join(dir, name);
+      try {
+        const parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+        const agent = normalizeAgentManifest(parsed, fullPath);
+        if (!agent.id || seen.has(agent.id.toLowerCase())) continue;
+        seen.add(agent.id.toLowerCase());
+        result.push(agent);
+      } catch (err) {
+        console.warn("[Skills Bridge] Manifiesto de agente inválido:", fullPath, err.message);
+      }
+    }
+  }
+  result.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
+}
+
+function getCreatedAgent(agentId) {
+  const needle = String(agentId || "").trim().toLowerCase();
+  if (!needle) return null;
+  return loadCreatedAgents().find((agent) => agent.id.toLowerCase() === needle || agent.slug.toLowerCase() === needle) || null;
+}
+
+function createAgentManifest(options = {}) {
+  const opts = (options && typeof options === "object") ? options : {};
+  const name = String(opts.name || "").trim();
+  if (!name) return { ok: false, error: "El nombre del agente es obligatorio" };
+  const slug = String(opts.slug || name)
+    .toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  if (!slug) return { ok: false, error: "No se pudo generar un identificador para el agente" };
+  const profileId = String(opts.profileId || "").trim();
+  if (profileId && !findProfileEntry(profileId)) return { ok: false, error: "Perfil cognitivo no encontrado: " + profileId };
+  const existing = getCreatedAgent(`agentes/${slug}`);
+  if (existing) return { ok: false, error: "Ya existe un agente con ese identificador: " + slug };
+
+  const skillIds = parseSkillIdsList(opts.skillIds || opts.skills || []).slice(0, 32);
+  const tools = Array.isArray(opts.tools) ? opts.tools.map((tool) => String(tool || "").trim()).filter((tool, index, list) => AGENT_TOOL_IDS.has(tool) && list.indexOf(tool) === index) : [];
+  const rawPermissions = (opts.permissions && typeof opts.permissions === "object") ? opts.permissions : {};
+  const permissions = {};
+  for (const key of AGENT_PERMISSION_KEYS) permissions[key] = rawPermissions[key] === true;
+  const provider = String(opts.modelProvider || (opts.modelPolicy && opts.modelPolicy.provider) || "auto").trim() || "auto";
+  const model = String(opts.model || (opts.modelPolicy && opts.modelPolicy.model) || "").trim();
+  const now = new Date().toISOString();
+  const id = `agentes/${slug}`;
+  const manifest = normalizeAgentManifest({
+    id, slug, name,
+    description: String(opts.description || "").trim().slice(0, 1000),
+    profileId, skillIds, tools,
+    modelPolicy: { provider, model }, permissions,
+    maxSteps: opts.maxSteps, createdAt: now, updatedAt: now
+  });
+
+  const dirs = getCreatedAgentsDirs();
+  const baseDir = dirs[0];
+  if (!baseDir) return { ok: false, error: "No hay un directorio de perfiles disponible" };
+  const manifestPath = path.join(baseDir, `${slug}.json`);
+  const profilePath = path.join(baseDir, `${slug}.md`);
+  if (!isPathInside(baseDir, manifestPath) || !isPathInside(baseDir, profilePath)) return { ok: false, error: "Ruta de agente fuera del directorio permitido" };
+  const toolText = tools.length ? tools.join(", ") : "ninguna seleccionada";
+  const permissionText = AGENT_PERMISSION_KEYS.filter((key) => permissions[key]).join(", ") || "ninguno";
+  const markdown = [
+    "---",
+    `name: "${name.replace(/"/g, '\\"')}"`,
+    `description: "${(manifest.description || `Agente operativo ${name}`).replace(/"/g, '\\"')}"`,
+    `vibe: "Agente ejecutor · ${provider}${model ? ` · ${model}` : ""}"`,
+    'emoji: "🤖"',
+    'color: "cyan"',
+    "---", "",
+    `# ${name}`, "",
+    "## Contrato operativo", "",
+    manifest.description || "Convierte la intención del usuario en cambios verificables y ejecuta el siguiente paso.", "",
+    `- Perfil cognitivo: ${profileId || "sin perfil"}`,
+    `- Skills activas: ${skillIds.join(", ") || "ninguna"}`,
+    `- Modelo preferido: ${provider}${model ? ` / ${model}` : ""}`,
+    `- Herramientas autorizadas: ${toolText}`,
+    `- Permisos concedidos: ${permissionText}`,
+    `- Máximo de pasos por tarea: ${manifest.maxSteps}`, "",
+    "## Protocolo", "",
+    "1. Entiende la intención y declara el objetivo ejecutable.",
+    "2. Usa solo las herramientas y permisos concedidos.",
+    "3. Ejecuta por pasos pequeños y verifica cada resultado.",
+    "4. No declares un cambio terminado sin evidencia de la operación.", ""
+  ].join("\n");
+
+  try {
+    fs.mkdirSync(baseDir, { recursive: true });
+    fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, manifestPath }, null, 2), "utf8");
+    fs.writeFileSync(profilePath, markdown, "utf8");
+  } catch (err) {
+    try { if (fs.existsSync(manifestPath)) fs.unlinkSync(manifestPath); } catch (_) {}
+    return { ok: false, error: "No se pudo guardar el agente: " + err.message };
+  }
+  profilesCache = null;
+  lastProfilesLoadTime = 0;
+  return { ok: true, agent: normalizeAgentManifest({ ...manifest, manifestPath }, manifestPath), profilePath };
+}
+
+function deleteCreatedAgent(agentId) {
+  const agent = getCreatedAgent(agentId);
+  if (!agent || !agent.manifestPath) return { ok: false, error: "Agente no encontrado" };
+  const baseDir = path.dirname(agent.manifestPath);
+  const profilePath = path.join(baseDir, `${agent.slug}.md`);
+  if (!isPathInside(baseDir, agent.manifestPath) || !isPathInside(baseDir, profilePath)) return { ok: false, error: "Ruta de agente no permitida" };
+  try {
+    if (fs.existsSync(agent.manifestPath)) fs.unlinkSync(agent.manifestPath);
+    if (fs.existsSync(profilePath)) fs.unlinkSync(profilePath);
+    profilesCache = null;
+    lastProfilesLoadTime = 0;
+    return { ok: true, id: agent.id };
+  } catch (err) { return { ok: false, error: "No se pudo eliminar: " + err.message }; }
+}
+
+function buildAgentSystemPrompt(agent) {
+  const a = normalizeAgentManifest(agent);
+  if (!a.id) return "";
+  const tools = a.tools.length ? a.tools.join(", ") : "ninguna";
+  const permissions = AGENT_PERMISSION_KEYS.filter((key) => a.permissions[key]).join(", ") || "ninguno";
+  return [
+    `--- [AGENTE OPERATIVO ACTIVO: ${a.name.toUpperCase()} · ${a.id}] ---`,
+    "No eres solo un asesor: trabaja como agente dentro del alcance autorizado.",
+    `Contrato: ${a.description || "convertir la petición en un resultado verificable"}.`,
+    `Modelo preferido: ${a.modelPolicy.provider}${a.modelPolicy.model ? ` / ${a.modelPolicy.model}` : ""}.`,
+    `Herramientas declaradas: ${tools}. Permisos: ${permissions}. Máximo ${a.maxSteps} pasos.`,
+    "Protocolo: entiende, decide el siguiente paso, ejecuta mediante las capacidades disponibles de la aplicación, verifica y reporta evidencia. Si una herramienta no está disponible, dilo y no simules su ejecución.",
+    "--- [FIN DE AGENTE OPERATIVO] ---"
+  ].join("\n");
+}
+
 module.exports = {
   SKILLS_REPO_URL,
   loadBundles,
@@ -779,6 +961,11 @@ module.exports = {
   parseSkillIdsList,
   buildSkillSystemPrompt,
   saveSkillFusion,
+  loadCreatedAgents,
+  getCreatedAgent,
+  createAgentManifest,
+  deleteCreatedAgent,
+  buildAgentSystemPrompt,
   SKILLS_ROOT,
   DEFAULT_SKILLS_DIRS
 };

@@ -445,7 +445,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 .side-pane{flex:1;overflow:auto;min-height:0;scrollbar-width:none}
 .side-pane::-webkit-scrollbar{width:0;display:none}
 .side-pane .nav{overflow:visible}
-#pane-project,#pane-staff,#pane-history,#pane-gallery,#pane-code{padding:12px 14px}
+#pane-project,#pane-staff{padding:12px 14px}
 .ctx-panel{display:none!important}
 /* ===== RUTA VIBE CODING (orden guiado) ===== */
 .vibe-guide{border:1px solid var(--line);border-radius:13px;padding:11px;margin-bottom:12px;background:var(--card2)}
@@ -484,6 +484,49 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #galleryGrid figure{margin:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;cursor:pointer;background:var(--card)}
 #galleryGrid img{width:100%;height:86px;object-fit:cover;display:block}
 #galleryGrid figcaption{font-size:10px;padding:5px 7px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== Herramientas anidadas dentro de SETUP ===== */
+.setup-tools{padding:10px 10px 4px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(124,108,255,.08),transparent)}
+.setup-tools-title{padding:2px 4px 7px;color:var(--faint);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.setup-tool-tab{display:flex;align-items:center;gap:10px;width:100%;padding:8px 9px;margin-bottom:5px;border:1px solid transparent;border-radius:10px;color:var(--muted);text-align:left;transition:.2s ease-out}
+.setup-tool-tab:hover{background:var(--hover);border-color:var(--line);color:var(--txt);transform:translateX(2px)}
+.setup-tool-tab.active{background:var(--sel);border-color:var(--vio);color:var(--txt);box-shadow:0 5px 16px rgba(124,108,255,.12)}
+.setup-tool-tab>span:first-child{width:25px;height:25px;display:grid;place-items:center;border-radius:8px;background:var(--card);color:var(--vio2);font-family:var(--mono);font-size:13px;font-weight:800;flex-shrink:0}
+.setup-tool-tab b,.setup-tool-tab small{display:block}
+.setup-tool-tab b{font-size:12px}
+.setup-tool-tab small{margin-top:2px;color:var(--faint);font-size:10px}
+
+/* ===== Vista principal de Historial / Galería / Code ===== */
+#view-library.active{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.library-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;flex-shrink:0}
+.library-head .sect-sub{margin-bottom:0}
+.library-actions{display:flex;gap:7px;align-items:center}
+.library-content{flex:1;min-height:0;overflow:auto;margin-top:18px;padding:1px 2px 4px;scrollbar-width:thin}
+.library-pane{display:none;min-height:100%;flex-direction:column}
+.library-pane.active{display:flex}
+.library-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:40px 20px;text-align:center;border:1px dashed var(--line2);border-radius:18px;background:radial-gradient(420px 180px at 50% 0%,rgba(124,108,255,.1),transparent 70%),var(--panel)}
+.library-empty-icon{width:66px;height:66px;display:grid;place-items:center;border-radius:20px;background:var(--sel);color:var(--vio2);font-size:28px;box-shadow:0 12px 28px rgba(124,108,255,.16);margin-bottom:14px}
+.library-empty h3{font-size:18px;margin-bottom:6px}
+.library-empty p{max-width:520px;color:var(--muted);font-size:13px;line-height:1.6}
+.library-placeholder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-content:start}
+.library-placeholder-card{min-height:170px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:16px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--panel),var(--card2));overflow:hidden;position:relative}
+.library-placeholder-card::before{content:"";position:absolute;inset:0 0 auto;height:92px;background:linear-gradient(115deg,rgba(124,108,255,.2),rgba(34,211,238,.08),transparent);opacity:.7}
+.library-placeholder-card .ph-icon{position:relative;width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--line2);border-radius:11px;background:rgba(7,7,13,.25);color:var(--vio2);font-size:18px}
+.library-placeholder-card .ph-line{height:8px;width:70%;border-radius:99px;background:var(--line2);opacity:.72}
+.library-placeholder-card .ph-line.short{width:42%;opacity:.45}
+.library-placeholder-card .ph-label{color:var(--muted);font-size:12px}
+.library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start}
+#view-library #galleryGrid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-content:start}
+#view-library #historyList>.library-placeholder-grid,#view-library #galleryGrid>.library-placeholder-grid,#view-library #codeList>.library-placeholder-grid{grid-column:1/-1;width:100%}
+#view-library #galleryGrid figure{min-height:210px;border-radius:16px;background:var(--panel);border-color:var(--line);transition:.2s ease-out}
+#view-library #galleryGrid figure:hover{transform:translateY(-3px);border-color:var(--vio);box-shadow:0 12px 28px rgba(124,108,255,.14)}
+#view-library #galleryGrid img{height:160px}
+#view-library #galleryGrid figcaption{padding:9px 11px;font-size:12px}
+#view-library #historyList,#view-library #codeList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;align-content:start}
+#view-library #historyList .list-item,#view-library #codeList .list-item{min-height:112px;padding:15px;align-items:flex-start;background:var(--panel);border-radius:16px}
+#view-library #historyList .list-item:hover,#view-library #codeList .list-item:hover{transform:translateY(-3px);border-color:var(--vio);box-shadow:0 12px 28px rgba(124,108,255,.12)}
+@media(max-width:900px){.library-placeholder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.library-placeholder-grid{grid-template-columns:1fr}.library-grid,#view-library #galleryGrid,#view-library #historyList,#view-library #codeList{grid-template-columns:1fr}}
 
 /* ===== Nuevo chat en la barra superior ===== */
 .new-chat.top{margin:0;padding:8px 14px;border-radius:11px;font-size:12.5px;white-space:nowrap;flex-shrink:0}
@@ -742,6 +785,90 @@ body.staff-on #chatEmpty{display:none!important}
 #staffWelcome summary{cursor:pointer;font-size:12.5px;font-weight:700}
 #staffWelcome .sw-master{white-space:pre-wrap;font-size:11.5px;line-height:1.6;color:var(--muted);border:1px dashed var(--line2);border-radius:11px;padding:10px 12px;margin-top:8px;max-height:220px;overflow:auto}
 @media(max-width:900px){#staffWelcome .sw-grid{grid-template-columns:1fr}}
+
+/* ===== CENTRO DE SALUD: todo el panel cabe en la ventana =====
+   Sólo esta pantalla se ajusta por zoom cuando su contenido supera el alto
+   útil. Las demás vistas mantienen su scroll y tipografía normales. */
+.fit-viewport{overflow:hidden!important;min-height:0}
+.fit-viewport>*{min-width:0}
+#view-hardware.fit-viewport .card{padding:11px 12px}
+#view-hardware.fit-viewport .stat{padding:10px 11px}
+#view-hardware.fit-viewport #healthCenterPanel{padding:11px 12px}
+#view-hardware.fit-viewport #healthFindings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px!important}
+#view-hardware.fit-viewport #healthFindings .card{margin-top:0!important;padding:7px 9px;line-height:1.25}
+#view-hardware.fit-viewport #healthFindings .card h3{margin-bottom:0}
+#view-hardware.fit-viewport #healthFindings .card p{margin-top:3px!important;line-height:1.3}
+#view-hardware.fit-viewport > .grid.g2:last-child .card{padding:10px 12px}
+#view-hardware.fit-viewport > .grid.g2:last-child .mt{margin-top:6px}
+/* Agentes y Hubs: una tarjeta por proveedor, siete columnas en escritorio. */
+#apiUsageControls .api-usage-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:10px}
+#apiUsageControls .api-usage-card{padding:10px;background:var(--bg);min-width:0}
+#apiUsageControls .api-usage-card .flex.between{align-items:flex-start;gap:6px;flex-wrap:wrap}
+#apiUsageControls .api-usage-card .tag{white-space:normal;text-align:center;line-height:1.25}
+#apiUsageControls .api-usage-fields{display:grid;grid-template-columns:1fr;gap:6px}
+#apiUsageControls .api-usage-fields .mt{margin-top:3px}
+@media(max-width:1250px){#apiUsageControls .api-usage-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:900px){#apiUsageControls .api-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#apiUsageControls .api-usage-grid{grid-template-columns:1fr}}
+/* Motores: 30 modelos locales en una matriz 5x6 sin scroll interno. */
+#view-motores.active{display:flex;flex-direction:column;overflow:auto;min-height:0}
+#view-motores.active>.grid.g3{flex:0 0 auto}
+#view-motores #motorCatalogPanel{min-height:510px;display:flex;flex-direction:column;overflow:hidden}
+.motor-catalog-head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+.motor-catalog-title{display:flex;align-items:center;gap:9px;min-width:0}
+.motor-catalog-title h3{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.motor-catalog-title .motor-icon{width:30px;height:30px;flex:0 0 30px}
+.motor-catalog-summary{margin:0;color:#fff;font-size:12px;font-weight:750;white-space:nowrap}
+.motor-catalog-filter{display:flex;align-items:center;justify-self:end;gap:7px;margin-left:0}
+.motor-catalog-filter .input{width:auto;min-width:155px;padding:7px 9px}
+.motor-catalog-viewport{position:relative;flex:1;min-height:410px;overflow:hidden;margin-top:10px;padding:0 2px}
+.motor-catalog-track{display:flex;height:100%;min-height:410px;transition:transform .35s ease-out;will-change:transform}
+.motor-catalog-page{flex:0 0 100%;min-width:100%;height:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:8px;padding:2px 0}
+.motor-catalog-card{min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);text-align:center;cursor:pointer;transition:background .3s ease-out,border-color .3s ease-out,transform .3s ease-out,box-shadow .3s ease-out}
+.motor-catalog-card:hover,.motor-catalog-card:focus-visible{background:var(--card2);border-color:var(--vio2);transform:translateY(-2px);box-shadow:0 12px 24px rgba(0,0,0,.18);outline:none}
+.motor-catalog-card.is-selected{border-color:var(--green);box-shadow:inset 3px 0 0 var(--green)}
+.motor-catalog-card .model-name{width:100%;font-family:var(--mono);font-size:15px;font-weight:850;color:#fff;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.motor-catalog-card .model-meta{width:100%;font-size:12px;color:#fff;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.motor-capabilities{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;min-height:20px;overflow:hidden}
+.motor-capability{font-size:10px;line-height:18px;padding:0 6px;border-radius:999px;background:var(--sel);color:var(--cyan);white-space:nowrap}
+.motor-catalog-nav{grid-column:2;position:static;display:flex;gap:4px;padding:3px;border:1px solid var(--line2);border-radius:10px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,.2)}
+.motor-catalog-nav button{width:29px;height:29px;padding:0;border-radius:8px;font-size:17px;line-height:1}
+.motor-catalog-nav button:disabled{opacity:.3;cursor:not-allowed}
+.motor-catalog-empty{grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);border:1px dashed var(--line2);border-radius:10px}
+.motor-catalog-panel .motor-catalog-empty{color:#fff}
+.engine-provider-card{cursor:pointer}
+.motor-icon{width:30px;height:30px;box-sizing:border-box;object-fit:cover;border-radius:10px;vertical-align:-8px;display:inline-block}
+.motor-icon-circular,.motor-icon-light{width:30px;height:30px;box-sizing:border-box;flex:0 0 30px;border-radius:50%;padding:2px;object-fit:cover}
+.motor-icon-openrouter{background:#000!important;border:1px solid rgba(255,255,255,.14)}
+.motor-icon-freeai{mix-blend-mode:screen;object-fit:contain;border-radius:0;padding:0}
+.motor-logo-freeai{width:96px;height:30px;border-radius:0;background:transparent;object-fit:contain;object-position:left center;vertical-align:middle;font-size:10px}
+.motor-icon-light{mix-blend-mode:screen;filter:invert(1)}
+.motor-card-active{border-color:var(--vio2)!important;box-shadow:inset 3px 0 0 var(--vio2),0 10px 28px rgba(124,92,255,.12)}
+.ollama-model-card{min-width:0;min-height:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;justify-content:center;gap:5px;overflow:hidden;text-align:left;color:var(--text);font:inherit;cursor:pointer;transition:border-color .2s ease,background .2s ease,transform .2s ease,box-shadow .2s ease}
+.ollama-model-card:hover,.ollama-model-card:focus-visible{border-color:var(--vio2);background:var(--card2);transform:none;box-shadow:0 6px 14px rgba(0,0,0,.14);outline:none}
+.ollama-model-card.is-active{border-color:var(--green);box-shadow:inset 3px 0 0 var(--green)}
+.ollama-model-card.is-selected{border-color:var(--vio2);box-shadow:inset 3px 0 0 var(--vio2)}
+.ollama-model-card .model-name{height:20px;line-height:20px;flex:0 0 20px;font-family:var(--mono);font-size:13px;font-weight:850;color:var(--vio2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ollama-model-card .model-meta{height:18px;line-height:18px;flex:0 0 18px;font-size:12px;font-weight:700;color:var(--text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ollama-ready{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;padding:7px 9px;background:var(--card2);border:1px solid var(--line);border-radius:8px}
+.ollama-ready .ready-label{flex:0 0 auto;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.ollama-ready .ready-model{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11px;color:var(--vio2);font-weight:800;text-align:right}
+@media(max-width:1100px){
+  #view-motores.active{overflow:auto}
+  .motor-catalog-page{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr))}
+  .motor-catalog-viewport,.motor-catalog-track{min-height:410px}
+  .motor-catalog-head{display:flex;flex-wrap:wrap}
+  .motor-catalog-title{flex:1 1 auto}
+  .motor-catalog-nav{order:3;margin:0 auto}
+  .ollama-model-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;overflow:visible}
+}
+@media(max-width:700px){.ollama-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.motor-catalog-page{grid-template-columns:1fr 1fr;grid-template-rows:repeat(6,minmax(0,1fr))}.motor-catalog-viewport,.motor-catalog-track{min-height:410px}.motor-catalog-filter{width:100%;margin-left:0;justify-self:auto}.motor-catalog-filter .input{flex:1}.motor-catalog-nav{order:3;margin:0 auto}}
+@media(prefers-reduced-motion:reduce){.motor-catalog-track,.motor-catalog-card{transition:none!important}.motor-catalog-card:hover,.motor-catalog-card:focus-visible{transform:none}}
+@media(max-width:760px){
+  /* En una pantalla estrecha priorizamos legibilidad táctil. */
+  .fit-viewport{overflow:auto!important}
+}
 </style>
 </head>
 <body>
@@ -772,11 +899,14 @@ body.staff-on #chatEmpty{display:none!important}
       <button class="side-tab active" data-tab="setup" onclick="sideTab('setup')">SETUP</button>
       <button class="side-tab" data-tab="project" onclick="sideTab('project')">PROJECT</button>
       <button class="side-tab" data-tab="staff" onclick="sideTab('staff')">STAFF AI</button>
-      <button class="side-tab" data-tab="history" onclick="sideTab('history')">HISTORIAL</button>
-      <button class="side-tab" data-tab="gallery" onclick="sideTab('gallery')">GALERÍA</button>
-      <button class="side-tab" data-tab="code" onclick="sideTab('code')">CODE</button>
     </div>
     <div class="side-pane" id="pane-setup">
+    <div class="setup-tools" aria-label="Herramientas de Setup">
+      <div class="setup-tools-title">Workspace</div>
+      <button class="setup-tool-tab" data-setup-tool="history" onclick="setupToolTab('history')"><span>🕘</span><span><b>Historial</b><small>Chats guardados</small></span></button>
+      <button class="setup-tool-tab" data-setup-tool="gallery" onclick="setupToolTab('gallery')"><span>▦</span><span><b>Galería</b><small>Imágenes creadas</small></span></button>
+      <button class="setup-tool-tab" data-setup-tool="code" onclick="setupToolTab('code')"><span>&lt;/&gt;</span><span><b>Code</b><small>Webs y artefactos</small></span></button>
+    </div>
     <nav class="nav" id="nav">
       <div class="nav-group">Conversar</div>
       <button class="nav-item active" data-view="chat"><span class="ic">💬</span>Chat<span class="pill">Ollama</span></button>
@@ -789,14 +919,12 @@ body.staff-on #chatEmpty{display:none!important}
       <button class="nav-item" data-view="skills"><span class="ic">🧩</span>Skills y Perfiles<span class="pill">128</span></button>
       <button class="nav-item" data-view="memoria"><span class="ic">🗄️</span>Memoria e Historial</button>
       <div class="nav-group">Sistema</div>
-      <button class="nav-item" data-view="motores"><span class="ic">⚡</span>Motores IA<span class="pill">3</span></button>
-      <button class="nav-item" data-view="hardware"><span class="ic">🖥️</span>Hardware y Tuning</button>
+      <button class="nav-item" data-view="motores"><span class="ic">⚡</span>Motores IA<span class="pill" id="ollamaNavCount">—</span></button>
+      <button class="nav-item" data-view="hardware"><span class="ic">🛠️</span>Centro de Salud</button>
       <button class="nav-item" data-view="integraciones"><span class="ic">🔗</span>Integraciones</button>
       <button class="nav-item" data-view="descargas"><span class="ic">⬇️</span>Descargas HF<span class="pill">1 activa</span></button>
       <button class="nav-item" data-view="agentes"><span class="ic">🤖</span>Agentes y Hubs</button>
-      <button class="nav-item" data-view="ajustes"><span class="ic">⚙️</span>Ajustes y Diagnóstico</button>
     </nav>
-    <div class="badge-proto" style="margin:12px 4px 4px">✦ <b>Interfaz v2</b> — conectada en vivo a tu servidor local · la clásica sigue en <a href="/classic">/classic</a></div>
     </div>
     <div class="side-pane" id="pane-project" style="display:none">
       <h4 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:2px 0 8px">Proyecto activo</h4>
@@ -818,20 +946,6 @@ body.staff-on #chatEmpty{display:none!important}
         <button class="btn sm" onclick="go('archivos')">📝 Abrir editor de archivos</button>
       </div>
     </div>
-    <div class="side-pane" id="pane-history" style="display:none">
-      <div class="flex between" style="margin:2px 0 10px"><h4 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)">Historial de chats</h4><button class="btn sm" onclick="loadHistoryTab()">↻</button></div>
-      <div class="pane-list" id="historyList"><p class="tiny muted">Cargando…</p></div>
-    </div>
-    <div class="side-pane" id="pane-gallery" style="display:none">
-      <div class="flex between" style="margin:2px 0 10px"><h4 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)">Galería · imágenes creadas</h4><button class="btn sm" onclick="loadGalleryTab()">↻</button></div>
-      <p class="tiny muted" style="margin-bottom:9px">De la <span class="mono">biblioteca/</span> del proyecto activo. Clic para verla al costado.</p>
-      <div id="galleryGrid"></div>
-    </div>
-    <div class="side-pane" id="pane-code" style="display:none">
-      <div class="flex between" style="margin:2px 0 10px"><h4 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)">Webs · Artefactos · WebApps</h4><button class="btn sm" onclick="loadCodeTab()">↻</button></div>
-      <p class="tiny muted" style="margin-bottom:9px">Tus proyectos web creados. Al seleccionar uno se muestra al costado como <b>Live Preview</b>.</p>
-      <div class="pane-list" id="codeList"><p class="tiny muted">Cargando…</p></div>
-    </div>
     <div class="side-pane" id="pane-staff" style="display:none">
       <div class="vibe-guide">
         <h5>🧭 RUTA VIBE CODING · TU ORDEN DE TRABAJO</h5>
@@ -845,9 +959,9 @@ body.staff-on #chatEmpty{display:none!important}
       <div id="staffSlot"></div>
     </div>
     <div class="side-foot">
-      <div class="row"><span>🟢 Ollama</span><span>7 modelos</span></div>
-      <div class="row"><span>🔴 DirectML</span><span>detenido</span></div>
-      <div class="row"><span>🟢 Free.ai</span><span>sin costo</span></div>
+      <div class="row"><span id="sideOllamaState">⚪ Ollama</span><span id="sideOllamaCount">consultando…</span></div>
+      <div class="row"><span id="sideDmlState">⚪ DirectML</span><span id="sideDmlText">consultando…</span></div>
+      <div class="row"><span id="sideFreeaiState">⚪ Free.ai</span><span id="sideFreeaiText">consultando…</span></div>
     </div>
   </aside>
 
@@ -863,7 +977,7 @@ body.staff-on #chatEmpty{display:none!important}
           <option value="dml-freeai">☁️ DirectML + Free.ai</option>
           <option value="dml-ollama-freeai-apis">🐝 DirectML + Ollama + Free.ai + API 1…N</option>
         </select>
-        <button class="health-pill pill-hw" onclick="go('hardware')">🎛️ RX 7600 · 8 GB</button>
+        <button class="health-pill pill-hw" id="hwHealthPill" onclick="go('hardware')">🎛️ Hardware · consultando…</button>
         <select class="input" id="themeSel" title="Tema de la app" style="width:auto;max-width:168px;padding:7px 9px" onchange="setTheme(this.value)">
           <option value="dark">🌙 Oscuro</option>
           <option value="light">☀️ Claro</option>
@@ -904,9 +1018,10 @@ body.staff-on #chatEmpty{display:none!important}
               <span id="composerMotorBtns" style="display:contents">
               <span class="tiny muted" style="font-weight:700">MOTOR</span>
               <button class="chip sel" data-engine="ollama" onclick="setEngine(this)"><img class="pill-icon" src="assets/ollama-icon.png" alt="">Ollama</button>
-              <button class="chip" data-engine="directml" onclick="setEngine(this)">🎮 DirectML</button>
+              <button class="chip" id="chatDmlBtn" data-engine="directml" onclick="setEngine(this)" title="Estado real del motor local Hermes en DirectML">🎮 <span id="chatDmlLabel">DirectML</span></button>
               <button class="chip" data-engine="freeai" onclick="setEngine(this)"><img class="pill-icon" src="assets/freeai-icon.png" alt="">Free.ai</button>
               </span>
+              <span class="tag amber" id="chatDmlStatus">comprobando…</span>
               <span style="flex:1"></span>
               <button class="chip" onclick="toast('Contexto: 12 archivos · 8.4k tokens estimados','ok')">📎 Contexto · 12 archivos</button>
               <button class="chip" id="webChip" onclick="toggleWeb(this)">🌐 Web: off</button>
@@ -919,12 +1034,16 @@ body.staff-on #chatEmpty{display:none!important}
               <div class="composer-bar">
                 <button class="icon-btn" title="Adjuntar" onclick="toast('Adjuntos: demo visual','ok')">📎</button>
                 <button class="icon-btn" title="Mencionar archivo" onclick="toast('Escribe @ en el mensaje para mencionar archivos')">＠</button>
+                <select class="input" style="width:auto;padding:7px 10px;max-width:210px" id="agentSel" title="Agente operativo activo" onchange="activateCreatedAgent(this.value)">
+                  <option value="">🤖 Sin agente creado</option>
+                </select>
                 <select class="input" style="width:auto;padding:7px 10px;max-width:190px" id="profileSel" title="Perfil cognitivo activo (bundles de Antigravity OS v2 o tus perfiles)">
                   <option value="">🎭 Sin perfil</option>
                 </select>
                 <select class="input" style="width:auto;padding:7px 10px" id="modelSel">
                   <option>qwen2.5-coder:7b</option><option>llama3.1:8b</option><option>deepseek-coder-v2:16b</option><option>Phi-3.5 DirectML</option><option>freeai: GPT-OSS 120B</option>
                 </select>
+                <span class="tag amber" id="chatDirectorStatus">Hermes comprobando…</span>
                 <label class="flex small muted" style="gap:6px">Temp <input type="range" min="0" max="20" value="7" style="width:80px" oninput="document.getElementById('tempV').textContent=(this.value/10).toFixed(1)"><b id="tempV">0.7</b></label>
                 <span style="flex:1"></span>
                 <button class="btn sm danger" id="stopBtn" style="display:none" onclick="stopStream()">⏹ Detener</button>
@@ -994,6 +1113,31 @@ body.staff-on #chatEmpty{display:none!important}
             <div>💾 Último backup <button class="btn sm" onclick="restoreLatestBackup(this)">Restaurar</button></div>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- ======== SETUP · HISTORIAL / GALERÍA / CODE ======== -->
+    <section class="view" id="view-library">
+      <div class="library-head">
+        <div>
+          <div class="sect-title" id="libraryTitle">🕘 Historial</div>
+          <p class="sect-sub" id="librarySubtitle">Tus conversaciones guardadas localmente.</p>
+        </div>
+        <div class="library-actions">
+          <span class="tag cyan" id="libraryContext">SETUP · WORKSPACE</span>
+          <button class="btn sm" id="libraryRefresh" onclick="refreshLibraryTab()">↻ Actualizar</button>
+        </div>
+      </div>
+      <div class="library-content">
+        <div class="library-pane active" id="library-pane-history">
+          <div id="historyList" class="library-grid"></div>
+        </div>
+        <div class="library-pane" id="library-pane-gallery">
+          <div id="galleryGrid" class="library-grid"></div>
+        </div>
+        <div class="library-pane" id="library-pane-code">
+          <div id="codeList" class="library-grid"></div>
+        </div>
       </div>
     </section>
 
@@ -1235,50 +1379,72 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
       <div class="sect-title">⚡ Motores IA</div>
       <p class="sect-sub">Fiabilidad primero: estado en vivo, arranque/parada seguros y diagnóstico de un clic cuando algo falla.</p>
       <div class="grid g3">
-        <div class="card"><div class="flex between"><h3><img class="real-icon" src="assets/ollama-icon.png" alt="" style="background:#fff;padding:2px;vertical-align:-6px"> Ollama</h3><span class="tag green" id="ollamaTag">● activo</span></div>
-          <p class="desc mt">127.0.0.1:11434 · 7 modelos · 1 cargado en VRAM (4.1 GB)</p>
-          <div class="bar-row mt"><span>VRAM</span><div class="progress"><b style="width:51%"></b></div><span>4.1/8 GB</span></div>
-          <div class="flex mt wrap"><button class="btn sm" onclick="engineAct('Ollama','reiniciado')">🔄 Reiniciar</button><button class="btn sm" onclick="engineAct('Ollama','descargado de VRAM')">⏏ Descargar modelo</button><button class="btn sm primary" onclick="go('chat')">Chatear</button></div></div>
-        <div class="card"><div class="flex between"><h3>🎮 DirectML (GPU)</h3><span class="tag red" id="dmlTag">● detenido</span></div>
-          <p class="desc mt">127.0.0.1:8002 · ONNX INT4 · Phi-3.5 listo para cargar</p>
-          <div class="bar-row mt"><span>Contexto</span><div class="progress"><b style="width:68%"></b></div><span>68% ajuste</span></div>
-          <div class="flex mt wrap"><button class="btn sm primary" id="dmlBtn" onclick="toggleDml()">▶ Iniciar DirectML</button><button class="btn sm" onclick="diagDirectML(this)">🩺 Diagnóstico</button></div></div>
-        <div class="card"><div class="flex between"><h3><img class="real-icon" src="assets/freeai-icon.png" alt="" style="background:#fff;padding:2px;vertical-align:-6px;width:52px"> Free.ai</h3><span class="tag green">● listo</span></div>
-          <p class="desc mt">Modelos cloud sin costo · clave configurada ✓ · 14 modelos</p>
-          <div class="bar-row mt"><span>Cuota</span><div class="progress"><b style="width:100%"></b></div><span>ilimitada*</span></div>
-          <div class="flex mt wrap"><button class="btn sm" onclick="showFreeAiModels(this)">Ver modelos</button><button class="btn sm primary" onclick="go('chat')">Chatear</button></div></div>
+        <div class="card motor-engine-card" data-engine-card="ollama"><div class="flex between"><h3><img class="motor-icon motor-icon-circular" src="assets/ollama-icon.png" alt="Ollama"> Ollama</h3><span class="tag green" id="ollamaTag">● comprobando…</span></div>
+          <p class="desc mt" id="ollamaDetail">127.0.0.1:11434 · comprobando modelos…</p>
+          <div class="ollama-ready mt" id="ollamaReadyModel" aria-live="polite"><span class="ready-label" id="ollamaReadyModelLabel">Modelo Ollama</span><b class="ready-model" id="ollamaReadyModelName">Selecciona un modelo abajo</b></div>
+          <div class="bar-row mt"><span>Memoria</span><div class="progress"><b id="ollamaMemBar" style="width:0%"></b></div><span id="ollamaMemText">sin medición</span></div>
+          <div class="flex mt wrap"><button class="btn sm" onclick="engineAct('Ollama','reiniciado')">🔄 Reiniciar</button><button class="btn sm" onclick="engineAct('Ollama','descargado de VRAM')">⏏ Descargar modelo</button><button class="btn sm primary" onclick="openMotorChat('ollama',selectedOllamaModel)">Chatear</button></div></div>
+        <div class="card motor-engine-card" data-engine-card="directml"><div class="flex between"><h3><img class="motor-icon motor-icon-circular" src="assets/mistral-icon.png" alt="Mistral"> Hermes · DirectML</h3><span class="tag red" id="dmlTag">● comprobando…</span></div>
+          <p class="desc mt" id="dmlDetail">127.0.0.1:8002 · comprobando Hermes…</p>
+          <div class="ollama-ready mt"><span class="ready-label" id="dmlReadyModelLabel">Modelo DirectML</span><b class="ready-model" id="dmlReadyModelName" data-motor-ready-model="directml">Hermes-3-8B-UNLOCKED-ONNX-DirectML</b></div><div class="bar-row mt"><span>Modelo</span><div class="progress"><b id="dmlContextBar" style="width:0%"></b></div><span id="dmlContextText">sin medición</span></div>
+          <div class="flex mt wrap"><button class="btn sm primary" id="dmlBtn" onclick="toggleDml()">▶ Iniciar DirectML</button><button class="btn sm" onclick="diagDirectML(this)">🩺 Diagnóstico</button><button class="btn sm primary" onclick="openMotorChat('directml',MOTOR_SELECTED_MODELS.directml||DIRECTOR_MODEL_ID)">Chatear</button></div></div>
+        <div class="card motor-engine-card" data-engine-card="freeai"><div class="flex between"><h3><img class="motor-icon motor-icon-freeai motor-logo-freeai" src="assets/freeai-brand.png" alt="Free.ai"></h3><span class="tag amber" id="freeaiTag">● comprobando…</span></div>
+          <p class="desc mt" id="freeaiDetail">Modelos cloud · comprobando conexión…</p>
+          <div class="ollama-ready mt"><span class="ready-label">Modelo Free.ai</span><b class="ready-model" id="freeaiReadyModelName" data-motor-ready-model="freeai">Selecciona un modelo del catálogo</b></div><div class="bar-row mt"><span>Cuota</span><div class="progress"><b style="width:100%"></b></div><span>ilimitada*</span></div>
+          <div class="flex mt wrap"><button class="btn sm" onclick="showFreeAiModels(this)">Ver modelos</button><button class="btn sm primary" onclick="openMotorChat('freeai',MOTOR_SELECTED_MODELS.freeai||'')">Chatear</button></div></div>
       </div>
-      <div class="card mt"><h3>📚 Catálogo unificado de modelos</h3>
-        <table class="table mt"><thead><tr><th>Modelo</th><th>Motor</th><th>Tamaño</th><th>Estado</th><th></th></tr></thead><tbody>
-        <tr><td class="mono">qwen2.5-coder:7b</td><td>🦙 Ollama</td><td>4.7 GB</td><td><span class="tag green">cargado</span></td><td><button class="btn sm" onclick="go('chat')">Usar</button></td></tr>
-        <tr><td class="mono">llama3.1:8b</td><td>🦙 Ollama</td><td>4.9 GB</td><td><span class="tag">descargado</span></td><td><button class="btn sm" onclick="go('chat')">Usar</button></td></tr>
-        <tr><td class="mono">Phi-3.5-mini ONNX INT4</td><td>🎮 DirectML</td><td>2.3 GB</td><td><span class="tag amber">motor detenido</span></td><td><button class="btn sm" onclick="toggleDml()">Iniciar motor</button></td></tr>
-        <tr><td class="mono">GPT-OSS 120B</td><td>☁️ Free.ai</td><td>—</td><td><span class="tag green">listo</span></td><td><button class="btn sm" onclick="go('chat')">Usar</button></td></tr>
-        <tr><td class="mono">Hermes-3-8B ONNX</td><td>🎮 DirectML</td><td>8.5 GB</td><td><span class="tag amber">motor detenido</span></td><td><button class="btn sm" onclick="go('descargas')">Gestionar</button></td></tr></tbody></table></div>
+      <div class="grid g3 mt" id="apiEngineCards" aria-live="polite"></div>
+      <div class="card mt motor-catalog-panel" id="motorCatalogPanel" aria-live="polite">
+        <div class="motor-catalog-head">
+          <div class="motor-catalog-title"><img class="motor-icon motor-icon-circular" id="motorCatalogIcon" src="assets/ollama-icon.png" alt="Motor seleccionado"><p class="motor-catalog-summary" id="motorCatalogSummary">Cargando modelos locales…</p></div>
+          <div class="motor-catalog-nav"><button class="btn sm" id="motorCatalogPrev" onclick="moveMotorCatalog(-1)" aria-label="Catálogo anterior">‹</button><button class="btn sm" id="motorCatalogNext" onclick="moveMotorCatalog(1)" aria-label="Catálogo siguiente">›</button></div>
+          <label class="motor-catalog-filter"><span class="tiny muted">Filtrar</span><select class="input" id="motorCatalogFilter" onchange="setMotorCatalogFilter(this.value)"><option value="all">Todas las capacidades</option><option value="chat">Chat</option><option value="code">Código</option><option value="multimodal">Multimodal</option><option value="vision">Visión</option><option value="embedding">Embeddings</option><option value="audio">Audio / voz</option><option value="reasoning">Razonamiento</option></select></label>
+        </div>
+        <div class="motor-catalog-viewport" id="motorCatalogViewport">
+          <div class="motor-catalog-track" id="motorCatalogTrack"><div class="motor-catalog-page"><div class="motor-catalog-empty">Cargando catálogo…</div></div></div>
+        </div>
+      </div>
     </section>
 
     <!-- ======== HARDWARE ======== -->
     <section class="view" id="view-hardware">
-      <div class="sect-title">🖥️ Hardware y Tuning Seguro</div>
-      <p class="sect-sub">Telemetría real del equipo y recomendaciones que solo se aplican con tu confirmación (con copia previa).</p>
+      <div class="sect-title">🛠️ Centro de Salud del Sistema</div>
+      <p class="sect-sub">Mide el equipo, interpreta riesgos, previene problemas y aplica correcciones verificables desde un único lugar.</p>
       <div class="grid g4">
         <div class="stat"><div class="k">GPU</div><div class="v" style="font-size:17px" id="hwGpu">—</div><div class="s" id="hwGpuSub">consultando…</div></div>
         <div class="stat"><div class="k">VRAM</div><div class="v" id="hwVram">—</div><div class="s" id="hwVramSub">consultando…</div></div>
         <div class="stat"><div class="k">RAM</div><div class="v" id="hwRam">—</div><div class="s" id="hwRamSub">consultando…</div></div>
         <div class="stat"><div class="k">CPU</div><div class="v" style="font-size:17px" id="hwCpu">—</div><div class="s" id="hwCpuSub">consultando…</div></div>
       </div>
+      <div class="card mt" id="hwStorage"><b>💾 Almacenamiento medido</b><span class="tag amber">consultando…</span></div>
       <div class="grid g2 mt">
         <div class="card"><h3>🎛️ Evaluar un modelo</h3><p class="desc">¿Cabe este modelo en tu VRAM con el contexto elegido?</p>
-          <label class="lbl mt">Tamaño del modelo</label><select class="input"><option>7B · Q4 (4.7 GB)</option><option>8B · Q8 (8.5 GB)</option><option>16B · Q4 (9.8 GB)</option><option>3.8B ONNX INT4 (2.3 GB)</option></select>
-          <label class="lbl mt">Ventana de contexto: <b id="ctxVal">8 192</b> tokens</label><input type="range" min="2048" max="32768" step="2048" value="8192" oninput="document.getElementById('ctxVal').textContent=Number(Logica).toLocaleString('es')">
+          <label class="lbl mt">Tamaño del modelo</label><select class="input" id="hardwareModelSel"><option value="qwen2.5-coder:7b">7B · Q4 (catálogo Ollama)</option><option value="Hermes-3-8B-UNLOCKED-ONNX-DirectML">Hermes 3 8B Q8 (DirectML)</option><option value="Phi-3.5-mini-instruct-ONNX">3.8B ONNX INT4 (DirectML)</option></select>
+          <label class="lbl mt">Ventana de contexto: <b id="ctxVal">8 192</b> tokens</label><input id="hardwareCtx" type="range" min="2048" max="32768" step="2048" value="8192" oninput="document.getElementById('ctxVal').textContent=Number(this.value).toLocaleString('es')">
           <div class="flex mt"><button class="btn primary" onclick="evalHardwareReal(this)">Evaluar viabilidad</button><span class="tag" id="hwVerdict">sin evaluar</span></div></div>
         <div class="card"><h3>🧪 Tuning recomendado</h3>
-          <table class="table mt"><tbody>
-          <tr><td class="mono">OLLAMA_KV_CACHE_TYPE</td><td>q8_0</td><td><span class="tag green">óptimo</span></td></tr>
-          <tr><td class="mono">OLLAMA_FLASH_ATTENTION</td><td>1</td><td><span class="tag green">óptimo</span></td></tr>
-          <tr><td class="mono">OLLAMA_MAX_LOADED_MODELS</td><td>1 → 2</td><td><button class="btn sm" onclick="applyTuningVar(this)">Aplicar</button></td></tr>
-          <tr><td class="mono">HSA_OVERRIDE_GFX_VERSION</td><td>11.0.0</td><td><span class="tag green">óptimo</span></td></tr></tbody></table>
-          <p class="tiny muted mt">Nada se aplica sin confirmación. Siempre se guarda el valor anterior para revertir.</p></div>
+          <table class="table mt"><thead><tr><th>Variable</th><th>Valor efectivo</th><th>Estado</th><th></th></tr></thead><tbody id="tuningRows"><tr><td colspan="4" class="muted">Consultando Windows…</td></tr></tbody></table>
+          <p class="tiny muted mt" id="tuningEvidence">Nada se aplica sin confirmación. Se muestra el entorno efectivo del proceso.</p></div>
+      </div>
+      <div class="card mt" id="healthCenterPanel">
+        <div class="flex between"><div><h3>🩺 Salud operativa</h3><p class="desc mt">La app cruza hardware medido, motores vivos, tuning efectivo, integraciones y contadores. Cada hallazgo indica qué se observó y qué acción puede corregirlo.</p></div><span class="tag amber" id="healthOverall">sin ejecutar</span></div>
+        <div class="grid g4 mt">
+          <div class="stat"><div class="k">Equipo</div><div class="v" id="healthHardware">—</div><div class="s" id="healthHardwareSub">sin medir</div></div>
+          <div class="stat"><div class="k">Motores</div><div class="v" id="healthRuntime">—</div><div class="s" id="healthRuntimeSub">sin comprobar</div></div>
+          <div class="stat"><div class="k">Tuning</div><div class="v" id="healthTuning">—</div><div class="s" id="healthTuningSub">sin comprobar</div></div>
+          <div class="stat"><div class="k">Servicios</div><div class="v" id="healthServices">—</div><div class="s" id="healthServicesSub">sin comprobar</div></div>
+        </div>
+        <div class="flex wrap mt" style="gap:7px"><button class="btn primary" onclick="runHealthCenter(this)">🔄 Medir y diagnosticar</button><button class="btn" onclick="healthApplyRecommended(this)">🛠️ Aplicar corrección segura</button><button class="btn" onclick="copySafeReport(this)">📋 Copiar informe</button><span class="tiny muted" id="healthLastRun">Nunca ejecutado</span></div>
+        <div id="healthFindings" class="mt"><p class="tiny muted">Pulsa “Medir y diagnosticar” para obtener hallazgos reales.</p></div>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3>⚙️ Preferencias útiles</h3><p class="desc mt">Ajustes de la interfaz y protecciones del flujo local. No modifican Windows ni los motores.</p>
+          <div class="flex between mt"><span>Tema</span><select class="input" id="themeSelHealth" style="width:auto;max-width:190px" onchange="setTheme(this.value)"><option value="dark">🌙 Oscuro</option><option value="light">☀️ Claro</option><option value="amoled">⬛ Negro AMOLED</option><option value="ocean">🌊 Océano</option><option value="sunset">🌇 Atardecer</option></select></div>
+          <div class="flex between mt"><span>Tamaño de fuente del chat</span><select class="input" id="chatFontSelHealth" style="width:auto" onchange="applyChatFontSize(this.value)"><option value="14">Pequeña</option><option value="15.5" selected>Mediana</option><option value="17">Grande</option></select></div>
+          <div class="flex between mt"><span>Confirmar antes de ejecutar scripts</span><label class="switch"><input type="checkbox" data-pref="confirmScripts" onchange="savePref('confirmScripts',this.checked)"><i></i></label></div>
+          <div class="flex between mt"><span>Arranque automático de Ollama al chatear</span><label class="switch"><input type="checkbox" data-pref="autoOllama" onchange="savePref('autoOllama',this.checked)"><i></i></label></div>
+        </div>
+        <div class="card"><h3>🧭 Cómo actúa el centro</h3><div class="tiny mt" style="line-height:1.9"><div>1. <b>Mide:</b> Windows CIM, procesos y endpoints locales.</div><div>2. <b>Explica:</b> separa dato observado, recomendación y suposición.</div><div>3. <b>Previene:</b> detecta RAM baja, motor caído, tuning desfasado y cuotas.</div><div>4. <b>Corrige:</b> propone cambios de sesión con confirmación.</div><div>5. <b>Verifica:</b> vuelve a medir después de aplicar y muestra el resultado.</div></div><p class="tiny muted mt">Las correcciones de sesión son reversibles; los cambios persistentes de Windows siguen requiriendo confirmación explícita.</p></div>
       </div>
     </section>
 
@@ -1463,17 +1629,17 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
       <div class="sect-title">🔗 Integraciones</div>
       <p class="sect-sub">Tokens guardados solo en tu .env local. La app nunca muestra ni registra tus claves.</p>
       <div class="grid g3">
-        <div class="card"><div class="flex"><div class="avatar" style="background:#fff"><img class="real-icon lg" src="assets/github-icon.png" alt="GitHub"></div><div class="grow"><h3>GitHub</h3><p class="desc">@BennerCas · 12 repos</p></div><span class="tag green">conectado</span></div>
+        <div class="card"><div class="flex"><div class="avatar" style="background:#fff"><img class="real-icon lg" src="assets/github-icon.png" alt="GitHub"></div><div class="grow"><h3>GitHub</h3><p class="desc" id="githubDetail">comprobando conexión…</p></div><span class="tag amber" id="githubTag">comprobando…</span></div>
           <div class="flex mt wrap"><button class="btn sm" onclick="toast('Repos sincronizados','ok')">🔄 Sincronizar proyecto</button><button class="btn sm" onclick="toast('Creando repo…')">＋ Crear repo</button></div></div>
-        <div class="card"><div class="flex"><div class="avatar" style="background:#fff"><img class="real-icon lg" src="assets/netlify-icon.png" alt="Netlify"></div><div class="grow"><h3>Netlify</h3><p class="desc">5 sitios · último deploy hoy</p></div><span class="tag green">conectado</span></div>
+        <div class="card"><div class="flex"><div class="avatar" style="background:#fff"><img class="real-icon lg" src="assets/netlify-icon.png" alt="Netlify"></div><div class="grow"><h3>Netlify</h3><p class="desc" id="netlifyDetail">comprobando conexión…</p></div><span class="tag amber" id="netlifyTag">comprobando…</span></div>
           <div class="flex mt wrap"><button class="btn sm primary" onclick="deployDemo(this)">🚀 Desplegar dist/</button><button class="btn sm" onclick="toast('Sitio creado')">＋ Crear sitio</button></div>
           <div class="progress mt" style="display:none" id="deployBar"><b style="width:0%"></b></div></div>
-        <div class="card"><div class="flex"><div class="avatar">🤗</div><div class="grow"><h3>Hugging Face</h3><p class="desc">Busca y descarga modelos ONNX/GGUF</p></div><span class="tag green">conectado</span></div>
+        <div class="card"><div class="flex"><div class="avatar">🤗</div><div class="grow"><h3>Hugging Face</h3><p class="desc" id="hfDetail">Busca y descarga modelos ONNX/GGUF</p></div><span class="tag amber" id="hfTag">comprobando…</span></div>
           <div class="flex mt"><input class="input grow" placeholder="Buscar… ej. Phi-3 ONNX"><button class="btn sm primary" onclick="go('descargas')">Buscar</button></div></div>
-        <div class="card"><div class="flex"><div class="avatar">🔍</div><div class="grow"><h3>SerpApi · Web</h3><p class="desc">Búsqueda web para el chat</p></div><span class="tag amber">37/100 este mes</span></div>
-          <div class="bar-row mt"><span>Uso</span><div class="progress"><b style="width:37%"></b></div><span>37%</span></div>
+        <div class="card"><div class="flex"><div class="avatar">🔍</div><div class="grow"><h3>SerpApi · Web</h3><p class="desc" id="serpDetail">Búsqueda web para el chat</p></div><span class="tag amber" id="serpTag">comprobando…</span></div>
+          <div class="bar-row mt"><span>Uso</span><div class="progress"><b id="serpProgress" style="width:0%"></b></div><span id="serpUsageText">—</span></div>
           <button class="btn sm mt" onclick="toast('Contador reiniciado','ok')">Reiniciar contador local</button></div>
-        <div class="card"><div class="flex"><div class="avatar">🔑</div><div class="grow"><h3>Claves API (.env)</h3><p class="desc">FREEAI_API_KEY · GITHUB_TOKEN · NETLIFY_AUTH_TOKEN…</p></div><span class="tag green">5 configuradas</span></div>
+        <div class="card"><div class="flex"><div class="avatar">🔑</div><div class="grow"><h3>Claves API (.env)</h3><p class="desc" id="keysDetail">FREEAI_API_KEY · GITHUB_TOKEN · NETLIFY_AUTH_TOKEN…</p></div><span class="tag amber" id="keysTag">comprobando…</span></div>
           <button class="btn sm mt" onclick="toast('Editor seguro de .env: los valores nunca se muestran completos','ok')">Gestionar claves…</button></div>
         <div class="card"><div class="flex"><div class="avatar">🛡️</div><div class="grow"><h3>Seguridad</h3><p class="desc">Sanitización de secretos en logs y errores activa</p></div><span class="tag green">activa</span></div>
           <button class="btn sm mt" onclick="toast('Auditoría: 0 secretos filtrados en la última sesión ✅','ok')">Ejecutar auditoría</button></div>
@@ -1497,8 +1663,47 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
     <section class="view" id="view-agentes">
       <div class="sect-title">🤖 Agentes y Hubs</div>
       <p class="sect-sub">Los demás paneles que viven junto a Local AI Studio dentro de Antigravity.</p>
+      <div class="card mb" id="createdAgentCreator">
+        <div class="flex between"><h3>🧠 Creador de agentes operativos</h3><span class="tag cyan">perfil + skills + herramientas</span></div>
+        <p class="desc mt">Construye un agente persistente a partir de un perfil y una fusión de skills. El agente se puede activar en Chat y Staff; sus permisos quedan visibles y viajan con cada solicitud.</p>
+        <div class="grid g3 mt">
+          <label class="small">Nombre del agente<input class="input mt" id="createdAgentName" placeholder="ej. Constructor Vibe Coding"></label>
+          <label class="small">Objetivo operativo<input class="input mt" id="createdAgentPurpose" placeholder="ej. convertir ideas en cambios verificables"></label>
+          <label class="small">Perfil base<select class="input mt" id="createdAgentProfile"><option value="">Sin perfil</option></select></label>
+        </div>
+        <div class="grid g2 mt">
+          <label class="small">Skills activas (Ctrl/Cmd para varias)<select class="input mt" id="createdAgentSkills" multiple size="5" style="min-height:118px"></select></label>
+          <div>
+            <label class="small">Modelo preferido<select class="input mt" id="createdAgentProvider"><option value="auto">Auto · según motor activo</option><option value="ollama">Ollama local</option><option value="directml">Hermes · DirectML</option><option value="freeai">Free.ai</option><option value="api">API del enjambre</option></select></label>
+            <label class="small mt">Modelo concreto (opcional)<input class="input mt" id="createdAgentModel" placeholder="ej. qwen2.5-coder:7b"></label>
+            <label class="small mt">Máximo de pasos por tarea<input class="input mt" id="createdAgentMaxSteps" type="number" min="1" max="100" value="12"></label>
+          </div>
+        </div>
+        <div class="grid g2 mt">
+          <div><b class="small">Herramientas que podrá convocar</b><div class="flex wrap mt" style="gap:8px">
+            <label class="tiny"><input type="checkbox" data-agent-tool="read_file" checked> Leer archivos</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="search_code" checked> Buscar en código</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="write_file" checked> Crear archivos</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="patch_file" checked> Aplicar parches</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="preview_web" checked> Previsualizar web</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="run_tests" checked> Ejecutar pruebas</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="rollback"> Rollback</label>
+            <label class="tiny"><input type="checkbox" data-agent-tool="delegate"> Delegar</label>
+          </div></div>
+          <div><b class="small">Permisos efectivos</b><div class="flex wrap mt" style="gap:8px">
+            <label class="tiny"><input type="checkbox" data-agent-permission="read" checked> Lectura</label>
+            <label class="tiny"><input type="checkbox" data-agent-permission="write" checked> Escritura</label>
+            <label class="tiny"><input type="checkbox" data-agent-permission="preview" checked> Vista previa</label>
+            <label class="tiny"><input type="checkbox" data-agent-permission="test" checked> Pruebas</label>
+            <label class="tiny"><input type="checkbox" data-agent-permission="execute"> Ejecutar scripts</label>
+            <label class="tiny"><input type="checkbox" data-agent-permission="network"> Red</label>
+          </div></div>
+        </div>
+        <div class="flex wrap mt" style="gap:8px"><button class="btn primary" onclick="createAgentFromUI()">🤖 Crear y cablear agente</button><span class="tiny muted" id="createdAgentState"></span></div>
+        <div class="mt" id="createdAgentsList"></div>
+      </div>
       <div class="card mb"><div class="flex between"><h3>🐝 Enjambre del Staff · Registro de APIs de agentes</h3><span class="tag green">Director fijo: 🐝 Hermes (DirectML)</span></div>
-        <p class="desc mt">Añade cualquier API compatible con el formato OpenAI y Hermes podrá asignarle subtareas en las fases: OpenRouter, Groq, Together, un Ollama de otro PC (su URL <span class="mono">/v1</span>), LM Studio, llama.cpp server… La clave vive solo en tu navegador (localStorage), nunca sale en logs.</p>
+        <p class="desc mt">Groq y Mistral se cargan automáticamente desde la configuración local y Hermes puede asignarles subtareas. También puedes añadir cualquier API compatible con OpenAI: OpenRouter, Together, un Ollama remoto (URL <span class="mono">/v1</span>), LM Studio o llama.cpp. Los agentes gestionados por <span class="mono">.env</span> no exponen sus claves al navegador; los manuales se guardan en este perfil local.</p>
         <div class="grid g2 mt">
           <label class="small">Nombre del agente<input class="input mt" id="agName" placeholder="ej. Groq · Llama 3.3 70B"></label>
           <label class="small">Modelo<input class="input mt" id="agModel" placeholder="ej. llama-3.3-70b-versatile"></label>
@@ -1515,6 +1720,8 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <p class="tiny muted mt" id="swAgentsMode">Modo: —</p>
           <p class="tiny muted">Esto y el selector de Modo de la barra superior son lo mismo: cambiar uno cambia el otro al instante.</p></div>
         <div id="agList" class="mt"></div>
+        <div id="apiCatalog" class="card mt" style="background:var(--card2)"><b>🔌 APIs y hubs detectados</b><p class="tiny muted mt">Comprobando proveedores…</p></div>
+        <div id="apiUsageControls" class="card mt" style="background:var(--card2)"><b>⏱️ Contadores y margen por API</b><p class="tiny muted mt">Cargando límites locales…</p></div>
       </div>
       <div class="grid g3">
         <div class="card"><div class="big" style="font-size:30px">🛠️</div><h3 class="mt">Cline Agent</h3><p class="desc">Agente autónomo de código (CLI y Desktop), local y cloud, con su propia consola.</p><span class="tag mt">● sidecar externo · no se gestiona desde esta vista</span><div class="mt"><button class="btn primary" onclick="window.open('https://github.com/cline/cline','_blank')">Ver Cline en GitHub ↗</button></div></div>
@@ -1605,19 +1812,20 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') hideSplash(); });
 /* ============ NAVEGACIÓN ============ */
 const TITLES={
  chat:["Chat","Motor local · sin consumo de cuota de nube"],
+ library:["Workspace","Historial, galería y artefactos del Setup"],
  dual:["Modo Dual","Dos agentes independientes en paralelo"],
  proyectos:["Proyectos y Contexto","Qué sabe el asistente de tu código"],
  archivos:["Archivos y Editor","Diff seguro, backups y rollback en 1 clic"],
  skills:["Skills y Perfiles","Capacidades y personalidad del asistente"],
  memoria:["Memoria e Historial","Todo queda en tu disco"],
  motores:["Motores IA","Ollama · DirectML · Free.ai siempre bajo control"],
- hardware:["Hardware y Tuning","Recomendaciones seguras para tu equipo"],
+ hardware:["Centro de Salud","Medición, prevención y corrección del sistema"],
  imagen:["Estudio de Imagen","Generación gratuita con Free.ai"],
  voz:["Voz · TTS","Síntesis de voz local en español"],
  integraciones:["Integraciones","GitHub · Netlify · Hugging Face · SerpApi"],
  descargas:["Descargas HF","Modelos con destino siempre confirmado"],
  agentes:["Agentes y Hubs","Cline · Open WebUI · Bandeja"],
- ajustes:["Ajustes y Diagnóstico","Preferencias y salud del sistema"]};
+ ajustes:["Centro de Salud","Medición, prevención y corrección del sistema"]};
 let CURRENT_CHAT_NAME='Chat nuevo';
 function updateTopContext(){
   const t=document.getElementById('topTitle'), s=document.getElementById('topSub'); if(!t||!s) return;
@@ -1630,24 +1838,50 @@ function renameChat(){
   if(n&&n.trim()){ CURRENT_CHAT_NAME=n.trim().slice(0,80); updateTopContext(); toast('💬 Chat: '+CURRENT_CHAT_NAME,'ok'); }
 }
 function go(view){
+  if(view==='ajustes') view='hardware';
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+view).classList.add('active');
+  const activeView=document.getElementById('view-'+view);
+  if(!activeView) return;
+  activeView.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
   if(view==='chat'){ updateTopContext(); }
   else { document.getElementById('topTitle').textContent=TITLES[view][0]; document.getElementById('topSub').textContent=TITLES[view][1]; }
   document.getElementById('sidebar').classList.remove('open'); var _sc=document.getElementById('scrim'); if(_sc) _sc.classList.remove('show');
   location.hash=view;
   window.scrollTo(0,0);
+  scheduleFitActiveView();
 }
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>go(n.dataset.view)));
+let fitFrame=0;
 if(location.hash && TITLES[location.hash.slice(1)]) go(location.hash.slice(1));
+
+/* Encaje real de las vistas de sistema: mantiene todas las tarjetas dentro
+   del viewport y sólo reduce densidad si el contenido no cabe a escala 1. */
+/* Sólo el Centro de Salud usa el modo de encaje sin scroll. Las demás vistas
+   conservan su tamaño, tipografía y desplazamiento originales. */
+const FIT_VIEW_IDS=new Set(['hardware']);
+function fitActiveView(){
+  const view=document.querySelector('.view.active');
+  if(!view || !FIT_VIEW_IDS.has(view.id.replace('view-',''))) return;
+  view.classList.add('fit-viewport');
+  view.style.zoom='1';
+  const available=Math.max(1,view.clientHeight);
+  const required=Math.max(1,view.scrollHeight);
+  const scale=Math.min(1,Math.max(.58,available/required));
+  if(scale<.995) view.style.zoom=scale.toFixed(3);
+}
+function scheduleFitActiveView(){
+  cancelAnimationFrame(fitFrame);
+  fitFrame=requestAnimationFrame(()=>requestAnimationFrame(fitActiveView));
+}
+window.addEventListener('resize',scheduleFitActiveView);
 
 /* ============ TEMA ============ */
 const THEME_NAMES={dark:'🌙 Oscuro',light:'☀️ Claro',amoled:'⬛ Negro AMOLED',ocean:'🌊 Océano',sunset:'🌇 Atardecer'};
 function setTheme(t){
   if(!THEME_NAMES[t]) t='dark';
   document.documentElement.dataset.theme=t;
-  ['themeSel','themeSel2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=t; });
+  ['themeSel','themeSel2','themeSelHealth'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=t; });
   try{localStorage.setItem('las-theme',t)}catch(e){}
 }
 try{const saved=localStorage.getItem('las-theme'); if(saved) setTheme(saved);}catch(e){}
@@ -1664,14 +1898,17 @@ document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>
 
 /* ============ CHAT (motor real vía sendMsg) ============ */
 let streaming=null, engine='ollama';
-const ENGINE_NAME={ollama:'🦙 Ollama · qwen2.5-coder:7b',directml:'🎮 DirectML · Phi-3.5',freeai:'☁️ Free.ai · GPT-OSS 120B'};
+const ENGINE_NAME={ollama:'🦙 Ollama · qwen2.5-coder:7b',directml:'🎮 DirectML · Hermes-3-8B-UNLOCKED',freeai:'☁️ Free.ai · GPT-OSS 120B'};
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function decodeHtmlEntities(source){
+  const probe=document.createElement('textarea'); probe.innerHTML=String(source??''); return probe.value;
+}
 let CODEBLOCKS={}; let CODESEQ=0;
 function md(s){
   CODEBLOCKS={};
   let out=esc(s).replace(/```([a-zA-Z0-9]*)\n?([\s\S]*?)```/g,(m,lang,code)=>{
     const id='cb'+(++CODESEQ);
-    CODEBLOCKS[id]={lang:lang||'', code:code.replace(/&quot;/g,'"').replace(/&#39;/g,"'")};
+    CODEBLOCKS[id]={lang:lang||'', code:decodeHtmlEntities(code)};
     return '\u0001'+id+'\u0002';
   });
   out=out.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`\n]+)`/g,'<code class="mono" style="background:var(--sel);padding:1px 6px;border-radius:6px">$1</code>').replace(/\n/g,'<br>');
@@ -1679,13 +1916,55 @@ function md(s){
     const b=CODEBLOCKS[id]; if(!b) return m;
     const isHtml=(b.lang||'').toLowerCase()==='html'||/^\s*<!doctype html/i.test(b.code)||/<html[\s>]/i.test(b.code);
     const viewBtn=isHtml?' <button class="btn sm" onclick="previewCodeBlock(\''+id+'\')">👁 Visualizar</button>':'';
-    return '<div class="codeblock"><div class="codeblock-bar"><span class="mono">'+esc(b.lang||'código')+'</span><span><button class="btn sm" onclick="copyCodeBlock(\''+id+'\')">📋 Copiar</button>'+viewBtn+' <button class="btn sm primary" onclick="saveCodeBlock(\''+id+'\',this)">💾 Guardar en proyecto…</button></span></div><pre class="mono">'+esc(b.code)+'</pre></div>';
+    const action=/^(?:write|create|patch):(.+)$/i.test((b.lang||'').trim());
+    const actionBtn=action?' <button class="btn sm primary" onclick="applyCodeBlock(\''+id+'\',this)">⚡ Aplicar al proyecto</button>':'';
+    return '<div class="codeblock" data-code-id="'+id+'"><div class="codeblock-bar"><span class="mono">'+esc(b.lang||'código')+'</span><span><button class="btn sm" onclick="copyCodeBlock(\''+id+'\')">📋 Copiar</button>'+viewBtn+actionBtn+' <button class="btn sm" onclick="saveCodeBlock(\''+id+'\',this)">💾 Guardar como…</button></span></div><pre class="mono">'+esc(b.code)+'</pre></div>';
   });
   return out;
 }
 function copyCodeBlock(id){ const b=CODEBLOCKS[id]; navigator.clipboard&&navigator.clipboard.writeText(b?b.code:''); toast('📋 Código copiado','ok'); }
+function parseCodeAction(block){
+  const m=String(block?.lang||'').trim().match(/^(write|create|patch):(.+)$/i); if(!m) return null;
+  const kind=m[1].toLowerCase()==='patch'?'patch':m[1].toLowerCase();
+  const filePath=m[2].trim().replace(/^['"]|['"]$/g,'');
+  if(!filePath) return null;
+  if(kind!=='patch') return {kind,filePath,content:block.code};
+  const patch=String(block.code||'').match(/<<<\s*SEARCH\s*\n([\s\S]*?)\n===\s*\n([\s\S]*?)\n>>>\s*REPLACE\s*$/i);
+  if(!patch) return {kind,filePath,error:'El bloque patch debe incluir <<< SEARCH, === y >>> REPLACE.'};
+  return {kind,filePath,search:patch[1],replace:patch[2]};
+}
+async function applyCodeBlock(id,btn){
+  const block=CODEBLOCKS[id], action=parseCodeAction(block);
+  if(!action) return saveCodeBlock(id,btn);
+  if(action.error){ toast(action.error,'err'); return; }
+  if(!REAL.project||!REAL.project.name){ toast('Carga o crea un proyecto antes de aplicar cambios','err'); return; }
+  let auto=false; try{ auto=localStorage.getItem('las-pref-autoApply')==='1'; }catch(e){}
+  if(!auto && !confirm('Aplicar '+action.kind+' en '+action.filePath+' dentro de '+REAL.project.name+'? Se creará un backup automático.')) return;
+  const old=btn.textContent; btn.disabled=true; btn.textContent='⏳ Aplicando…';
+  try{
+    const url=action.kind==='patch'?'/api/project/apply-patch':'/api/project/save-file';
+    const body=action.kind==='patch'
+      ? {project:REAL.project.name,filePath:action.filePath,search:action.search,replace:action.replace,model:document.getElementById('modelSel')?.value,source:engine,summary:'Cambio aplicado desde Chat · vibe coding',tool:'Local AI Studio · Chat'}
+      : {project:REAL.project.name,filePath:action.filePath,content:action.content,model:document.getElementById('modelSel')?.value,source:engine,summary:'Archivo creado desde Chat · vibe coding',tool:'Local AI Studio · Chat'};
+    const result=await API.post(url,body);
+    btn.textContent='✅ Aplicado en disco'; btn.classList.remove('primary'); btn.classList.add('ok');
+    const card=btn.closest('.codeblock'); if(card) card.classList.add('applied');
+    toast('✅ '+action.filePath+' aplicado con backup automático','ok');
+    if(/\.html?$/i.test(action.filePath)){ previewProjectArtifact(action.filePath); }
+    if(typeof loadProject==='function') loadProject();
+    return result;
+  }catch(e){ btn.disabled=false; btn.textContent=old; toast('Aplicar cambio: '+e.message,'err'); }
+}
+async function autoApplyCodeBlocks(){
+  let enabled=false; try{ enabled=localStorage.getItem('las-pref-autoApply')==='1'; }catch(e){}
+  if(!enabled) return;
+  const ids=[...document.querySelectorAll('.codeblock[data-code-id]')].map(el=>el.dataset.codeId).filter(Boolean);
+  for(const id of ids){ const btn=[...document.querySelectorAll('.codeblock[data-code-id="'+id+'"] button')].find(b=>/Aplicar al proyecto/i.test(b.textContent)); if(btn) await applyCodeBlock(id,btn); }
+}
 async function saveCodeBlock(id, btn){
   const b=CODEBLOCKS[id]; if(!b) return;
+  const action=parseCodeAction(b);
+  if(action){ return applyCodeBlock(id,btn); }
   const guess=(b.code.match(/^(?:\/\/|#|<!--)\s*(?:archivo|file|ruta)?\s*:?\s*([\w.\/-]+\.[a-zA-Z]{1,6})/m)||[])[1]||'';
   const rel=prompt('Ruta del archivo dentro del proyecto '+(REAL.project?REAL.project.name:'')+':', guess||'nuevo-archivo.txt');
   if(!rel) return;
@@ -1736,15 +2015,15 @@ function resetChat(){
 function setEngine(btn){
   document.querySelectorAll('[data-engine]').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel'); engine=btn.dataset.engine;
-  if(engine==='directml' && !dmlOn){
-    toast('DirectML está detenido: se iniciará automáticamente al enviar (o inícialo en Motores)','err');
+  if(engine==='directml' && !hermesReady){
+    toast(dmlOn?'DirectML está activo, pero Hermes aún no figura cargado':'DirectML está detenido: se iniciará automáticamente al enviar (o inícialo en Motores)','err');
   } else toast('Motor: '+ENGINE_NAME[engine],'ok');
 }
 function toggleWeb(chip){
   const on=chip.textContent.includes('off');
   chip.textContent=on?'🌐 Web: on':'🌐 Web: off';
   chip.classList.toggle('sel',on);
-  toast(on?'Búsqueda web activada (SerpApi · 37/100 este mes)':'Búsqueda web desactivada','ok');
+  toast(on?'Búsqueda web activada (SerpApi · cuota real consultada)':'Búsqueda web desactivada','ok');
 }
 document.getElementById('composer').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}
@@ -1755,14 +2034,168 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ============ MOTORES ============ */
-let dmlOn=false;
-function toggleDml(){
-  dmlOn=!dmlOn;
-  const tag=document.getElementById('dmlTag');
-  tag.textContent=dmlOn?'● activo':'● detenido';
-  tag.className='tag '+(dmlOn?'green':'red');
-  document.getElementById('dmlBtn').textContent=dmlOn?'⏹ Detener DirectML':'▶ Iniciar DirectML';
-  toast(dmlOn?'🎮 DirectML iniciado · Phi-3.5 cargado en GPU':'🎮 DirectML detenido', dmlOn?'ok':'');
+let dmlOn=false, hermesReady=false;
+let selectedOllamaModel='';
+let ollamaModelReady=false;
+try{ selectedOllamaModel=localStorage.getItem('las-ollama-model')||''; }catch(e){}
+const API_ENGINE_PROVIDERS=Object.create(null);
+function openMotorChat(source, modelOverride=''){
+  const target=String(source||'ollama');
+  showSideColumn(null);
+  engine=target;
+  document.querySelectorAll('[data-engine]').forEach(b=>b.classList.toggle('sel',b.dataset.engine===target));
+  const sel=document.getElementById('modelSel');
+  let model=String(modelOverride||'').trim();
+  if(target==='directml' && !model) model=typeof DIRECTOR_MODEL_ID!=='undefined'?DIRECTOR_MODEL_ID:'Hermes-3-8B-UNLOCKED-ONNX-DirectML';
+  if(target==='freeai' && !model) model=[...(sel?.options||[])].find(o=>/^freeai:/i.test(o.value))?.value||'';
+  if(target==='ollama' && model) setOllamaReadyModel(model,'selected');
+  if(sel && model){
+    let opt=[...sel.options].find(o=>o.value===model);
+    if(!opt){ opt=document.createElement('option'); opt.value=model; opt.textContent=model; sel.appendChild(opt); }
+    sel.value=model;
+  }
+  if(target.startsWith('agent:')){
+    const providerId=target.slice(6), provider=API_ENGINE_PROVIDERS[providerId];
+    ENGINE_NAME[target]='🔌 '+(provider?.name||providerId)+' · '+(model||provider?.model||'modelo');
+  }
+  go('chat');
+  toast('💬 Chat listo · '+(ENGINE_NAME[target]||target),'ok');
+}
+const MOTOR_CATALOGS=Object.create(null);
+const MOTOR_CATALOG_META={
+  ollama:{label:'Ollama',title:'📚 Catálogo local de Ollama',icon:'assets/ollama-icon.png'},
+  directml:{label:'Hermes · DirectML',title:'📚 Catálogo de Hermes · DirectML',icon:'assets/mistral-icon.png'},
+  freeai:{label:'Free.ai',title:'📚 Catálogo de Free.ai',icon:'assets/freeai-brand.png'},
+  groq:{label:'Groq',title:'📚 Catálogo de Groq',icon:'assets/groq-icon.png'},
+  mistral:{label:'Mistral',title:'📚 Catálogo de Mistral',icon:'assets/hermes-icon.png'},
+  openrouter:{label:'OpenRouter',title:'📚 Catálogo de OpenRouter',icon:'assets/openrouter-icon.png'}
+};
+let MOTOR_CATALOG_ACTIVE='ollama', MOTOR_CATALOG_FILTER='all', MOTOR_CATALOG_PAGE=0;
+const MOTOR_SELECTED_MODELS=Object.create(null);
+try{ if(selectedOllamaModel) MOTOR_SELECTED_MODELS.ollama=selectedOllamaModel; }catch(e){}
+try{ const saved=JSON.parse(localStorage.getItem('las-motor-models')||'{}'); Object.keys(saved||{}).forEach(k=>{ if(saved[k]) MOTOR_SELECTED_MODELS[k]=String(saved[k]); }); }catch(e){}
+function persistMotorSelectedModels(){ try{ localStorage.setItem('las-motor-models',JSON.stringify(MOTOR_SELECTED_MODELS)); }catch(e){} }
+function updateMotorReadyCard(provider,id){
+  const clean=String(id||'').trim();
+  const ready=document.querySelector('[data-motor-ready-model="'+String(provider||'')+'"]');
+  if(!ready) return;
+  ready.textContent=clean||(provider==='freeai'?'Selecciona un modelo del catálogo':'Selecciona un modelo');
+  const label=ready.parentElement?.querySelector('.ready-label');
+  if(label) label.textContent=clean?'Listo para enjambre':(provider==='freeai'?'Modelo Free.ai':'Modelo '+String(provider||'').toUpperCase());
+  const card=ready.closest('[data-engine-card]');
+  if(card) card.classList.toggle('motor-card-model-ready',!!clean);
+}
+function formatMotorSize(size){
+  const n=Number(size||0); if(!Number.isFinite(n)||n<=0) return 'tamaño no expuesto';
+  if(n>=1024**3) return (n/1024**3).toFixed(1)+' GB';
+  if(n>=1024**2) return Math.round(n/1024**2)+' MB';
+  return Math.round(n/1024)+' KB';
+}
+function motorCapabilities(model,provider){
+  const raw=typeof model==='string'?model:JSON.stringify(model||{});
+  const low=raw.toLowerCase(), caps=[];
+  const existing=typeof model==='object'&&Array.isArray(model.capabilities)?model.capabilities:[];
+  const add=(id,label)=>{if(!caps.some(c=>c.id===id)) caps.push({id,label});};
+  existing.forEach(c=>{ const s=String(c).toLowerCase(); if(/vision|image|vl/.test(s)) add('vision','Visión'); else if(/embed/.test(s)) add('embedding','Embeddings'); else if(/audio|speech|whisper|tts/.test(s)) add('audio','Audio'); else if(/code|completion/.test(s)) add('code','Código'); else if(/chat|generate/.test(s)) add('chat','Chat'); });
+  if(/embed|bge-|e5-|nomic-embed/.test(low)) add('embedding','Embeddings');
+  if(/vision|multimodal|\bvl\b|llava|moondream|qwen2-vl|pixtral|gemma-3|image/.test(low)) { add('multimodal','Multimodal'); add('vision','Visión'); }
+  if(/coder|code|codestral|devstral|starcoder|deepseek-coder|sqlcoder|programmer/.test(low)) add('code','Código');
+  if(/whisper|audio|speech|tts|voxtral|voice/.test(low)) add('audio','Audio');
+  if(/reason|thinking|qwq|deepseek-r1|\bo1\b|\bo3\b/.test(low)) add('reasoning','Razonamiento');
+  if(!caps.length||(!caps.some(c=>c.id==='chat')&&!caps.some(c=>c.id==='embedding'&&/embed/.test(low)))) add('chat','Chat');
+  return caps;
+}
+function normalizeMotorModel(model,provider){
+  const raw=typeof model==='string'?{id:model,name:model}:model||{};
+  const id=String(raw.id||raw.name||raw.model||'').trim();
+  if(!id) return null;
+  return {id,name:String(raw.displayName||raw.name||raw.model||id),size:raw.size||raw.size_vram||0,capabilities:motorCapabilities(raw,provider),provider};
+}
+function setMotorCatalogData(provider,models){ MOTOR_CATALOGS[provider]=(Array.isArray(models)?models:[]).map(m=>normalizeMotorModel(m,provider)).filter(Boolean); renderMotorCatalog(); }
+function setMotorCatalogFilter(value){ MOTOR_CATALOG_FILTER=value||'all'; MOTOR_CATALOG_PAGE=0; renderMotorCatalog(); }
+function selectMotorCatalog(provider){
+  if(!MOTOR_CATALOG_META[provider]) return;
+  MOTOR_CATALOG_ACTIVE=provider; MOTOR_CATALOG_PAGE=0;
+  document.querySelectorAll('[data-engine-card]').forEach(card=>card.classList.toggle('motor-card-active',card.dataset.engineCard===provider));
+  renderMotorCatalog();
+}
+function renderMotorCatalog(){
+  const track=document.getElementById('motorCatalogTrack'); if(!track) return;
+  const meta=MOTOR_CATALOG_META[MOTOR_CATALOG_ACTIVE]||MOTOR_CATALOG_META.ollama;
+  const all=MOTOR_CATALOGS[MOTOR_CATALOG_ACTIVE]||[];
+  const filtered=MOTOR_CATALOG_FILTER==='all'?all:all.filter(m=>m.capabilities.some(c=>c.id===MOTOR_CATALOG_FILTER));
+  const pages=[]; for(let i=0;i<filtered.length;i+=12) pages.push(filtered.slice(i,i+12));
+  if(!pages.length) pages.push([]);
+  MOTOR_CATALOG_PAGE=Math.max(0,Math.min(MOTOR_CATALOG_PAGE,pages.length-1));
+  const icon=document.getElementById('motorCatalogIcon'); if(icon){ icon.src=meta.icon; icon.alt=meta.label; icon.className='motor-icon '+(MOTOR_CATALOG_ACTIVE==='ollama'||MOTOR_CATALOG_ACTIVE==='directml'||MOTOR_CATALOG_ACTIVE==='mistral'||MOTOR_CATALOG_ACTIVE==='openrouter'?'motor-icon-circular':'')+(MOTOR_CATALOG_ACTIVE==='openrouter'?' motor-icon-openrouter':'')+(MOTOR_CATALOG_ACTIVE==='freeai'?' motor-icon-freeai motor-logo-freeai':''); }
+  const title=document.getElementById('motorCatalogTitle'); if(title) title.textContent=meta.title;
+  const summary=document.getElementById('motorCatalogSummary'); if(summary) summary.textContent=all.length?filtered.length+' de '+all.length+' modelos · página '+(MOTOR_CATALOG_PAGE+1)+'/'+pages.length:'Sin catálogo consultado todavía';
+  track.innerHTML=pages.map(page=>'<div class="motor-catalog-page">'+(page.length?page.map(m=>{
+    const selected=MOTOR_SELECTED_MODELS[MOTOR_CATALOG_ACTIVE]===m.id;
+    return '<button class="motor-catalog-card'+(selected?' is-selected':'')+'" data-model="'+esc(m.id)+'" onclick="chooseMotorModel(\''+MOTOR_CATALOG_ACTIVE+'\',\''+encodeURIComponent(m.id)+'\')" title="Seleccionar '+esc(m.id)+'"><span class="model-name">'+esc(m.name)+'</span><span class="model-meta">'+esc(formatMotorSize(m.size))+'</span><span class="motor-capabilities">'+m.capabilities.slice(0,4).map(c=>'<span class="motor-capability">'+esc(c.label)+'</span>').join('')+'</span></button>';
+  }).join(''):'<div class="motor-catalog-empty">No hay modelos con este filtro para '+esc(meta.label)+'.</div>')+'</div>').join('');
+  track.style.transform='translateX(-'+(MOTOR_CATALOG_PAGE*100)+'%)';
+  const prev=document.getElementById('motorCatalogPrev'), next=document.getElementById('motorCatalogNext');
+  if(prev) prev.disabled=MOTOR_CATALOG_PAGE<=0; if(next) next.disabled=MOTOR_CATALOG_PAGE>=pages.length-1;
+  updateMotorReadyCard(MOTOR_CATALOG_ACTIVE,MOTOR_SELECTED_MODELS[MOTOR_CATALOG_ACTIVE]||'');
+}
+function moveMotorCatalog(delta){ MOTOR_CATALOG_PAGE+=Number(delta)||0; renderMotorCatalog(); }
+function chooseMotorModel(provider,encodedId){
+  const id=decodeURIComponent(encodedId||''); MOTOR_SELECTED_MODELS[provider]=id;
+  persistMotorSelectedModels(); updateMotorReadyCard(provider,id);
+  if(provider==='ollama'){ renderMotorCatalog(); useOllamaModel(id); return; }
+  const sel=document.getElementById('modelSel'); if(sel){ let opt=[...sel.options].find(o=>o.value===id); if(!opt){opt=document.createElement('option');opt.value=id;opt.textContent=id;sel.appendChild(opt);} sel.value=id; }
+  engine=provider==='directml'?'directml':provider==='freeai'? 'freeai':'agent:'+provider;
+  renderMotorCatalog(); toast('Modelo seleccionado · '+id,'ok');
+}
+function wireMotorCards(){
+  document.querySelectorAll('[data-engine-card]').forEach(card=>{ if(card.dataset.motorWired) return; card.dataset.motorWired='1'; card.addEventListener('click',event=>{ if(event.target.closest('button,a,input,select')) return; selectMotorCatalog(card.dataset.engineCard); }); });
+}
+window.addEventListener('DOMContentLoaded',()=>{ wireMotorCards(); selectMotorCatalog('ollama'); });
+function updateOllamaReadyCard(name, state='selected'){
+  const clean=String(name||'').trim();
+  const label=document.getElementById('ollamaReadyModelLabel'), value=document.getElementById('ollamaReadyModelName');
+  if(label) label.textContent=state==='loading'?'Cargando en memoria':state==='ready-cpu'?'Listo para enjambre · CPU':state==='ready'?'Listo para enjambre':state==='error'?'No cargado':'Modelo Ollama';
+  if(value) value.textContent=clean||(state==='error'?'Selecciona otro modelo':'Selecciona un modelo abajo');
+  document.querySelectorAll('.ollama-model-card').forEach(card=>{
+    const selected=clean&&card.dataset.model===clean;
+    const ready=state==='ready'||state==='ready-cpu';
+    card.classList.toggle('is-active', !!(selected&&ready));
+    card.classList.toggle('is-selected', !!(selected&&!ready));
+  });
+}
+function setOllamaReadyModel(name, state='selected', notify=false){
+  const clean=String(name||'').trim();
+  if(clean) selectedOllamaModel=clean;
+  if(clean && typeof MOTOR_SELECTED_MODELS!=='undefined') MOTOR_SELECTED_MODELS.ollama=clean;
+  if(clean && typeof persistMotorSelectedModels==='function') persistMotorSelectedModels();
+  ollamaModelReady=state==='ready'||state==='ready-cpu';
+  if(clean){ try{ localStorage.setItem('las-ollama-model',clean); }catch(e){} }
+  const sel=document.getElementById('modelSel');
+  if(sel&&clean&&[...sel.options].some(o=>o.value===clean)) sel.value=clean;
+  updateOllamaReadyCard(clean,state);
+  const tag=document.getElementById('ollamaTag');
+  if(tag&&tag.classList.contains('green')){
+    tag.textContent=(state==='ready'||state==='ready-cpu')?'● activo · modelo listo':state==='loading'?'● cargando modelo':'● activo';
+  }
+  if(notify) toast(state==='ready'?'🦙 '+clean+' cargado en Ollama · listo para el enjambre':'🦙 Preparando '+clean+' en Ollama…',state==='ready'?'ok':'');
+}
+async function legacyToggleDml(){
+  const btn=document.getElementById('dmlBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Cambiando DirectML…';}
+  try{
+    const current=await API.get('/api/directml/status');
+    if(current.isAlive){
+      await API.post('/api/directml/stop');
+      toast('🎮 DirectML detenido','ok');
+    }else{
+      await API.post('/api/directml/start');
+      const loaded=await API.post('/api/directml/load',{model:'Hermes-3-8B-UNLOCKED-ONNX-DirectML'});
+      toast('🎮 DirectML iniciado · '+(loaded.model||'Hermes cargado'),'ok');
+    }
+    await refreshHealth();
+  }catch(e){ toast('DirectML: '+e.message,'err'); }
+  finally{ if(btn) btn.disabled=false; }
 }
 function engineAct(name,what){ toast('🦙 '+name+': '+what+'','ok'); }
 
@@ -1834,11 +2267,29 @@ function cancelDl(){
   document.getElementById('dlState').className='tag red';
   toast('Descarga cancelada; archivos parciales limpiados');
 }
-function diag(btn){
-  const out=document.getElementById('diagOut'); btn.disabled=true;
-  const lines=['✔ Servidor Studio: OK (puerto 63719)','✔ Ollama 127.0.0.1:11434: activo · 7 modelos','⚠ DirectML 127.0.0.1:8002: detenido (arranque manual)','✔ Free.ai: clave configurada (···a91f) ','✔ Rutas: proyectos/memoria accesibles','✔ Python TTS: OK · ONNX Runtime: OK','✔ Secretos: 0 filtrados en logs'];
-  out.textContent='Ejecutando diagnóstico…'; let i=0;
-  const iv=setInterval(()=>{ out.textContent=lines.slice(0,++i).join('\n'); if(i>=lines.length){clearInterval(iv);btn.disabled=false;toast('Diagnóstico completado: 1 aviso','ok');} },260);
+async function legacyDiag(btn){
+  const out=document.getElementById('diagOut'); btn.disabled=true; out.textContent='Ejecutando diagnóstico real…';
+  try{
+    const [version,ollama,dml,integrations,tts]=await Promise.all([
+      API.get('/api/version'), API.get('/api/ollama/status'), API.get('/api/directml/status'),
+      API.get('/api/integrations/status'), API.get('/api/tts/status')
+    ]);
+    const st=integrations.status||{};
+    const dmlModel=dml.model||dml.active_model||'sin modelo';
+    const keys=['githubConfigured','netlifyConfigured','hfConfigured','freeaiConfigured','serpApiConfigured'];
+    const configured=keys.filter(k=>st[k]).length;
+    const lines=[
+      '✔ Servidor Studio: OK · v'+(version.v||'?')+' · puerto 63719',
+      (ollama.isAlive?'✔':'✘')+' Ollama 127.0.0.1:11434: '+(ollama.isAlive?('activo · '+(ollama.modelsCount||0)+' modelos'):'detenido'),
+      (dml.isAlive&&dml.model_loaded?'✔':'✘')+' DirectML 127.0.0.1:8002: '+(dml.isAlive?(dml.model_loaded?'Hermes cargado · '+dmlModel:'activo sin modelo'): 'detenido'),
+      (st.freeaiConfigured?'✔':'✘')+' Free.ai: '+(st.freeaiConfigured?'clave configurada':'sin clave'),
+      '✔ Integraciones: '+configured+'/'+keys.length+' configuradas · GitHub '+(st.githubConfigured?'✔':'✘')+' · Netlify '+(st.netlifyConfigured?'✔':'✘')+' · HF '+(st.hfConfigured?'✔':'✘')+' · SerpApi '+(st.serpApiConfigured?'✔':'✘'),
+      (tts.ok!==false?'✔':'✘')+' Python TTS: '+(tts.ok!==false?'disponible':'no disponible'),
+      '✔ Secretos: no se muestran ni se escriben en este informe'
+    ];
+    out.textContent=lines.join('\n'); toast('Diagnóstico real completado','ok');
+  }catch(e){ out.textContent='✘ Diagnóstico incompleto: '+e.message; toast('Diagnóstico: '+e.message,'err'); }
+  btn.disabled=false;
 }
 setInterval(()=>{ const b=document.getElementById('dlActive'); if(b&&document.getElementById('dlState').textContent.includes('descargando')){ let w=parseFloat(b.style.width)||62; w=Math.min(99,w+1); b.style.width=w+'%'; document.getElementById('dlState').textContent='descargando '+Math.floor(w)+'%'; } },1800);
 </script>
@@ -1854,32 +2305,113 @@ const API = {
   async get(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); },
   async post(url, body){ const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
 };
-const REAL = { hist: [], project: null, skills: [], abort: null };
+const REAL = { hist: [], project: null, skills: [], abort: null, agentId: localStorage.getItem('las-agent-id')||'' };
+let CREATED_AGENTS=[];
+const CHAT_VIBE_SYSTEM_PROMPT=`MODO VIBE CODING · CHAT NORMAL DE LOCAL AI STUDIO
+Eres el compañero de construcción del usuario, no un tutor que se limita a explicar. Trabaja en español y sigue este ciclo: entender la intención, resumirla en una frase, detectar solo las decisiones que bloquean el trabajo, proponer un camino concreto y ejecutar el siguiente cambio verificable.
+
+REGLAS DE CONVERSACIÓN:
+- No respondas con tutoriales genéricos, listas de tecnologías ni ejemplos ficticios cuando el usuario pidió construir o modificar algo.
+- Si falta información imprescindible, haz como máximo 1–3 preguntas concretas y ofrece un valor predeterminado razonable para avanzar.
+- Si la petición es suficientemente clara, actúa: crea o modifica el proyecto y entrega archivos completos, funcionales y visualizables. Después explica brevemente qué hiciste, qué verificaste y qué decisión sigue.
+- No afirmes que un archivo fue modificado si solo propusiste código. El cambio real ocurre cuando el bloque es aplicado en el proyecto.
+
+FORMATO DE CAMBIOS:
+- Archivo nuevo o reescritura completa: usa un bloque fenced cuyo lenguaje sea write:ruta/relativa o create:ruta/relativa.
+- Edición quirúrgica: usa patch:ruta/relativa con exactamente <<< SEARCH, === y >>> REPLACE.
+- Para una web, entrega HTML/CSS/JS real dentro de bloques de código; nunca HTML escapado (&lt;...&gt;) ni pseudocódigo. Si es una página autocontenida, usa write:src/ui/index.html y deja el documento listo para visualizar.
+- Si el usuario pidió una interfaz, prioriza una primera versión navegable y visible; no la sustituyas por instrucciones para que el usuario la programe.
+- No inventes resultados de ejecución. Distingue entre propuesto, aplicado y comprobado.
+
+ESTILO: pregunta, sugiere, construye y explica. Sé directo. Si el usuario cambia de idea, adapta el plan sin defender la solución anterior.`;
 
 function v2SetEnginePill(prefix, alive, text){
   const dot=document.getElementById('dot'+prefix), hp=document.getElementById('hp'+prefix);
   if(dot) dot.className='dot '+(alive?'on':'off');
   if(hp) hp.textContent=text;
 }
+function syncChatDirectorModel(){
+  const sel=document.getElementById('modelSel');
+  if(!sel||typeof STAFF_MODE==='undefined'||!STAFF_MODE||typeof DIRECTOR_MODEL_ID==='undefined') return;
+  let opt=[...sel.options].find(o=>o.value===DIRECTOR_MODEL_ID);
+  if(!opt){ opt=document.createElement('option'); opt.value=DIRECTOR_MODEL_ID; sel.appendChild(opt); }
+  opt.textContent=hermesReady?'🐝 Hermes cargado · DirectML':'🐝 Hermes · DirectML';
+  sel.value=DIRECTOR_MODEL_ID;
+}
+function updateChatHermesState(loaded, alive, model, provider){
+  hermesReady=!!loaded;
+  ENGINE_NAME.directml=hermesReady?'🎮 Hermes cargado · DirectML':'🎮 DirectML · Hermes-3-8B-UNLOCKED';
+  const label=document.getElementById('chatDmlLabel');
+  const status=document.getElementById('chatDmlStatus');
+  const button=document.getElementById('chatDmlBtn');
+  const detail=model||'Hermes-3-8B-UNLOCKED-ONNX-DirectML';
+  if(label) label.textContent=hermesReady?'Hermes cargado':'DirectML';
+  if(button){
+    button.title=hermesReady?('Hermes cargado en DirectML · '+(provider||'DmlExecutionProvider')):'Estado real de DirectML: '+(alive?'activo, sin Hermes cargado':'detenido');
+  }
+  if(status){
+    status.textContent=hermesReady?'✔ Hermes cargado · DirectML':(alive?'● DirectML activo · esperando Hermes':'● DirectML detenido');
+    status.className='tag '+(hermesReady?'green':(alive?'amber':'red'));
+  }
+  const directorStatus=document.getElementById('chatDirectorStatus');
+  if(directorStatus){
+    directorStatus.textContent=hermesReady?'🐝 Hermes cargado · DirectML':(alive?'🐝 Hermes iniciando…':'🐝 Hermes detenido');
+    directorStatus.className='tag '+(hermesReady?'green':(alive?'amber':'red'));
+  }
+  const sel=document.getElementById('modelSel');
+  const opt=sel&&[...sel.options].find(o=>/Hermes-3-8B-UNLOCKED-ONNX-DirectML/i.test(o.value+' '+o.textContent));
+  if(opt) opt.textContent=hermesReady?(detail+' · cargado en DirectML'):detail;
+  syncChatDirectorModel();
+}
 async function refreshHealth(){
   try{
     const s=await API.get('/api/ollama/status');
+    const loadedNames=(s.loadedModels||[]).map(m=>String(m.name||m.model||'').trim()).filter(Boolean);
+    renderOllamaMemory(s.loadedModels||[],{});
+    if(!selectedOllamaModel&&loadedNames[0]) setOllamaReadyModel(loadedNames[0],'ready');
+    else if(selectedOllamaModel) setOllamaReadyModel(selectedOllamaModel,loadedNames.includes(selectedOllamaModel)?'ready':'selected');
     v2SetEnginePill('Ollama', !!s.isAlive, s.isAlive?('activo · '+(s.modelsCount||0)+' modelos'):'detenido');
-    const ot=document.getElementById('ollamaTag'); if(ot){ ot.textContent=s.isAlive?'● activo':'● detenido'; ot.className='tag '+(s.isAlive?'green':'red'); }
+    const ot=document.getElementById('ollamaTag'); if(ot){ ot.textContent=s.isAlive?(ollamaModelReady?'● activo · modelo listo':'● activo'):'● detenido'; ot.className='tag '+(s.isAlive?'green':'red'); }
+    const od=document.getElementById('ollamaDetail'); if(od) od.textContent=s.isAlive?'127.0.0.1:11434 · catálogo local consultado'+(loadedNames.length?' · '+loadedNames.length+' residente(s)':''):'127.0.0.1:11434 · servidor detenido';
+    const sideOllama=document.getElementById('sideOllamaState'), sideCount=document.getElementById('sideOllamaCount');
+    if(sideOllama){ sideOllama.textContent=(s.isAlive?'🟢 ':'🔴 ')+'Ollama'; }
+    if(sideCount) sideCount.textContent=s.isAlive?((s.modelsCount||0)+' modelos'):'detenido';
+    const navCount=document.getElementById('ollamaNavCount'); if(navCount) navCount.textContent=s.modelsCount||0;
   }catch(e){ v2SetEnginePill('Ollama', false, 'sin conexión'); }
   try{
     const d=await API.get('/api/directml/status');
     dmlOn=!!d.isAlive;
-    v2SetEnginePill('Dml', dmlOn, dmlOn?'activo':'detenido');
-    const dt=document.getElementById('dmlTag'); if(dt){ dt.textContent=dmlOn?'● activo':'● detenido'; dt.className='tag '+(dmlOn?'green':'red'); }
+    const dmlModel=d.model||d.active_model||'';
+    const hermesLoaded=dmlOn&&d.model_loaded===true&&/Hermes-3-8B-UNLOCKED-ONNX-DirectML/i.test(dmlModel);
+    updateChatHermesState(hermesLoaded, dmlOn, dmlModel, d.provider);
+    v2SetEnginePill('Dml', dmlOn, hermesLoaded?'Hermes cargado':(dmlOn?('activo · '+(dmlModel||'sin modelo')):'detenido'));
+    const dt=document.getElementById('dmlTag'); if(dt){ dt.textContent=hermesLoaded?'● Hermes cargado':(dmlOn?'● activo · '+(dmlModel||'sin modelo'):'● detenido'); dt.className='tag '+(hermesLoaded?'green':(dmlOn?'amber':'red')); }
+    const dd=document.getElementById('dmlDetail'); if(dd) dd.textContent=dmlOn?(d.model_loaded?'127.0.0.1:8002 · '+dmlModel+' · '+(d.provider||'DirectML'):'127.0.0.1:8002 · activo, esperando modelo'):'127.0.0.1:8002 · detenido';
+    const cb=document.getElementById('dmlContextBar'), ct=document.getElementById('dmlContextText');
+    if(cb) cb.style.width=hermesLoaded?'100%':(dmlOn?'45%':'0%');
+    if(ct) ct.textContent=hermesLoaded?'Hermes cargado':(dmlOn?'motor activo':'sin motor');
+    const hs=document.getElementById('hermesDmlState'); if(hs){ hs.textContent=hermesLoaded?'cargado · Director listo':(dmlOn?'motor activo · '+(dmlModel||'sin modelo'):'motor detenido'); hs.className='tag '+(hermesLoaded?'green':(dmlOn?'amber':'red')); }
     const db=document.getElementById('dmlBtn'); if(db) db.textContent=dmlOn?'⏹ Detener DirectML':'▶ Iniciar DirectML';
-  }catch(e){ v2SetEnginePill('Dml', false, 'sin conexión'); }
+    const sideDml=document.getElementById('sideDmlState'), sideDmlText=document.getElementById('sideDmlText');
+    if(sideDml){ sideDml.textContent=(hermesLoaded?'🟢 ':dmlOn?'🟡 ':'🔴 ')+'DirectML'; }
+    if(sideDmlText) sideDmlText.textContent=hermesLoaded?'Hermes cargado':(dmlOn?'activo':'detenido');
+  }catch(e){ dmlOn=false; updateChatHermesState(false, false); v2SetEnginePill('Dml', false, 'sin conexión'); }
 }
 async function loadModels(){
   try{
     const cat=await API.get('/api/tags');
     const sel=document.getElementById('modelSel'); if(!sel) return;
-    const groups=[['🦙 Ollama', cat.localModels||[]],['🎮 DirectML', cat.directmlModels||[]],['☁️ Free.ai', cat.freeAiModels||[]]];
+    const localModels=(cat.localModels||[]).filter(m=>{ const name=String(m.name||m.model||m.id||''); return !m.remote_host&&!/cloud/i.test(name)&&!/^qwen2\.5-coder:0\.5b$/i.test(name); });
+    MOTOR_CATALOGS.ollama=localModels.map(m=>normalizeMotorModel(m,'ollama')).filter(Boolean);
+    MOTOR_CATALOGS.directml=(cat.directmlModels||[]).map(m=>normalizeMotorModel(m,'directml')).filter(Boolean);
+    MOTOR_CATALOGS.freeai=(cat.freeAiModels||[]).map(m=>normalizeMotorModel(m,'freeai')).filter(Boolean);
+    renderMotorCatalog();
+    Object.keys(MOTOR_SELECTED_MODELS).forEach(provider=>updateMotorReadyCard(provider,MOTOR_SELECTED_MODELS[provider]));
+    const sideCount=document.getElementById('sideOllamaCount'), navCount=document.getElementById('ollamaNavCount');
+    if(sideCount && localModels.length) sideCount.textContent=localModels.length+' modelos locales';
+    if(navCount && localModels.length) navCount.textContent=localModels.length;
+    const od=document.getElementById('ollamaDetail'); if(od) od.textContent='127.0.0.1:11434 · '+localModels.length+' modelos locales descargados';
+    const groups=[['🦙 Ollama', localModels],['🎮 DirectML', cat.directmlModels||[]],['☁️ Free.ai', cat.freeAiModels||[]]];
     let html='';
     for(const [label, arr] of groups){
       if(!arr.length) continue;
@@ -1887,8 +2419,45 @@ async function loadModels(){
       for(const m of arr){ const name=m.name||m.id||''; if(name) html+='<option value="'+esc(name)+'">'+esc(m.displayName||name)+'</option>'; }
       html+='</optgroup>';
     }
-    if(html){ sel.innerHTML=html; toast('📚 Catálogo real cargado: '+(cat.models||[]).length+' modelos','ok'); }
+    if(html){ sel.innerHTML=html; updateChatHermesState(hermesReady, dmlOn); syncChatDirectorModel(); toast('📚 Catálogo real cargado: '+(cat.models||[]).length+' modelos','ok'); }
   }catch(e){ toast('No se pudo cargar el catálogo de modelos','err'); }
+}
+function setIntegrationTag(id, state, text){
+  const el=document.getElementById(id); if(!el) return;
+  el.textContent=text; el.className='tag '+(state==='ready'?'green':state==='configured'?'amber':'red');
+}
+async function loadIntegrationStatus(){
+  try{
+    const base=await API.get('/api/integrations/status'), st=base.status||{};
+    const checks=await Promise.allSettled([
+      st.githubConfigured?API.get('/api/integrations/github/repos'):Promise.resolve(null),
+      st.netlifyConfigured?API.get('/api/integrations/netlify/sites'):Promise.resolve(null),
+      st.hfConfigured?API.get('/api/integrations/hf/search?q=onnx&limit=1'):Promise.resolve(null),
+      API.get('/api/integrations/serpapi/usage'),
+      API.get('/api/tags')
+    ]);
+    const [gh,nf,hf,serp,tags]=checks.map(x=>x.status==='fulfilled'?x.value:null);
+    const ghReady=!!(gh&&gh.ok&&gh.configured), nfReady=!!(nf&&nf.ok&&nf.configured), hfReady=!!(hf&&hf.ok), serpReady=!!(serp&&serp.ok&&serp.configured);
+    setIntegrationTag('githubTag',ghReady?'ready':(st.githubConfigured?'configured':'missing'),ghReady?'● listo · API verificada':(st.githubConfigured?'● configurada':'● no configurada'));
+    setIntegrationTag('netlifyTag',nfReady?'ready':(st.netlifyConfigured?'configured':'missing'),nfReady?'● listo · API verificada':(st.netlifyConfigured?'● configurada':'● no configurada'));
+    setIntegrationTag('hfTag',hfReady?'ready':(st.hfConfigured?'configured':'missing'),hfReady?'● listo · API verificada':(st.hfConfigured?'● configurada':'● no configurada'));
+    setIntegrationTag('serpTag',serpReady?'ready':'missing',serpReady?'● listo · clave verificada':'● no configurado');
+    setIntegrationTag('keysTag',Object.keys(st).some(k=>/Configured$/.test(k)&&st[k])?'configured':'missing',Object.keys(st).filter(k=>/Configured$/.test(k)&&st[k]).length+' APIs configuradas');
+    const gd=document.getElementById('githubDetail'); if(gd) gd.textContent=ghReady?('@'+(gh.user&&gh.user.login||'usuario')+' · '+((gh.repos||[]).length)+' repositorios'):st.githubConfigured?'clave configurada · sin verificación':'requiere GITHUB_TOKEN';
+    const nd=document.getElementById('netlifyDetail'); if(nd) nd.textContent=nfReady?((nf.sites||[]).length+' sitios disponibles'):st.netlifyConfigured?'clave configurada · sin verificación':'requiere NETLIFY_AUTH_TOKEN';
+    const hd=document.getElementById('hfDetail'); if(hd) hd.textContent=hfReady?'búsqueda API verificada · modelos ONNX/GGUF disponibles':st.hfConfigured?'token configurado · sin verificación':'requiere HF_TOKEN';
+    const sd=document.getElementById('serpDetail'); const su=document.getElementById('serpUsageText'); const sp=document.getElementById('serpProgress');
+    const usage=serp&&serp.usage||{}; const web=Number(usage.webUses||0), limit=Number(usage.webLimit||0); const pct=limit?Math.min(100,Math.round(web/limit*100)):0;
+    if(sd) sd.textContent=serpReady?'búsqueda web lista · pool '+(serp.webKeysCount||0)+' clave(s) web':'requiere SERPAPI_API_KEY';
+    if(su) su.textContent=limit?web+'/'+limit:'—'; if(sp) sp.style.width=pct+'%';
+    const kd=document.getElementById('keysDetail'); if(kd) kd.textContent='GitHub · Netlify · HF · Free.ai · SerpApi · valores ocultos';
+    const ft=document.getElementById('freeaiTag'), fd=document.getElementById('freeaiDetail'); const freeReady=!!(st.freeaiConfigured&&tags&&Array.isArray(tags.freeAiModels)&&tags.freeAiModels.length);
+    if(ft){ft.textContent=freeReady?'● listo · '+tags.freeAiModels.length+' modelos':'● '+(st.freeaiConfigured?'configurado':'no configurado');ft.className='tag '+(freeReady?'green':(st.freeaiConfigured?'amber':'red'));}
+    if(fd) fd.textContent=freeReady?'Modelos cloud sin costo · API verificada · '+tags.freeAiModels.length+' modelos':'Modelos cloud · '+(st.freeaiConfigured?'clave configurada':'sin clave');
+    const sideFree=document.getElementById('sideFreeaiState'), sideFreeText=document.getElementById('sideFreeaiText');
+    if(sideFree) sideFree.textContent=(freeReady?'🟢 ':st.freeaiConfigured?'🟡 ':'🔴 ')+'Free.ai';
+    if(sideFreeText) sideFreeText.textContent=freeReady?(tags.freeAiModels.length+' modelos'):(st.freeaiConfigured?'configurado':'sin clave');
+  }catch(e){ ['githubTag','netlifyTag','hfTag','serpTag','keysTag'].forEach(id=>setIntegrationTag(id,'missing','● sin conexión')); }
 }
 async function loadProject(){
   try{
@@ -1909,6 +2478,7 @@ async function loadSkillsReal(){
     const r=await API.get('/api/skills?limit=60');
     REAL.skills=(r.skills||[]).map(s=>({id:s.id||s.name||'', name:s.name||s.id||'', cat:s.category||s.cat||'General', desc:s.description||''}));
     renderSkills('');
+    populateAgentCreator();
     const pill=document.querySelector('[data-view="skills"] .pill'); if(pill) pill.textContent=String(r.totalCount??REAL.skills.length);
   }catch(e){ /* skills no instaladas: queda la demo */ }
 }
@@ -1943,13 +2513,27 @@ function sendMsg(){
   let full='';
   (async()=>{
     try{
+      const apiProviderId=typeof engine==='string'&&engine.startsWith('agent:')?engine.slice(6):'';
+      if(apiProviderId){
+        const apiRes=await fetch('/api/agents/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:REAL.abort.signal,
+          body:JSON.stringify({providerId:apiProviderId,model,messages:(typeof staffTranslatePayload==='function'?staffTranslatePayload(REAL.hist):REAL.hist.slice()),temperature:Number(document.querySelector('input[type="range"][min="0"][max="20"]')?.value||7)/10,max_tokens:2048})});
+        const apiJson=await apiRes.json().catch(()=>({}));
+        if(!apiRes.ok) throw new Error(apiJson.error||('HTTP '+apiRes.status));
+         full=String(apiJson.text||''); box.innerHTML=md(full||'_El modelo no devolvió texto._');
+         await autoApplyCodeBlocks();
+         if(full) REAL.hist.push({role:'assistant',content:full});
+        toast('✅ Respuesta de '+(ENGINE_NAME[engine]||engine),'ok');
+        return;
+      }
       const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:REAL.abort.signal,
-        body:JSON.stringify({model, messages:(typeof staffTranslatePayload==='function'?staffTranslatePayload(REAL.hist):REAL.hist.slice()), stream:true, source,
-          isDirectML:engine==='directml', isFreeAi:engine==='freeai', webSearchEnabled:!!REAL.webSearch,
-          attachments:REAL.attachments&&REAL.attachments.length?REAL.attachments:undefined,
-          profileId:REAL.profileId||undefined,
-          skillIds:REAL.activeSkills&&REAL.activeSkills.size?[...REAL.activeSkills]:undefined,
-          project:REAL.project?(REAL.project.name||undefined):undefined,
+         body:JSON.stringify({model, messages:(typeof staffTranslatePayload==='function'?staffTranslatePayload(REAL.hist):REAL.hist.slice()), stream:true, source,
+           isDirectML:engine==='directml', isFreeAi:engine==='freeai', webSearchEnabled:!!REAL.webSearch,
+           attachments:REAL.attachments&&REAL.attachments.length?REAL.attachments:undefined,
+           agentId:REAL.agentId||undefined,
+           profileId:REAL.profileId||undefined,
+           skillIds:REAL.activeSkills&&REAL.activeSkills.size?[...REAL.activeSkills]:undefined,
+           customSystemPrompt:(typeof STAFF_MODE==='undefined'||!STAFF_MODE)?CHAT_VIBE_SYSTEM_PROMPT:undefined,
+           project:REAL.project?(REAL.project.name||undefined):undefined,
           projectPath:REAL.project?(REAL.project.path||undefined):undefined})});
       if(!res.ok){ const j=await res.json().catch(()=>({})); throw new Error(j.error||('HTTP '+res.status)); }
       const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
@@ -1965,8 +2549,9 @@ function sendMsg(){
           try{ const p=JSON.parse(t); if(p.error) throw new Error(p.error); pump((p.message&&p.message.content)||p.response||''); }catch(e){ if(!/JSON/.test(e.message)) throw e; }
         }
       }
-      box.innerHTML=md(full||'_El modelo no devolvió texto._');
-      if(full) REAL.hist.push({role:'assistant', content:full});
+       box.innerHTML=md(full||'_El modelo no devolvió texto._');
+       await autoApplyCodeBlocks();
+       if(full) REAL.hist.push({role:'assistant', content:full});
       toast('✅ Respuesta de '+(ENGINE_NAME[engine]||engine),'ok');
     }catch(err){
       if(err && err.name==='AbortError'){ box.innerHTML=md(full)+'<div class="tiny muted mt">⏹ Respuesta detenida — se conserva lo generado.</div>'; if(full) REAL.hist.push({role:'assistant',content:full}); }
@@ -1979,12 +2564,22 @@ function resetChat(){ REAL.hist=[]; document.getElementById('chatMsgs').innerHTM
 
 /* ---- Motores reales: arrancar / detener ---- */
 async function toggleDml(){
+  const btn=document.getElementById('dmlBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Cambiando DirectML…';}
   try{
-    toast(dmlOn?'Deteniendo DirectML…':'Iniciando DirectML… (puede tardar)');
-    await API.post(dmlOn?'/api/directml/stop':'/api/directml/start',{});
+    const current=await API.get('/api/directml/status');
+    if(current.isAlive){
+      toast('Deteniendo DirectML…');
+      await API.post('/api/directml/stop',{});
+    }else{
+      toast('Iniciando DirectML… (puede tardar)');
+      await API.post('/api/directml/start',{});
+      await API.post('/api/directml/load',{model:'Hermes-3-8B-UNLOCKED-ONNX-DirectML'});
+    }
     await refreshHealth();
-    toast(dmlOn?'🎮 DirectML activo':'🎮 DirectML detenido','ok');
+    toast(current.isAlive?'🎮 DirectML detenido':'🎮 DirectML activo · Hermes solicitado','ok');
   }catch(e){ toast('DirectML: '+e.message,'err'); await refreshHealth(); }
+  finally{ if(btn){btn.disabled=false;} }
 }
 async function engineAct(name, what){
   if(name==='Ollama'){
@@ -2014,6 +2609,90 @@ function filterSkills(v){ renderSkills(v); }
 
 REAL.activeSkills = new Set(JSON.parse(localStorage.getItem('las-skills')||'[]'));
 REAL.profileId = localStorage.getItem('las-profile')||'';
+
+function agentLabel(agent){
+  if(!agent) return '🤖 Sin agente creado';
+  const policy=agent.modelPolicy||{};
+  return '🤖 '+(agent.name||agent.slug||'Agente')+' · '+(policy.provider||'auto');
+}
+function renderCreatedAgentSelector(){
+  const sel=document.getElementById('agentSel'); if(!sel) return;
+  const current=REAL.agentId||'';
+  sel.innerHTML='<option value="">🤖 Sin agente creado</option>'+CREATED_AGENTS.map(a=>'<option value="'+esc(a.id)+'">'+esc(agentLabel(a))+'</option>').join('');
+  sel.value=current;
+  if(current&&!sel.value){ REAL.agentId=''; localStorage.removeItem('las-agent-id'); }
+}
+function populateAgentCreator(){
+  const ps=document.getElementById('createdAgentProfile');
+  if(ps && typeof PROFILES_CACHE!=='undefined'){
+    const current=ps.value;
+    ps.innerHTML='<option value="">Sin perfil</option>'+PROFILES_CACHE.map(p=>'<option value="'+esc(p.id)+'">'+esc((p.emoji||'🎭')+' '+p.name)+'</option>').join('');
+    if(current) ps.value=current;
+  }
+  const ss=document.getElementById('createdAgentSkills');
+  if(ss && REAL.skills&&REAL.skills.length){
+    const chosen=[...ss.selectedOptions].map(o=>o.value);
+    ss.innerHTML=REAL.skills.map(s=>'<option value="'+esc(s.id)+'">'+esc((s.cat||'General')+' · '+s.name)+'</option>').join('');
+    chosen.forEach(id=>{ const o=[...ss.options].find(x=>x.value===id); if(o) o.selected=true; });
+  }
+}
+function renderCreatedAgents(){
+  renderCreatedAgentSelector();
+  const host=document.getElementById('createdAgentsList'); if(!host) return;
+  if(!CREATED_AGENTS.length){ host.innerHTML='<div class="tiny muted">Aún no hay agentes creados. El primero que guardes aparecerá aquí y en el selector de Chat.</div>'; return; }
+  host.innerHTML='<div class="small"><b>Agentes persistentes</b></div><div class="grid g2 mt">'+CREATED_AGENTS.map(a=>{
+    const p=a.modelPolicy||{}; const active=REAL.agentId===a.id;
+    return '<div class="card" style="background:var(--card2);border-color:'+(active?'var(--cyan)':'')+'"><div class="flex between"><h3>🤖 '+esc(a.name)+'</h3><span class="tag '+(active?'green':'cyan')+'">'+(active?'activo':'listo')+'</span></div><p class="desc mt">'+esc(a.description||'Sin objetivo descrito')+'</p><p class="tiny muted mt">Perfil: '+esc(a.profileId||'sin perfil')+' · '+(a.skillIds||[]).length+' skills · '+(a.tools||[]).length+' herramientas · '+esc(p.provider||'auto')+(p.model?' / '+esc(p.model):'')+'</p><div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="activateCreatedAgent(\''+a.id+'\')">'+(active?'✅ Activo':'▶ Activar en Chat')+'</button><button class="btn sm danger" onclick="deleteCreatedAgent(\''+a.id+'\')">🗑 Eliminar</button></div></div>';
+  }).join('')+'</div>';
+}
+async function loadCreatedAgents(){
+  try{
+    const r=await API.get('/api/agents/created');
+    CREATED_AGENTS=Array.isArray(r.agents)?r.agents:[];
+    renderCreatedAgents(); populateAgentCreator();
+  }catch(e){ const st=document.getElementById('createdAgentState'); if(st) st.textContent='No se pudo cargar el registro: '+e.message; }
+}
+async function createAgentFromUI(){
+  const state=document.getElementById('createdAgentState');
+  const name=(document.getElementById('createdAgentName')?.value||'').trim();
+  const description=(document.getElementById('createdAgentPurpose')?.value||'').trim();
+  if(!name){ if(state) state.textContent='Escribe un nombre para el agente.'; toast('El agente necesita un nombre','err'); return; }
+  const tools=[...document.querySelectorAll('[data-agent-tool]:checked')].map(x=>x.dataset.agentTool);
+  const permissions={}; document.querySelectorAll('[data-agent-permission]').forEach(x=>permissions[x.dataset.agentPermission]=x.checked);
+  const skillSel=document.getElementById('createdAgentSkills');
+  const payload={name,description,profileId:document.getElementById('createdAgentProfile')?.value||'',skillIds:[...(skillSel?.selectedOptions||[])].map(o=>o.value),tools,permissions,maxSteps:Number(document.getElementById('createdAgentMaxSteps')?.value||12),modelProvider:document.getElementById('createdAgentProvider')?.value||'auto',model:document.getElementById('createdAgentModel')?.value||''};
+  if(state) state.textContent='Guardando manifiesto…';
+  try{
+    const r=await API.post('/api/agents/create',payload);
+    if(r.agent){ CREATED_AGENTS=[...CREATED_AGENTS,r.agent]; renderCreatedAgents(); }
+    if(state) state.textContent='Agente guardado en el registro local.';
+    toast('🤖 Agente creado y cableado a Chat/Staff','ok');
+    try{ await loadProfilesReal(); }catch(e){}
+  }catch(e){ if(state) state.textContent=e.message; toast('No se pudo crear el agente: '+e.message,'err'); }
+}
+function activateCreatedAgent(id){
+  const value=String(id||'');
+  if(!value){ REAL.agentId=''; localStorage.removeItem('las-agent-id'); renderCreatedAgents(); toast('🤖 Agente desactivado','ok'); return; }
+  const agent=CREATED_AGENTS.find(a=>a.id===value||a.slug===value);
+  if(!agent){ toast('Agente no encontrado','err'); return; }
+  REAL.agentId=agent.id; localStorage.setItem('las-agent-id',agent.id);
+  REAL.profileId=agent.profileId||''; localStorage.setItem('las-profile',REAL.profileId);
+  REAL.activeSkills=new Set(agent.skillIds||[]); localStorage.setItem('las-skills',JSON.stringify([...REAL.activeSkills]));
+  const ps=document.getElementById('profileSel'); if(ps) ps.value=REAL.profileId;
+  renderCreatedAgents(); renderCreatedAgentSelector();
+  toast('🤖 '+agent.name+' activo: listo para Chat y Staff','ok');
+  if(typeof go==='function') go('chat');
+}
+async function deleteCreatedAgent(id){
+  const agent=CREATED_AGENTS.find(a=>a.id===id); if(!agent) return;
+  if(!confirm('¿Eliminar el agente '+agent.name+'?')) return;
+  try{
+    await API.post('/api/agents/created/delete',{id});
+    if(REAL.agentId===id){ REAL.agentId=''; localStorage.removeItem('las-agent-id'); }
+    await loadCreatedAgents();
+    toast('Agente eliminado del registro local','ok');
+  }catch(e){ toast('No se pudo eliminar: '+e.message,'err'); }
+}
 function toggleSkillActive(id, on){
   if(on) REAL.activeSkills.add(id); else REAL.activeSkills.delete(id);
   localStorage.setItem('las-skills', JSON.stringify([...REAL.activeSkills]));
@@ -2038,6 +2717,7 @@ async function loadProfilesReal(){
       grid.innerHTML=profiles.map(p=>'<div class="card"><div class="flex between"><h3>'+(p.isBundle?'🧩':'🎭')+' '+esc(p.name)+'</h3><span class="tag '+(p.isBundle?'cyan':'green')+'">'+(p.isBundle?(p.skillsCount+' skills'):'perfil')+'</span></div><p class="desc mt">'+esc(p.description||p.vibe||'')+'</p><button class="btn sm primary mt" onclick="useProfile(\''+esc(p.id)+'\')">Usar en el chat</button></div>').join('')||'<p class="muted">Sin perfiles.</p>';
     }
     renderProfileTree(profiles, r);
+    populateAgentCreator();
   }catch(e){ /* el selector queda en Sin perfil */ }
 }
 /* ----- Esquema jerarquico de perfiles + detalle (descripcion, skills, Master Prompt) ----- */
@@ -2429,7 +3109,7 @@ function useProfile(id){
   go('chat'); toast('🎭 Perfil activo para el chat: '+id,'ok');
 }
 
-window.addEventListener('DOMContentLoaded', ()=>{ refreshHealth(); loadModels(); loadProject(); loadSkillsReal(); loadChatsReal(); loadSkillsSource(); loadProfilesReal(); });
+window.addEventListener('DOMContentLoaded', ()=>{ refreshHealth(); loadModels(); loadIntegrationStatus(); loadProject(); loadSkillsReal(); loadChatsReal(); loadSkillsSource(); loadProfilesReal(); loadCreatedAgents(); });
 
 async function loadSkillsSource(){
   try{
@@ -2446,6 +3126,7 @@ async function updateSkills(btn){
 }
 
 setInterval(refreshHealth, 30000);
+setInterval(loadIntegrationStatus, 60000);
 </script>
 
 <script>
@@ -2589,27 +3270,134 @@ async function speakSave(btn){
 }
 
 /* ---------- HARDWARE real ---------- */
+function formatMemoryReal(bytes){
+  const n=Number(bytes||0); if(!Number.isFinite(n)||n<=0) return '';
+  const gb=n/1073741824; return gb>=1?gb.toFixed(gb>=10?1:2)+' GB':(n/1048576).toFixed(0)+' MB';
+}
+function renderOllamaMemory(ollamaPs=[], telemetry={}){
+  const bar=document.getElementById('ollamaMemBar'), txt=document.getElementById('ollamaMemText');
+  const resident=Array.isArray(ollamaPs)&&ollamaPs.length?ollamaPs[0]:null;
+  if(!resident){ if(bar) bar.style.width='0%'; if(txt) txt.textContent='sin modelo residente'; return; }
+  const name=String(resident.name||resident.model||'modelo Ollama');
+  const total=Number(resident.size||resident.size_bytes||0), vram=Number(resident.size_vram||resident.size_vram_bytes||0);
+  const gpuGb=Number(telemetry?.gpu?.reportedAdapterMemoryGb||0);
+  const pct=vram>0&&gpuGb>0?Math.min(100,Math.round(vram/(gpuGb*1073741824)*100)):0;
+  if(bar) bar.style.width=pct+'%';
+  if(txt){
+    const parts=[name];
+    if(total>0) parts.push(formatMemoryReal(total)+' total');
+    if(vram>0) parts.push(formatMemoryReal(vram)+' VRAM');
+    else parts.push(total>0?'VRAM no expuesta':'memoria no expuesta');
+    txt.textContent=parts.join(' · ');
+  }
+}
+function renderHardwareTuning(t, ollamaPs=[]){
+  const body=document.getElementById('tuningRows'); if(!body) return;
+  const effective=Object.assign({}, (t.env&&t.env.effective)||{}, (t.ollamaRuntime&&t.ollamaRuntime.env)||{});
+  const recommended={OLLAMA_KV_CACHE_TYPE:'q8_0', OLLAMA_FLASH_ATTENTION:'1', OLLAMA_MAX_LOADED_MODELS:'1', HSA_OVERRIDE_GFX_VERSION:'11.0.0'};
+  body.innerHTML=Object.keys(recommended).map(k=>{
+    const value=String(effective[k]||'no definido'), rec=recommended[k];
+    const state=value==='no definido'?'<span class="tag amber">no definido</span>':(value===rec?'<span class="tag green">activo</span>':'<span class="tag cyan">configurado</span>');
+    const action=value==='no definido'||value!==rec?'<button class="btn sm" onclick="applyTuningVar(this,\''+k+'\',\''+rec+'\')">Aplicar</button>':'';
+    return '<tr><td class="mono">'+k+'</td><td>'+value+'</td><td>'+state+'</td><td>'+action+'</td></tr>';
+  }).join('');
+  const ev=document.getElementById('tuningEvidence');
+  if(ev) ev.textContent=(t.source==='override/test'?'⚠ Datos de override/prueba; no representan el equipo. ':'')+'Fuente: '+(t.source||'desconocida')+' · valores efectivos del proceso y del runtime cuando están disponibles.';
+  renderOllamaMemory(ollamaPs,t);
+}
+let LAST_HEALTH_DATA=null;
+function healthTag(level){ return level==='bad'?'<span class="tag red">✘ atención</span>':level==='warn'?'<span class="tag amber">⚠ revisar</span>':level==='info'?'<span class="tag cyan">ℹ información</span>':'<span class="tag green">✔ correcto</span>'; }
+function renderHealthCenter(data={}){
+  const p=data.profile||{}, t=p.telemetry||data.telemetry||{}, ram=t.ram||{}, rt=t.ollamaRuntime||{}, dml=data.directmlStatus||p.directmlStatus||{}, oll=data.ollamaStatus||{}, integ=data.integrations||{}, st=integ.status||integ||{}, usage=data.usage||{};
+  const findings=[];
+  const add=(level,title,detail,action='')=>findings.push({level,title,detail,action});
+  if(t.measured===false||!t.measured) add('warn','Hardware no medido','La fuente no es Windows CIM; no se usarán estos valores para afirmar capacidades reales.','Actualiza y vuelve a medir.');
+  else add('ok','Hardware medido','Windows CIM confirmó '+(t.cpu?.name||'CPU')+' y '+(ram.installedGb||'?')+' GB instalados.');
+  const freeRatio=Number(ram.usableGb)>0?Number(ram.freeGb||0)/Number(ram.usableGb):1;
+  if(freeRatio<0.12) add('bad','Presión de memoria alta',(ram.freeGb||0)+' GB libres de '+(ram.usableGb||0)+' GB utilizables.','Descarga modelos o reduce contexto antes de ejecutar doble motor.');
+  else if(freeRatio<0.25) add('warn','Memoria ajustada',(ram.freeGb||0)+' GB libres de '+(ram.usableGb||0)+' GB utilizables.','Evita cargar dos modelos locales a la vez.');
+  else add('ok','Memoria disponible',(ram.freeGb||0)+' GB libres de '+(ram.usableGb||0)+' GB utilizables.');
+  const ollamaAlive=oll.isAlive!==undefined?oll.isAlive:rt.alive;
+  const dmlAlive=dml.isAlive!==undefined?dml.isAlive:dml.alive;
+  if(ollamaAlive) add('ok','Ollama activo',(oll.modelsCount!==undefined?oll.modelsCount+' modelos visibles · ':'')+(rt.computeBackend||'backend detectado'));
+  else add('warn','Ollama detenido','No se puede comprobar carga local ni aplicar tuning al proceso vivo.','Inícialo al probar un modelo local.');
+  if(dmlAlive&&dml.model_loaded!==false) add('ok','DirectML activo',(dml.provider||'DmlExecutionProvider')+' · Hermes listo cuando model_loaded=true.');
+  else add('warn','DirectML no está listo','El servidor local no respondió con un modelo cargado.','Inicia DirectML antes de delegar a Hermes.');
+  const effective=Object.assign({},t.env?.effective||{},rt.env||{}), tuningKeys=['OLLAMA_IGPU_ENABLE','HSA_OVERRIDE_GFX_VERSION','OLLAMA_FLASH_ATTENTION','OLLAMA_KV_CACHE_TYPE'];
+  const missing=tuningKeys.filter(k=>!String(effective[k]||'').trim());
+  const drift=tuningKeys.filter(k=>String(effective[k]||'').trim() && ((k==='OLLAMA_IGPU_ENABLE'&&effective[k]!=='1')||(k==='HSA_OVERRIDE_GFX_VERSION'&&effective[k]!=='11.0.0')||(k==='OLLAMA_FLASH_ATTENTION'&&effective[k]!=='1')||(k==='OLLAMA_KV_CACHE_TYPE'&&effective[k]!=='q8_0')));
+  if(drift.length||missing.length) add('warn','Tuning incompleto o desfasado',(drift.length?drift.join(', ')+' no coincide. ':'')+(missing.length?missing.join(', ')+' no está definido. ':'') ,'Aplica la corrección segura de sesión y vuelve a medir.');
+  else add('ok','Tuning base coherente','Variables ROCm/iGPU y caché KV coinciden con la recomendación observada.');
+  const configured=['githubConfigured','netlifyConfigured','hfConfigured','freeaiConfigured','serpApiConfigured','groqConfigured','mistralConfigured','openrouterConfigured'].filter(k=>st[k]).length;
+  const providerRows=usage.providers?Object.values(usage.providers):[];
+  const providerErrors=providerRows.reduce((n,x)=>n+Number(x.usage?.errors||0)+Number(x.usage?.rateLimited||0),0);
+  if(providerErrors) add('warn','APIs con incidencias',providerErrors+' errores o rate limits registrados en el contador local.','Revisa Contadores y margen por API en Agentes y Hubs.');
+  else add('ok','APIs sin incidencias locales',configured+' integraciones configuradas; sin errores registrados en esta lectura.');
+  if(st.ttsConfigured===false||data.tts?.ok===false) add('info','TTS no confirmado','El diagnóstico no recibió confirmación positiva del motor de voz.');
+  const bad=findings.filter(x=>x.level==='bad').length, warn=findings.filter(x=>x.level==='warn').length;
+  const overall=bad?'atención':warn?'revisar':'saludable';
+  const overallEl=document.getElementById('healthOverall'); if(overallEl){ overallEl.textContent=(bad?'✘ ':warn?'⚠ ':'✔ ')+overall; overallEl.className='tag '+(bad?'red':warn?'amber':'green'); }
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('healthHardware',t.measured?'medido':'no medido'); set('healthHardwareSub',t.source||'fuente desconocida');
+  set('healthRuntime',(ollamaAlive?'Ollama ✔':'Ollama —')+' · '+(dmlAlive?'DML ✔':'DML —')); set('healthRuntimeSub',rt.computeBackend||dml.provider||'estado consultado');
+  set('healthTuning',drift.length||missing.length?'revisar':'coherente'); set('healthTuningSub',(tuningKeys.length-missing.length)+'/'+tuningKeys.length+' variables base');
+  set('healthServices',configured+'/'+(st&&Object.keys(st).length?8:8)); set('healthServicesSub',providerErrors?providerErrors+' incidencias API':'sin incidencias locales');
+  const out=document.getElementById('healthFindings'); if(out) out.innerHTML=findings.map(f=>'<div class="card mt" style="background:var(--card2);border-left:3px solid '+(f.level==='bad'?'var(--red)':f.level==='warn'?'var(--amber)':f.level==='info'?'var(--cyan)':'var(--green)')+'"><div class="flex between"><b>'+esc(f.title)+'</b>'+healthTag(f.level)+'</div><p class="tiny mt">'+esc(f.detail)+'</p>'+(f.action?'<p class="tiny muted mt">➡ '+esc(f.action)+'</p>':'')+'</div>').join('');
+  const last=document.getElementById('healthLastRun'); if(last) last.textContent='Última lectura: '+new Date().toLocaleTimeString('es');
+  scheduleFitActiveView();
+  return {findings,overall};
+}
+async function runHealthCenter(btn,silent=false){
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Midiendo…'; }
+  try{
+    const [profile,ollamaStatus,directmlStatus,integrations,usage,tts]=await Promise.all([
+      API.get('/api/system/hardware-profile?refresh=1'),API.get('/api/ollama/status'),API.get('/api/directml/status'),API.get('/api/integrations/status'),API.get('/api/agents/limits'),API.get('/api/tts/status')
+    ]);
+    LAST_HEALTH_DATA={profile,ollamaStatus,directmlStatus,integrations,usage,tts}; renderHealthCenter(LAST_HEALTH_DATA); renderHardwareTuning(profile.telemetry||{},profile.ollamaPs||ollamaStatus.loadedModels||[]);
+    if(!silent) toast('🩺 Medición y diagnóstico completados','ok');
+    return LAST_HEALTH_DATA;
+  }catch(e){ const out=document.getElementById('healthFindings'); if(out) out.innerHTML='<div class="card mt"><span class="tag red">✘ diagnóstico incompleto</span><p class="tiny mt">'+esc(e.message)+'</p></div>'; if(!silent) toast('Centro de Salud: '+e.message,'err'); return null; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🔄 Medir y diagnosticar'; } }
+}
+async function healthApplyRecommended(btn){
+  let data=LAST_HEALTH_DATA; if(!data) data=await runHealthCenter(null,true); const profile=data&&data.profile; const suggested=profile&&profile.profiles&&profile.profiles['freeai+ollama']&&profile.profiles['freeai+ollama'].suggestedEnv;
+  if(!suggested){ toast('No hay recomendación verificable para aplicar','err'); return; }
+  if(!confirm('Se aplicará el tuning recomendado sólo a la sesión y se reiniciará Ollama para que el proceso lo reciba. ¿Continuar?')) return;
+  if(btn) btn.disabled=true;
+  try{ const r=await API.post('/api/system/apply-tuning',{scope:'session',pair:'freeai+ollama',envOverrides:suggested,restartOllama:true}); toast('🛠️ Corrección aplicada; se volverá a medir','ok'); LAST_HEALTH_DATA=null; await runHealthCenter(null,true); if(r.restarts&&r.restarts.ollama&&r.restarts.ollama.ok===false) toast('Ollama no confirmó el reinicio','err'); }catch(e){ toast('Aplicar corrección: '+e.message,'err'); }
+  if(btn) btn.disabled=false;
+}
 async function loadHardwareReal(){
   try{
     const p=await API.get('/api/system/hardware-profile');
     const t=p.telemetry||p.profile||p||{};
     const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-    set('hwGpu', (t.gpu&&t.gpu.name)||'—'); set('hwGpuSub', t.gpu&&t.gpu.dedicatedVramGb?('VRAM dedicada: '+t.gpu.dedicatedVramGb+' GB'):'');
-    set('hwVram', t.gpu&&t.gpu.dedicatedVramGb?(t.gpu.dedicatedVramGb+' GB'):'—');
-    set('hwRam', t.ram&&t.ram.totalGb?(Math.round(t.ram.totalGb)+' GB'):'—'); set('hwRamSub', t.ram&&t.ram.freeGb?('libre: '+Math.round(t.ram.freeGb)+' GB'):'');
-    set('hwCpu', (t.cpu&&t.cpu.name)||'—'); set('hwCpuSub', t.cpu&&t.cpu.cores?(t.cpu.cores+' núcleos · '+t.cpu.logicalThreads+' hilos'):'');
+    const gpu=t.gpu||{}, ram=t.ram||{}, cpu=t.cpu||{}, storage=t.storage||{};
+    set('hwGpu', gpu.name||'—'); set('hwGpuSub', (gpu.driverVersion?'driver '+gpu.driverVersion+' · ':'')+(t.source||'fuente no indicada'));
+    set('hwVram', gpu.reportedAdapterMemoryGb?(gpu.reportedAdapterMemoryGb+' GB reportados'):'—');
+    set('hwVramSub', gpu.memoryType==='shared'?'memoria de adaptador compartida; no es VRAM dedicada':'memoria dedicada reportada por Windows');
+    set('hwRam', ram.installedGb?(ram.installedGb+' GB instalados'):'—'); set('hwRamSub', ram.usableGb?(ram.usableGb+' GB utilizables · '+(ram.freeGb||0)+' GB libres'):'');
+    set('hwCpu', cpu.name||'—'); set('hwCpuSub', cpu.cores?(cpu.cores+' núcleos · '+cpu.logicalThreads+' hilos · '+(cpu.maxClockMHz||0)+' MHz máx. reportados'):'');
+    const pill=document.getElementById('hwHealthPill'); if(pill) pill.textContent='🎛️ '+(gpu.name||'Hardware')+' · '+(gpu.reportedAdapterMemoryGb||'?')+' GB reportados';
+    const storageEl=document.getElementById('hwStorage'); if(storageEl){ const vols=Array.isArray(storage.volumes)?storage.volumes:[]; storageEl.innerHTML='<b>💾 Almacenamiento medido</b> '+(storage.measured===false?'<span class="tag amber">override/prueba</span>':'<span class="tag green">Windows CIM</span>')+'<p class="tiny muted mt">'+(vols.length?vols.map(v=>esc(v.drive)+' '+v.usedGb+'/'+v.totalGb+' GB usados · '+v.freeGb+' GB libres').join(' · '):'Sin volúmenes medidos')+' · total '+(storage.totalGb||0)+' GB</p>'; }
+    renderHardwareTuning(t,p.ollamaPs||[]);
+    if(!LAST_HEALTH_DATA){ renderHealthCenter({profile:p}); }
+    renderOllamaMemory(p.ollamaPs||[],t);
   }catch(e){ /* deja los guiones */ }
   try{
     const rows=document.querySelectorAll('#view-hardware table.table tbody tr');
     const rec=await API.get('/api/system/hardware-profile'); // tuning se refleja al evaluar
   }catch(e){}
+  setTimeout(()=>runHealthCenter(null,true),250);
 }
 async function evalHardwareReal(btn){
   const verdict=document.getElementById('hwVerdict');
   verdict.textContent='evaluando…';
   try{
-    const model=document.getElementById('modelSel').value||'qwen2.5-coder:7b';
-    const r=await API.post('/api/system/hardware-evaluate',{pair:'ollama+directml', workflow:'parallel', agentA:{source:'ollama', model, numCtx:8192}, agentB:{source:'directml', model:'Phi-3.5-mini-instruct-ONNX'}});
+    const model=document.getElementById('hardwareModelSel').value||'qwen2.5-coder:7b';
+    const ctx=Number(document.getElementById('hardwareCtx')?.value||8192);
+    const isDml=/DirectML|ONNX/i.test(model);
+    const r=await API.post('/api/system/hardware-evaluate',{pair:isDml?'ollama+directml':'freeai+ollama', workflow:'pipeline', agentA:{source:isDml?'directml':'ollama', model, numCtx:ctx}, agentB:{source:isDml?'ollama':'freeai', model:isDml?'qwen2.5-coder:7b':'freeai', numCtx:ctx}});
     const ev=r.evaluation||{};
     verdict.textContent=(ev.riskLevel?('riesgo: '+ev.riskLevel):'evaluado')+(ev.allowParallelLocal===false?' · dual local no recomendado':' · dual local OK');
     verdict.className='tag '+(ev.riskLevel==='critical'?'red':(ev.riskLevel==='warning'?'amber':'green'));
@@ -2663,10 +3451,42 @@ async function cancelDlReal(jobId){
 async function loadMotorsTableReal(){
   try{
     const cat=await API.get('/api/tags');
-    const tbody=document.querySelector('#view-motores table.table tbody'); if(!tbody) return;
-    const rows=(cat.models||[]).slice(0,12).map(m=>'<tr><td class="mono">'+esc(m.name||m.id||'')+'</td><td>'+esc(m.provider||'')+'</td><td>'+esc(String(m.size||'—'))+'</td><td><span class="tag '+(m.active?'green':'')+'">'+esc(m.status||(m.isLocal?'descargado':'listo'))+'</span></td><td><button class="btn sm" onclick="go(\'chat\')">Usar</button></td></tr>').join('');
-    if(rows) tbody.innerHTML=rows;
+    const grid=document.getElementById('ollamaModelGrid'); if(!grid) return;
+    const local=(cat.localModels||[]).filter(m=>{
+      const name=String(m.name||m.model||m.id||'');
+      return !m.remote_host&&!/cloud/i.test(name)&&!/^qwen2\.5-coder:0\.5b$/i.test(name);
+    }).slice(0,30);
+    const formatSize=(size)=>{ const n=Number(size); if(!Number.isFinite(n)||n<=0) return '—'; if(n>=1024**3) return (n/1024**3).toFixed(1)+' GB'; if(n>=1024**2) return Math.round(n/1024**2)+' MB'; return '—'; };
+    const rows=local.map(m=>{
+      const name=m.name||m.model||m.id||'';
+      const parameter=m.details&&m.details.parameter_size?(' · '+m.details.parameter_size):'';
+      const active=m.active===true&&(!selectedOllamaModel||name===selectedOllamaModel);
+      const jsName=String(name).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const selected=name===selectedOllamaModel;
+      return '<div class="ollama-model-card'+(active?' is-active':selected?' is-selected':'')+'" data-model="'+esc(name)+'" role="button" tabindex="0" aria-label="Cargar modelo '+esc(name)+'" title="Cargar '+esc(name)+'" onclick="useOllamaModel(\''+jsName+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();useOllamaModel(\''+jsName+'\')}"><div class="model-name" title="'+esc(name)+'">'+esc(name)+'</div><div class="model-meta">'+esc(formatSize(m.size))+esc(parameter)+'</div></div>';
+    }).join('');
+    grid.innerHTML=rows||'<div class="tiny muted">Ollama no tiene modelos locales descargados.</div>';
+    if(selectedOllamaModel&&local.some(m=>(m.name||m.model||m.id||'')===selectedOllamaModel)) updateOllamaReadyCard(selectedOllamaModel,ollamaModelReady?'ready':'selected');
+    const sideCount=document.getElementById('sideOllamaCount'), navCount=document.getElementById('ollamaNavCount');
+    if(sideCount) sideCount.textContent=local.length+' modelos locales';
+    if(navCount) navCount.textContent=local.length;
   }catch(e){}
+}
+async function useOllamaModel(name){
+  const sel=document.getElementById('modelSel');
+  if(sel && [...sel.options].some(o=>o.value===name)) sel.value=name;
+  document.querySelectorAll('[data-engine]').forEach(b=>b.classList.toggle('sel',b.dataset.engine==='ollama'));
+  engine='ollama';
+  setOllamaReadyModel(name,'loading',true);
+  try{
+    const loaded=await API.post('/api/ollama/load',{model:name});
+    setOllamaReadyModel(name,loaded.fallbackUsed?'ready-cpu':'ready');
+    await refreshHealth();
+    toast('🦙 '+name+' cargado en Ollama · listo para el enjambre'+(loaded.fallbackUsed?' · CPU por compatibilidad ROCm':'') ,'ok');
+  }catch(e){
+    setOllamaReadyModel(name,'error');
+    toast('Ollama no pudo cargar '+name+': '+e.message,'err');
+  }
 }
 
 /* ---------- DIAGNÓSTICO real ---------- */
@@ -2919,13 +3739,13 @@ async function rollbackReal(changeId){
 }
 
 /* ---------- Ejecutor del enjambre: subtareas en paralelo + integracion ---------- */
-async function swarmChatOnce(source, prompt, perfil, skills){
+async function swarmChatOnce(source, prompt, perfil, skills, modelOverride){
   let model=undefined;
   if(source==='ollama'){
-    try{ const t=await API.get('/api/tags'); const loc=(t.localModels||[]).map(m=>m.id||m.name).filter(n=>n&&!/cloud/i.test(n)); model=loc[0]; }catch(e){}
+    try{ const t=await API.get('/api/tags'); const loc=(t.localModels||[]).map(m=>m.id||m.name).filter(n=>n&&!/cloud/i.test(n)&&!/^qwen2\.5-coder:0\.5b$/i.test(n)); model=modelOverride||(ollamaModelReady&&selectedOllamaModel?selectedOllamaModel:loc[0]); }catch(e){ if(!modelOverride&&ollamaModelReady) model=selectedOllamaModel; }
     if(!model) throw new Error('Ollama sin modelos locales en el catalogo');
   }
-  if(source==='directml') model=(typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:undefined;
+  if(source==='directml') model=modelOverride||((typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:undefined);
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model, stream:true, source, profileId:perfil||undefined,
       skillIds:skills&&skills.length?skills:undefined,
@@ -2953,14 +3773,14 @@ async function swarmAgentOnce(sub){
     const ag=(AGENTS_API||[]).find(a=>a.active && a.name.toLowerCase()===nombre) || (AGENTS_API||[]).find(a=>a.active && a.name.toLowerCase().includes(nombre));
     if(!ag) throw new Error('agente API "'+nombre+'" no registrado o inactivo (vista Agentes)');
     const r=await fetch('/api/agents/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({baseUrl:ag.url, apiKey:firstAgentKey(ag.key||''), model:ag.model||undefined,
+      body:JSON.stringify({providerId:sub.provider||ag.providerId||undefined, baseUrl:ag.url, apiKey:ag.envManaged?'':firstAgentKey(ag.key||''), model:sub.model||ag.model||undefined,
         messages:[{role:'system', content:'Eres un agente del enjambre de Local AI Studio. Tu perfil para esta subtarea: '+(sub.perfil||'especialista')+'. Capacidades declaradas: '+(ag.caps||'generales')+'.'},{role:'user', content:prompt}]})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.text) throw new Error(j.error||('HTTP '+r.status));
     return j.text;
   }
   const source=(m==='freeai')?'freeai':(m==='directml')?'directml':'ollama';
-  return swarmChatOnce(source, prompt, sub.perfil, sub.skills);
+  return swarmChatOnce(source, prompt, sub.perfil, sub.skills, sub.model||undefined);
 }
 async function runSwarmPhase(i, btn){
   const f=STAFF.fases[i]; if(!f||!f.subtareas||!f.subtareas.length) return;
@@ -3060,8 +3880,8 @@ function renderAgents(){
 }
 function firstAgentKey(key){ return String(key||'').split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean)[0]||''; }
 function agentKeyCount(key){ return String(key||'').split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean).length; }
-async function testAgentRequest(url, key){
-  const r=await fetch('/api/agents/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseUrl:url, apiKey:firstAgentKey(key)})});
+async function testAgentRequest(url, key, providerId){
+  const r=await fetch('/api/agents/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({providerId:providerId||undefined, baseUrl:url, apiKey:firstAgentKey(key)})});
   return r.json();
 }
 async function testAgentForm(btn){
@@ -3074,7 +3894,7 @@ async function testAgentForm(btn){
 }
 async function testAgentApi(i, btn){
   const a=AGENTS_API[i]; if(!a) return; btn.disabled=true;
-  try{ const j=await testAgentRequest(a.url, a.key||''); a.status=j.ok?('✔ probado · HTTP '+j.status+(j.models!=null?(' · '+j.models+' modelos'):'')):('✘ HTTP '+j.status+' '+(j.detail||'')); }
+  try{ const j=await testAgentRequest(a.url, a.key||'', a.providerId); a.status=j.ok?('✔ probado · HTTP '+j.status+(j.models!=null?(' · '+j.models+' modelos'):'')):('✘ HTTP '+j.status+' '+(j.detail||'')); }
   catch(e){ a.status='✘ '+e.message; }
   persistAgents(); renderAgents(); renderSwarmSummary(); btn.disabled=false;
 }
@@ -3092,8 +3912,76 @@ function saveAgentApi(){
   toast('🔌 Agente "'+name+'" registrado: Hermes ya puede asignarle subtareas','ok');
 }
 function toggleAgentApi(i, on){ AGENTS_API[i].active=!!on; persistAgents(); renderAgents(); renderSwarmSummary(); }
-function delAgentApi(i){ const a=AGENTS_API[i]; AGENTS_API.splice(i,1); persistAgents(); renderAgents(); renderSwarmSummary(); toast('🗑 Agente "'+(a?a.name:'')+'" eliminado','ok'); }
-window.addEventListener('DOMContentLoaded', ()=>{ renderAgents(); renderSwarmSummary(); });
+function delAgentApi(i){ const a=AGENTS_API[i]; if(a&&a.envManaged){ toast('Este agente se gestiona desde .env y se actualiza automáticamente','ok'); return; } AGENTS_API.splice(i,1); persistAgents(); renderAgents(); renderSwarmSummary(); toast('🗑 Agente "'+(a?a.name:'')+'" eliminado','ok'); }
+function renderApiEngineCards(data){
+  const el=document.getElementById('apiEngineCards'); if(!el) return;
+  const providers=Array.isArray(data&&data.providers)?data.providers:[];
+  if(!providers.length){ el.innerHTML=''; return; }
+  providers.forEach(p=>{ API_ENGINE_PROVIDERS[p.id]=p; MOTOR_CATALOGS[p.id]=(Array.isArray(p.models)?p.models:[]).map(m=>normalizeMotorModel(m,p.id)).filter(Boolean); });
+  renderMotorCatalog();
+  el.innerHTML=providers.map(p=>{
+    const models=Array.isArray(p.models)?p.models:[], chat=Array.isArray(p.chatModels)?p.chatModels:models;
+    const selectedModel=MOTOR_SELECTED_MODELS[p.id]||'';
+    const model=selectedModel||p.model||p.defaultModel||'sin modelo';
+    const status=p.ready?'listo':(p.configured?'clave configurada':'sin clave');
+    const color=p.ready?'green':(p.configured?'amber':'red');
+    const disabled=!p.configured;
+    const icon=MOTOR_CATALOG_META[p.id]?.icon||'assets/local-ai-studio-icon.png';
+    const iconClass=p.id==='openrouter'?'motor-icon-circular motor-icon-openrouter':p.id==='mistral'?'motor-icon-circular':'';
+    return '<div class="card engine-provider-card" data-engine-card="'+esc(p.id)+'"><div class="flex between"><h3><img class="motor-icon '+iconClass+'" src="'+icon+'" alt="'+esc(p.name)+'"> '+esc(p.name)+'</h3><span class="tag '+color+'">● '+status+'</span></div>'+
+      '<p class="desc mt">'+esc(p.baseUrl)+' · catálogo consultado</p>'+
+      '<div class="ollama-ready mt"><span class="ready-label">'+(selectedModel?'Listo para enjambre':'Modelo de chat')+'</span><b class="ready-model" data-motor-ready-model="'+esc(p.id)+'">'+esc(model)+'</b></div>'+
+      '<div class="bar-row mt"><span>Memoria</span><span class="tiny muted">cloud · no ocupa VRAM local</span><span class="tag cyan">'+models.length+' modelos · '+chat.length+' chat</span></div>'+
+      '<div class="flex mt wrap"><button class="btn sm" onclick="testAgentApiById(\''+esc(p.id)+'\',this)">🔌 Probar</button><button class="btn sm primary" '+(disabled?'disabled ':'')+'onclick="openMotorChat(\'agent:'+esc(p.id)+'\',\''+esc(model).replace(/'/g,"\\'")+'\')">Chatear</button></div>'+
+      (p.detail?'<p class="tiny muted mt">'+esc(p.detail)+'</p>':'')+'</div>';
+  }).join('');
+  wireMotorCards();
+}
+async function testAgentApiById(id,btn){
+  const p=API_ENGINE_PROVIDERS[id]; if(!p||!btn) return;
+  btn.disabled=true;
+  try{ const j=await testAgentRequest(p.baseUrl,'',id); toast((j.ok?'✔ ':'✘ ')+p.name+' · '+(j.models??0)+' modelos','ok'); await loadConfiguredAgents(); }
+  catch(e){ toast(p.name+': '+e.message,'err'); }
+  finally{ btn.disabled=false; }
+}
+function renderApiCatalog(data){
+  const el=document.getElementById('apiCatalog'); if(!el) return;
+  const providers=Array.isArray(data&&data.providers)?data.providers:[], hubs=Array.isArray(data&&data.hubs)?data.hubs:[];
+  const phtml=providers.map(p=>{ const models=Array.isArray(p.models)?p.models:[], chat=Array.isArray(p.chatModels)?p.chatModels:models; return '<details class="mt"><summary><span class="tag '+(p.ready?'green':(p.configured?'amber':'muted'))+'">'+esc(p.name)+' · '+(p.ready?'listo':(p.configured?'clave configurada':'sin clave'))+' · '+models.length+' modelos ('+chat.length+' chat)</span></summary><div class="tiny muted mt mono" style="line-height:1.8">'+(models.length?models.map(m=>'<span class="tag '+(chat.includes(m)?'cyan':'muted')+'" style="margin:2px">'+esc(m)+'</span>').join(' '):'sin catálogo')+'</div></details>'; }).join('');
+  const hhtml=hubs.map(h=>'<span class="tag '+(h.configured?'cyan':'muted')+'">'+esc(h.name)+' · '+(h.configured?'listo':'sin clave')+'</span>').join(' ');
+  el.innerHTML='<b>🔌 APIs y hubs detectados</b><p class="tiny muted mt">Cada catálogo se consulta al proveedor. Los modelos en cyan son delegables por chat; los grises están listados pero no son modelos conversacionales.</p><div class="mt">'+(phtml||'ninguno')+'</div><p class="tiny muted mt">Hubs: '+(hhtml||'ninguno')+'</p>';
+}
+function renderApiUsage(data){
+  const el=document.getElementById('apiUsageControls'); if(!el) return;
+  const providers=(data&&data.providers)||{};
+  const ids=Object.keys(providers);
+  if(!ids.length){ el.innerHTML='<b>⏱️ Contadores y margen por API</b><p class="tiny muted mt">Sin APIs gestionadas.</p>'; return; }
+  el.innerHTML='<b>⏱️ Contadores y margen por API</b><p class="tiny muted mt">Límite local de seguridad; la cuota real y los límites del proveedor siguen aplicando. 0 llamadas = ilimitado local.</p><div class="api-usage-grid">'+ids.map(id=>{ const p=providers[id], u=p.usage||{}; return '<div class="card api-usage-card"><div class="flex between"><b>'+esc(p.label||id)+'</b><span class="tag cyan">'+(u.calls||0)+' llamadas · '+(u.success||0)+' OK · '+(u.errors||0)+' errores</span></div><div class="api-usage-fields mt"><label class="tiny">Máx. llamadas<input class="input mt" id="api-max-'+esc(id)+'" type="number" min="0" value="'+(p.maxCalls||0)+'"></label><label class="tiny">Ventana (min)<input class="input mt" id="api-window-'+esc(id)+'" type="number" min="1" value="'+Math.round((p.windowMs||3600000)/60000)+'"></label><label class="tiny">Timeout (s)<input class="input mt" id="api-timeout-'+esc(id)+'" type="number" min="1" value="'+Math.round((p.timeoutMs||120000)/1000)+'"></label><label class="tiny">Espera mínima (s)<input class="input mt" id="api-gap-'+esc(id)+'" type="number" min="0" value="'+Math.round((p.minIntervalMs||0)/1000)+'"></label></div><p class="tiny muted mt">Última: '+(u.lastStatus||'—')+(u.lastLatencyMs?' · '+u.lastLatencyMs+' ms':'')+' · rate limit: '+(u.rateLimited||0)+' · timeouts: '+(u.timeouts||0)+'</p><div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="saveApiUsage(\''+esc(id)+'\',this)">Guardar límites</button><button class="btn sm" onclick="resetApiUsage(\''+esc(id)+'\')">Reiniciar contador</button></div></div>'; }).join('')+'</div>';
+}
+async function loadApiUsage(){ try{ const data=await fetch('/api/agents/limits',{cache:'no-store'}).then(r=>r.json()); renderApiUsage(data); }catch(e){ const el=document.getElementById('apiUsageControls'); if(el) el.innerHTML='<b>⏱️ Contadores y margen por API</b><p class="tiny muted mt">No se pudieron cargar los límites locales.</p>'; } }
+async function saveApiUsage(id,btn){
+  const n=(suffix)=>Number(document.getElementById('api-'+suffix+'-'+id)?.value||0);
+  btn.disabled=true;
+  try{ const data=await fetch('/api/agents/limits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({providerId:id,maxCalls:n('max'),windowMinutes:n('window'),timeoutSeconds:n('timeout'),minIntervalSeconds:n('gap')})}).then(r=>r.json()); renderApiUsage(data); toast('⏱️ Límites de '+id+' guardados','ok'); }catch(e){ toast('Límites: '+e.message,'err'); }
+  btn.disabled=false;
+}
+async function resetApiUsage(id){ try{ const data=await fetch('/api/agents/limits/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({providerId:id})}).then(r=>r.json()); renderApiUsage(data); toast('Contador de '+id+' reiniciado','ok'); }catch(e){ toast('Contador: '+e.message,'err'); } }
+async function loadConfiguredAgents(){
+  try{
+    const data=await fetch('/api/agents/catalog',{cache:'no-store'}).then(r=>r.json());
+    renderApiEngineCards(data);
+    renderApiCatalog(data);
+    renderApiUsage(data.usage||{});
+    (data.providers||[]).filter(p=>p.configured).forEach(p=>{
+      const idx=AGENTS_API.findIndex(a=>a.providerId===p.id);
+      const item={id:'env-'+p.id, providerId:p.id, name:p.name+' · '+(p.model||p.defaultModel), url:p.baseUrl, model:p.model||p.defaultModel, models:p.models||[], chatModels:p.chatModels||[], key:'', caps:p.caps, active:!!p.ready, envManaged:true, status:p.ready?('✔ verificado · HTTP '+p.status+' · '+((p.models||[]).length)+' modelos'):('⚠ configurado · '+(p.detail||'sin verificación'))};
+      if(idx>=0){ if(AGENTS_API[idx].envManaged) AGENTS_API[idx]=Object.assign({},AGENTS_API[idx],item); }
+      else AGENTS_API.push(item);
+    });
+    persistAgents(); renderAgents(); renderSwarmSummary(); if(typeof STAFF!=='undefined' && STAFF.fases&&STAFF.fases.length) renderStaff();
+  }catch(e){ renderApiCatalog({providers:[],hubs:[]}); await loadApiUsage(); }
+}
+window.addEventListener('DOMContentLoaded', ()=>{ renderAgents(); renderSwarmSummary(); loadConfiguredAgents(); loadApiUsage(); });
 
 /* ---------- Integraciones: acciones reales ---------- */
 function wireIntegraciones(){
@@ -3231,17 +4119,42 @@ async function staffCatalog(idea){
   try{ const r2=await API.get('/api/skills?q='+encodeURIComponent('arquitectura diseño desarrollo web api')+'&limit=25'); (r2.skills||[]).forEach(s=>{ if(!cand.includes(s.id)) cand.push(s.id); }); }catch(e){}
   return {profileIds, candSkills:cand.slice(0,60)};
 }
+function staffModelChoices(){
+  const directModel=MOTOR_SELECTED_MODELS.directml||(typeof DIRECTOR_MODEL_ID!=='undefined'?DIRECTOR_MODEL_ID:'Hermes-3-8B-UNLOCKED-ONNX-DirectML');
+  const out=[{provider:'directml',id:directModel,label:'Hermes · DirectML'+(MOTOR_SELECTED_MODELS.directml?' · '+directModel:'')}];
+  if(typeof selectedOllamaModel!=='undefined'&&selectedOllamaModel) out.push({provider:'ollama',id:selectedOllamaModel,label:'Ollama · '+selectedOllamaModel});
+  if(MOTOR_SELECTED_MODELS.freeai) out.push({provider:'freeai',id:MOTOR_SELECTED_MODELS.freeai,label:'Free.ai · '+MOTOR_SELECTED_MODELS.freeai});
+  (typeof AGENTS_API!=='undefined'?AGENTS_API:[]).filter(a=>a.active).forEach(a=>{
+    const providerId=a.providerId||('api:'+a.name);
+    const rawModels=a.chatModels&&a.chatModels.length?a.chatModels:(a.models||[]);
+    const preferred=MOTOR_SELECTED_MODELS[providerId];
+    const models=rawModels.filter(m=>m&&!/(prompt-guard|safeguard|whisper|embed|moderation|transcri|ocr|tts|audio|voxtral)/i.test(m));
+    const ordered=preferred?[preferred,...models.filter(id=>id!==preferred)]:models;
+    ordered.forEach(id=>out.push({provider:providerId,id,label:(providerId||a.name)+' · '+id,agent:a.name}));
+  });
+  return out;
+}
+async function staffModelCatalogText(){
+  let local=[];
+  try{ const t=await API.get('/api/tags'); local=(t.localModels||[]).map(m=>m.id||m.name).filter(n=>n&&!/^qwen2\.5-coder:0\.5b$/i.test(n)); }catch(e){}
+  const choices=staffModelChoices(), grouped={};
+  choices.forEach(c=>{ const k=c.provider||'api'; (grouped[k]||(grouped[k]=[])).push(c.id); });
+  const lines=Object.keys(grouped).map(k=>k+': '+grouped[k].join(', '));
+  if(local.length) lines.unshift('ollama: '+local.join(', '));
+  return lines.join('\n')||'directml: Hermes-3-8B-UNLOCKED-ONNX-DirectML';
+}
 async function staffGenerate(){
   const idea=document.getElementById('staffIdea').value.trim();
   if(!idea){ toast('Escribe primero tu idea o plan','err'); return; }
   const btn=document.getElementById('staffGenBtn'); btn.disabled=true; btn.textContent='🐝 El Orquestador está diseñando tu staff…';
   try{
-    const cat=await staffCatalog(idea);
+    const cat=await staffCatalog(idea), modelCatalog=await staffModelCatalogText();
     const prompt=
 'IDEA / PLAN DEL USUARIO:\n'+idea+'\n\n'+
 'PERFILES DISPONIBLES (usa ids exactos):\n'+cat.profileIds.join(', ')+'\n\n'+
 'SKILLS CANDIDATAS (usa ids exactos):\n'+cat.candSkills.join(', ')+'\n\n'+
-'COMBO HÍBRIDO ACTIVO: '+staffComboNames().join(', ')+' (el Director siempre es Hermes en DirectML). Motores permitidos para subtareas: '+staffComboMotors()+'. En cada fase, si admite trabajo en paralelo, incluye "subtareas": [{"motor":"ollama|freeai|directml|api:<nombre exacto del agente>","perfil":"id o rol","skills":["ids"],"tarea":"...","entregable":"..."}] con subtareas INDEPENDIENTES y territorios (archivos) separados. Maximo 3 por fase.\n\n'+
+'CATÁLOGO REAL DE MODELOS DISPONIBLES PARA DELEGAR (usa exactamente estos ids; excluye modelos no conversacionales):\n'+modelCatalog+'\n\n'+
+'COMBO HÍBRIDO ACTIVO: '+staffComboNames().join(', ')+' (el Director siempre es Hermes en DirectML). Motores permitidos para subtareas: '+staffComboMotors()+'. En cada fase, si admite trabajo en paralelo, incluye "subtareas": [{"motor":"ollama|freeai|directml|api:<nombre exacto del agente>","provider":"groq|mistral|directml|ollama","model":"id exacto del catálogo","perfil":"id o rol","skills":["ids"],"tarea":"...","entregable":"..."}] con subtareas INDEPENDIENTES y territorios (archivos) separados. Maximo 3 por fase.\n\n'+
 'Diseña el plan y el staff siguiendo tu formato obligatorio (resumen breve + bloque ```staff-json).';
     const model=(typeof DIRECTOR_MODEL_ID!=='undefined')?DIRECTOR_MODEL_ID:document.getElementById('modelSel').value;
     const source='directml'; /* 🐝 El Director es Hermes-3-8B-UNLOCKED (Q8 ONNX DirectML), local y sin censura */
@@ -3251,6 +4164,7 @@ async function staffGenerate(){
     const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model, stream:true, source, isDirectML:engine==='directml', isFreeAi:engine==='freeai',
         profileId:ORCH_PROFILE, skillIds:['ai-agents-architect','parallel-agents'],
+        agentId:REAL.agentId||undefined,
         project:REAL.project?(REAL.project.name||undefined):undefined,
         projectPath:REAL.project?(REAL.project.path||undefined):undefined,
         messages:[{role:'user', content:prompt}]})});
@@ -3282,10 +4196,24 @@ function parseStaff(text){
     STAFF={idea:document.getElementById('staffIdea').value.trim(),
       objetivo:j.objetivo||'', resumen:j.resumen||'',
       fases:j.fases.map(f=>({titulo:f.titulo||'Fase', tarea:f.tarea||'', perfil:f.perfil||'', skills:Array.isArray(f.skills)?f.skills:[], entregable:f.entregable||'', riesgo:f.riesgo||'', estado:'pendiente', sugeridas:[],
-        subtareas:Array.isArray(f.subtareas)?f.subtareas.filter(s=>s&&s.tarea).map(s=>({motor:String(s.motor||'ollama').toLowerCase(), perfil:s.perfil||'', skills:Array.isArray(s.skills)?s.skills:[], tarea:s.tarea||'', entregable:s.entregable||'', estado:'pendiente', resultado:''})):[], integrado:''})),
+        subtareas:Array.isArray(f.subtareas)?f.subtareas.filter(s=>s&&s.tarea).map(s=>({motor:String(s.motor||'ollama').toLowerCase(), provider:s.provider||'', model:s.model||'', perfil:s.perfil||'', skills:Array.isArray(s.skills)?s.skills:[], tarea:s.tarea||'', entregable:s.entregable||'', estado:'pendiente', resultado:''})):[], integrado:''})),
       refuerzos:Array.isArray(j.refuerzos_sugeridos)?j.refuerzos_sugeridos:[]};
     saveStaff(); return true;
   }catch(e){ return false; }
+}
+function staffModelSelect(sub, fi, si){
+  const choices=staffModelChoices(), current=(sub.provider||'')+'|'+(sub.model||'');
+  const hasCurrent=choices.some(c=>c.provider+'|'+c.id===current);
+  const extra=(!hasCurrent&&sub.model)?'<option selected value="'+esc(current)+'">'+esc((sub.provider||'modelo')+' · '+sub.model)+'</option>':'';
+  return '<label class="tiny muted" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px">modelo <select class="input" style="width:auto;min-width:180px;padding:3px 6px;font-size:11px" onchange="setSubtaskModel('+fi+','+si+',this.value)">'+extra+choices.map(c=>'<option value="'+esc(c.provider+'|'+c.id)+'" '+(c.provider+'|'+c.id===current?'selected':'')+'>'+esc(c.label)+'</option>').join('')+'</select></label>';
+}
+function setSubtaskModel(fi,si,value){
+  const f=STAFF.fases[fi], s=f&&f.subtareas&&f.subtareas[si]; if(!s) return;
+  const split=String(value||'').split('|'), provider=split.shift(), model=split.join('|');
+  s.provider=provider; s.model=model;
+  if(provider==='directml') s.motor='directml';
+  else { const ag=(AGENTS_API||[]).find(a=>a.providerId===provider); if(ag) s.motor='api:'+ag.name; }
+  saveStaff(); renderStaff(); toast('Modelo de subtarea actualizado','ok');
 }
 function renderStaff(){
   const el=document.getElementById('staffPanelBody')||document.getElementById('staffPlan'); if(!el) return;
@@ -3313,7 +4241,7 @@ function renderStaff(){
       (f.entregable?'<div class="tiny muted mt">📦 Entregable: '+esc(f.entregable)+'</div>':'')+
       (f.riesgo?'<div class="tiny mt" style="color:var(--red)">⚠ '+esc(f.riesgo)+'</div>':'')+
       '<div id="sugg-'+i+'">'+(f.sugeridas||[]).map(s=>'<span class="tag sugg-chip" title="Añadir esta skill a la fase" onclick="addSkillToFase('+i+',\''+esc(s)+'\')">➕ '+esc(s)+'</span>').join(' ')+'</div>'+
-      (f.subtareas&&f.subtareas.length?'<div class="mt"><b class="tiny">🐝 Subtareas del enjambre ('+f.subtareas.length+')</b>'+f.subtareas.map(s=>'<div class="tiny mt">🔹 <span class="tag cyan">'+esc(s.motor)+'</span> '+esc(s.tarea)+(s.perfil?' · 🎭 '+esc(s.perfil):'')+' <span class="tag">'+esc(s.estado||'pendiente')+'</span></div>').join('')+'</div>':'')+
+      (f.subtareas&&f.subtareas.length?'<div class="mt"><b class="tiny">🐝 Subtareas del enjambre ('+f.subtareas.length+')</b>'+f.subtareas.map((s,j)=>'<div class="tiny mt">🔹 <span class="tag cyan">'+esc(s.motor)+'</span> '+esc(s.tarea)+(s.perfil?' · 🎭 '+esc(s.perfil):'')+' <span class="tag">'+esc(s.estado||'pendiente')+'</span>'+staffModelSelect(s,i,j)+(s.model?' <span class="mono muted">'+esc(s.model)+'</span>':'')+'</div>').join('')+'</div>':'')+
       '<div id="swarm-'+i+'"></div>'+
       (f.integrado?'<details class="mt"><summary class="tiny">📦 Resultado integrado por el Director</summary><div class="tiny mt">'+md(f.integrado)+'</div></details>':'')+
       '<div class="flex wrap mt" style="gap:6px">'+((f.subtareas&&f.subtareas.length)?'<button class="btn sm primary" onclick="runSwarmPhase('+i+',this)">🐝 Ejecutar fase en enjambre</button>':'')+'<button class="btn sm primary" onclick="activateFase('+i+')">▶ Activar esta fase</button>'+
@@ -3374,16 +4302,12 @@ window.addEventListener('DOMContentLoaded', ()=>{ if(STAFF.fases.length) renderS
    COLUMNA 1 · Pestañas SETUP / PROJECT / STAFF AI + Ruta Vibe Coding
    ===================================================================== */
 function sideTab(name){
-  /* Definicion autosuficiente: maneja los 6 paneles y protege cada
-     cargador para que un fallo en uno nunca congele el cambio de pestana. */
+  /* Definición autosuficiente para las tres pestañas principales del sidebar. */
   document.querySelectorAll('.side-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  ['setup','project','staff','history','gallery','code'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
+  ['setup','project','staff'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
   const safe=(fn)=>{ try{ fn(); }catch(e){ console.warn('sideTab:', e); } };
   if(name==='project') safe(()=>updateProjectTab());
   if(name==='staff') safe(()=>renderVibeGuide());
-  if(name==='history' && typeof loadHistoryTab==='function') safe(()=>loadHistoryTab());
-  if(name==='gallery' && typeof loadGalleryTab==='function') safe(()=>loadGalleryTab());
-  if(name==='code' && typeof loadCodeTab==='function') safe(()=>loadCodeTab());
   safe(()=>localStorage.setItem('las-sidetab', name));
 }
 /* El panel 🐝 vive ahora dentro de la pestaña STAFF AI de la columna 1 */
@@ -3478,7 +4402,7 @@ cycleFase=function(i){
 };
 window.addEventListener('DOMContentLoaded', ()=>{
   mountStaffIntoSidebar();
-  sideTab('staff'); /* STAFF AI es la pestaña por defecto al iniciar */
+  sideTab('setup'); /* Chat normal por defecto; STAFF_MODE solo se activa al entrar en Staff AI */
   updateProjectTab();
   const ta=document.getElementById('staffIdea');
   if(ta) ta.addEventListener('input', renderVibeGuide);
@@ -3490,34 +4414,70 @@ window.addEventListener('DOMContentLoaded', ()=>{
    PESTAÑAS HISTORIAL / GALERÍA / CODE + contadores de caracteres
    ===================================================================== */
 const _sideTab=sideTab;
+const SETUP_TOOL_META={
+  history:{icon:'🕘',title:'Historial',subtitle:'Tus conversaciones guardadas localmente.',emptyIcon:'🕘'},
+  gallery:{icon:'▦',title:'Galería',subtitle:'Imágenes creadas y guardadas en la biblioteca del proyecto activo.',emptyIcon:'▦'},
+  code:{icon:'</>',title:'Code',subtitle:'Webs, artefactos y WebApps creadas desde Local AI Studio.',emptyIcon:'&lt;/&gt;'}
+};
+function setupToolTab(name){
+  const meta=SETUP_TOOL_META[name]; if(!meta) return;
+  document.querySelectorAll('.setup-tool-tab').forEach(t=>t.classList.toggle('active',t.dataset.setupTool===name));
+  Object.keys(SETUP_TOOL_META).forEach(n=>{
+    const pane=document.getElementById('library-pane-'+n); if(pane) pane.classList.toggle('active',n===name);
+  });
+  const title=document.getElementById('libraryTitle'), subtitle=document.getElementById('librarySubtitle');
+  if(title) title.textContent=meta.icon+' '+meta.title;
+  if(subtitle) subtitle.textContent=meta.subtitle;
+  go('library');
+  const safe=(fn)=>{try{fn();}catch(e){console.warn('setupToolTab:',e);}};
+  if(name==='history') safe(()=>loadHistoryTab());
+  if(name==='gallery') safe(()=>loadGalleryTab());
+  if(name==='code') safe(()=>loadCodeTab());
+  try{localStorage.setItem('las-setup-tool',name);}catch(e){}
+}
+function refreshLibraryTab(){
+  const active=document.querySelector('.setup-tool-tab.active')?.dataset.setupTool||'history';
+  setupToolTab(active);
+}
 sideTab=function(name){
+  if(SETUP_TOOL_META[name]){ setupToolTab(name); return; }
   document.querySelectorAll('.side-tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  ['setup','project','staff','history','gallery','code'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
+  ['setup','project','staff'].forEach(n=>{ const el=document.getElementById('pane-'+n); if(el) el.style.display=n===name?'':'none'; });
   if(name==='project') updateProjectTab();
   if(name==='staff') renderVibeGuide();
-  if(name==='history') loadHistoryTab();
-  if(name==='gallery') loadGalleryTab();
-  if(name==='code') loadCodeTab();
-  localStorage.setItem('las-sidetab', name);
+  try{localStorage.setItem('las-sidetab', name);}catch(e){}
 };
 function bindCounter(textareaId, countId){
   const ta=document.getElementById(textareaId), c=document.getElementById(countId); if(!ta||!c) return;
   const upd=()=>{ c.textContent=Number(ta.value.length).toLocaleString('es'); };
   ta.addEventListener('input', upd); upd();
 }
+function renderLibraryPlaceholders(kind){
+  const data={
+    history:{icon:'🕘',label:'Próxima conversación',copy:'Aquí aparecerán tus chats guardados'},
+    gallery:{icon:'▦',label:'Próxima imagen',copy:'Aquí aparecerá tu próxima creación'},
+    code:{icon:'&lt;/&gt;',label:'Próximo artefacto',copy:'Aquí aparecerá tu próxima WebApp'}
+  }[kind]||{icon:'✦',label:'Próximo elemento',copy:'Este espacio está listo para usarse'};
+  const count=kind==='code'?4:6;
+  return '<div class="library-placeholder-grid">'+Array.from({length:count},(_,i)=>'<div class="library-placeholder-card"><div class="ph-icon">'+data.icon+'</div><div class="ph-label">'+data.label+' '+(i+1)+'</div><div class="ph-line"></div><div class="ph-line short"></div><small class="muted">'+data.copy+'</small></div>').join('')+'</div>';
+}
+function renderLibraryError(kind,message){
+  const meta=SETUP_TOOL_META[kind]||SETUP_TOOL_META.history;
+  return '<div class="library-empty"><div class="library-empty-icon">'+meta.emptyIcon+'</div><h3>'+meta.title+' no disponible</h3><p>'+esc(message||'No se pudo consultar este espacio local.')+'</p></div>';
+}
 async function loadHistoryTab(){
   const el=document.getElementById('historyList'); if(!el) return;
   try{
     const r=await API.get('/api/memory/chats');
     const chats=r.chats||r.items||[];
-    if(!chats.length){ el.innerHTML='<p class="tiny muted">Aún no hay conversaciones guardadas.</p>'; return; }
+    if(!chats.length){ el.innerHTML=renderLibraryPlaceholders('history'); return; }
     el.innerHTML=chats.slice(0,30).map(c=>{
       const title=esc(c.title||c.name||c.id||'Conversación');
       const proj=esc(c.project||c.projectName||'General');
       const when=c.updatedAt||c.createdAt||c.mtime||'';
       return '<div class="list-item" onclick="openChatFromHistory(\''+esc(c.id||c.chatId||'')+'\')"><div class="avatar">💬</div><div class="grow"><b class="small">'+title+'</b><div class="tiny muted">'+proj+(when?' · '+esc(String(when).slice(0,10)):'')+'</div></div></div>';
     }).join('');
-  }catch(e){ el.innerHTML='<p class="tiny muted">Historial no disponible: '+esc(e.message)+'</p>'; }
+  }catch(e){ el.innerHTML=renderLibraryError('history',e.message); }
 }
 async function openChatFromHistory(id){
   if(!id){ toast('Esta conversación no tiene id cargable','err'); return; }
@@ -3546,9 +4506,9 @@ async function loadGalleryTab(){
   try{
     const r=await API.get('/api/gallery?project='+encodeURIComponent(proj));
     const imgs=r.images||[];
-    if(!imgs.length){ el.innerHTML='<p class="tiny muted" style="grid-column:1/-1">Sin imágenes todavía en '+(proj||'el proyecto')+'. Genera una en 🎨 Estudio de Imagen y aparecerá aquí.</p>'; return; }
+    if(!imgs.length){ el.innerHTML=renderLibraryPlaceholders('gallery'); return; }
     el.innerHTML=imgs.map(im=>'<figure onclick="showGalleryImage(\''+esc(im.url)+'\',\''+esc(im.name)+'\')"><img src="'+esc(im.url)+'" alt=""><figcaption>'+esc(im.name)+'</figcaption></figure>').join('');
-  }catch(e){ el.innerHTML='<p class="tiny muted" style="grid-column:1/-1">Galería no disponible: '+esc(e.message)+'</p>'; }
+  }catch(e){ el.innerHTML=renderLibraryError('gallery',e.message); }
 }
 function showGalleryImage(url, name){
   go('chat'); toggleArtifactPanel(true); showArtifactFrame();
@@ -3561,9 +4521,9 @@ async function loadCodeTab(){
   try{
     const r=await API.get('/api/projects');
     const list=r.projects||[];
-    if(!list.length){ el.innerHTML='<p class="tiny muted">Aún no hay webs creadas. Empieza en STAFF AI → ✨ Nuevo proyecto.</p>'; return; }
+    if(!list.length){ el.innerHTML=renderLibraryPlaceholders('code'); return; }
     el.innerHTML=list.map(pr=>'<div class="list-item'+(REAL.project&&pr.name===REAL.project.name?' sel':'')+'" onclick="openCodeProject(\''+esc(pr.name)+'\')"><div class="avatar">🌐</div><div class="grow"><b class="small">'+esc(pr.name)+'</b><div class="tiny muted" style="word-break:break-all">'+esc(pr.path||'')+'</div></div>'+(REAL.project&&pr.name===REAL.project.name?'<span class="tag green">activo</span>':'<span class="tag">ver 👁</span>')+'</div>').join('');
-  }catch(e){ el.innerHTML='<p class="tiny muted">CODE no disponible: '+esc(e.message)+'</p>'; }
+  }catch(e){ el.innerHTML=renderLibraryError('code',e.message); }
 }
 async function openCodeProject(name){
   try{
@@ -4924,27 +5884,35 @@ async function showFreeAiModels(btn){
   }catch(e){ toast('Modelos Free.ai: '+e.message,'err'); }
   btn.disabled=false; btn.textContent=old;
 }
-async function applyTuningVar(btn){
+async function applyTuningVar(btn,key='OLLAMA_MAX_LOADED_MODELS',value='2'){
   const old=btn.textContent; btn.disabled=true; btn.textContent='⏳ Aplicando…';
   try{
-    const r=await API.post('/api/system/apply-tuning',{scope:'session', envOverrides:{OLLAMA_MAX_LOADED_MODELS:'2'}});
+    const r=await API.post('/api/system/apply-tuning',{scope:'session', envOverrides:{[key]:value}});
     toast('✔ Variable aplicada (ámbito sesión)'+(r.applied?': '+Object.keys(r.applied).join(', '):''),'ok');
   }catch(e){ toast('Aplicar variable: '+e.message,'err'); }
   btn.disabled=false; btn.textContent=old;
 }
 async function copySafeReport(btn){
   try{
-    const [v,oll,dml,integ,skills]=await Promise.all([
+    const [v,oll,dml,integ,skills,profile,limits,tts]=await Promise.all([
       API.get('/api/version').catch(()=>({})), API.get('/api/ollama/status').catch(()=>({})),
       API.get('/api/directml/status').catch(()=>({})), API.get('/api/integrations/status').catch(()=>({})),
-      API.get('/api/skills/source').catch(()=>({}))]);
+      API.get('/api/skills/source').catch(()=>({})), API.get('/api/system/hardware-profile?refresh=1').catch(()=>({})),
+      API.get('/api/agents/limits').catch(()=>({})), API.get('/api/tts/status').catch(()=>({}))]);
     const st=integ.status||{};
+    const hw=profile.telemetry||profile||{};
+    const ram=hw.ram||{}, gpu=hw.gpu||{}, cpu=hw.cpu||{};
+    const usage=limits.usage||limits.providers||{};
     const report=['# Informe seguro · Local AI Studio '+new Date().toLocaleString('es'),
       'Versión: v'+(v.v||'?')+' · build '+(v.build!==undefined?Math.round(v.build):'?'),
+      'Hardware medido: '+(profile.measured===false?'no confirmado':'Windows CIM')+' · CPU '+(cpu.name||'?')+' · GPU '+(gpu.name||'?'),
+      'RAM: '+(ram.installedGb||'?')+' GB instalados · '+(ram.freeGb||'?')+' GB libres · adaptador GPU '+(gpu.reportedAdapterMemoryGb||'?')+' GB ('+(gpu.memoryType||'tipo no indicado')+')',
       'Ollama: '+(oll.isAlive?'activo ('+(oll.modelsCount||0)+' modelos)':'detenido'),
-      'DirectML: '+(dml.isAlive?'activo':'detenido'),
+      'DirectML: '+(dml.isAlive?(dml.model_loaded?'activo · '+(dml.model||'modelo cargado'):'activo · sin modelo cargado'):'detenido')+' · '+(dml.provider||'proveedor no indicado'),
       'Skills: '+(skills.count||0)+' instaladas · '+(skills.categories||0)+' categorías',
       'Integraciones (sin secretos): GitHub '+(st.githubConfigured?'✔':'✘')+' · Netlify '+(st.netlifyConfigured?'✔':'✘')+' · HF '+(st.hfConfigured?'✔':'✘')+' · Free.ai '+(st.freeaiConfigured?'✔':'✘'),
+      'Cuotas/contadores: '+(Object.keys(usage).length?JSON.stringify(usage):'sin lecturas disponibles'),
+      'TTS local: '+(tts.ok!==false?'disponible':'no disponible'),
       'Proyecto activo: '+(REAL.project?(REAL.project.name||''):'ninguno')].join('\n');
     await navigator.clipboard.writeText(report);
     toast('📋 Informe seguro copiado (sin claves ni secretos)','ok');
@@ -5009,8 +5977,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('[data-pref]').forEach(inp=>{
     try{ const v=localStorage.getItem('las-pref-'+inp.dataset.pref); if(v!==null) inp.checked=v==='1'; }catch(e){}
   });
-  const fs=document.getElementById('chatFontSel');
-  try{ const saved=localStorage.getItem('las-pref-fontSize'); if(saved){ if(fs) fs.value=saved; applyChatFontSize(saved); } }catch(e){}
+  const fs=document.getElementById('chatFontSel'), fsh=document.getElementById('chatFontSelHealth');
+  try{ const saved=localStorage.getItem('las-pref-fontSize'); if(saved){ if(fs) fs.value=saved; if(fsh) fsh.value=saved; applyChatFontSize(saved); } }catch(e){}
 });
 </script>
 <script>
@@ -5122,6 +6090,7 @@ function enterStaffMode(){
   STAFF_MODE=true;
   document.body.classList.add('staff-on');
   const mb=document.getElementById('composerMotorBtns'); if(mb) mb.style.display='none'; /* en Staff mandan las tarjetas, no los botones MOTOR */
+  syncChatDirectorModel();
   const hayFase=(typeof STAFF!=='undefined' && STAFF.fases)?STAFF.fases.some(f=>f.estado==='en curso'):false;
   if(!hayFase){
     /* Perfil del Director en silencio (sin toast ni salto de vista al cambiar de pestaña) */
@@ -5170,10 +6139,12 @@ function staffTranslatePayload(hist){
     const faseIdx=(typeof STAFF!=='undefined' && STAFF.fases)?STAFF.fases.findIndex(f=>f.estado==='en curso'):-1;
     const fase=faseIdx>=0?STAFF.fases[faseIdx]:null;
     const skills=REAL.activeSkills?[...REAL.activeSkills].join(', '):'';
+    const activeAgent=REAL.agentId&&typeof CREATED_AGENTS!=='undefined'?CREATED_AGENTS.find(a=>a.id===REAL.agentId):null;
     out[i].content=
 '[DIRECTOR DE STAFF · TRADUCCIÓN VIBE CODING — aplica tu protocolo antes de responder]\n'+
 'Fase activa: '+(fase?((faseIdx+1)+' · '+fase.titulo+' · Tarea: '+fase.tarea+' · Entregable: '+(fase.entregable||'el de la tarea')):'sin plan todavía (si es idea nueva, propón primero el plan con el bloque staff-json; no escribas código suelto)')+'\n'+
 'Perfil que piensa: '+(REAL.profileId||DIRECTOR_PROFILE)+' · Skills que ejecutan: '+(skills||DIRECTOR_SKILLS.join(', '))+'\n'+
+'Agente operativo activo: '+(activeAgent?activeAgent.name+' · herramientas '+(activeAgent.tools||[]).join(', ')+' · permisos '+Object.keys(activeAgent.permissions||{}).filter(k=>activeAgent.permissions[k]).join(', '):'ninguno')+'\n'+
 'Proyecto: '+(REAL.project?(REAL.project.name||''):'ninguno')+' · Combo híbrido: '+staffComboLabel()+' (Director: Hermes en DirectML)\n'+
 'Instrucciones extra del Director (del usuario, persistentes): '+((()=>{ try{ return localStorage.getItem('las-director-extra')||'ninguna'; }catch(e){ return 'ninguna'; } })())+'\n'+
 'Traduce la petición a una instrucción ejecutable: objetivo imperativo, alcance (qué toca y qué NO), entregable verificable, código COMPLETO en bloques con la ruta encima de cada bloque, criterio de aceptación en 1–3 comprobaciones. Si la petición era ambigua, abre con "🎯 Entendido como: …". Una sola fase; nada a medias.\n\n'+

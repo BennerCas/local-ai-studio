@@ -9,6 +9,7 @@ __pycache__/
 node_modules/
 vendor/
 respaldos/
+datos/api-usage.json
 
 # Artefactos de tests en sandbox (rutas Windows literales)
 C:\\*

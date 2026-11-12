@@ -3,12 +3,17 @@ const test = require('node:test');
 const fs = require('fs');
 const html = fs.readFileSync('sidecars/local_ai_chat/ui-v2.html', 'utf8');
 
-test('sideTab base maneja los 6 paneles con cargadores protegidos', () => {
-  if (!html.includes("['setup','project','staff','history','gallery','code']")) throw new Error('no maneja los 6');
-  if (!html.includes("console.warn('sideTab:'")) throw new Error('cargadores sin proteger');
+test('Setup contiene las herramientas de workspace y abre una vista principal', () => {
+  for (const tool of ['history', 'gallery', 'code']) {
+    if (!html.includes(`class="setup-tool-tab" data-setup-tool="${tool}"`)) throw new Error(`falta Setup/${tool}`);
+    if (!html.includes(`id="library-pane-${tool}"`)) throw new Error(`falta vista ${tool}`);
+  }
+  if (!html.includes('id="view-library"')) throw new Error('falta la vista principal del workspace');
+  if (!html.includes('function setupToolTab(name)')) throw new Error('falta el selector anidado de Setup');
 });
 
-test('ultimo eslabon: red de seguridad de visibilidad', () => {
-  if (!html.includes("console.warn('sideTab staff:'")) throw new Error('sin try/catch');
-  if (!html.includes('Nunca mas una columna')) throw new Error('sin red de seguridad');
+test('cada herramienta vacía tiene placeholders visuales y manejo de error', () => {
+  if (!html.includes('function renderLibraryPlaceholders(kind)')) throw new Error('sin placeholders');
+  if (!html.includes('library-placeholder-grid')) throw new Error('sin grid de placeholders');
+  if (!html.includes('function renderLibraryError(kind,message)')) throw new Error('sin estado de error');
 });

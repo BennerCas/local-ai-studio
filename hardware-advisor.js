@@ -289,6 +289,9 @@ async function queryWindowsCimSnapshot(forceRefresh = false) {
     "$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1 Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed",
     "$gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'Radeon|AMD|NVIDIA|Intel|Arc' } | Select-Object -First 1 Name,DriverVersion,AdapterRAM",
     "$npu = Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'NPU Compute' } | Select-Object -First 1 Name,Status",
+    "$memory = Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum | Select-Object Sum",
+    "$os = Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory",
+    "$disks = @(Get-CimInstance Win32_LogicalDisk -Filter \"DriveType=3\" | Select-Object DeviceID,Size,FreeSpace)",
     `$keys = @(${keysLiteral})`,
     "$userEnv = @{}",
     "$machineEnv = @{}",
@@ -296,7 +299,7 @@ async function queryWindowsCimSnapshot(forceRefresh = false) {
     "$hklmProps = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment' -ErrorAction SilentlyContinue).PSObject.Properties",
     "foreach ($k in $keys) { $val = [Environment]::GetEnvironmentVariable($k, 'User'); $userEnv[$k] = if ($null -eq $val) { '' } else { [string]$val }; $mProp = if ($null -ne $hklmProps) { $hklmProps[$k] } else { $null }; if ($null -ne $mProp) { $machineEnvHasProp[$k] = $true; $machineEnv[$k] = if ($null -eq $mProp.Value) { '' } else { [string]$mProp.Value } } else { $machineEnvHasProp[$k] = $false; $mVal = [Environment]::GetEnvironmentVariable($k, 'Machine'); $machineEnv[$k] = if ($null -eq $mVal) { '' } else { [string]$mVal } } }",
     "$procs = @(Get-CimInstance Win32_Process -Filter \"Name = 'ollama.exe' OR Name = 'ollama app.exe' OR Name LIKE 'python%'\" | ForEach-Object { $n = [string]$_.Name; $cmd = [string]$_.CommandLine; $isDml = ($n -like 'python*') -and ($cmd -match 'api_openai\\.py'); if ($n -eq 'ollama.exe' -or $n -eq 'ollama app.exe' -or $isDml) { $cDate = ''; try { if ($_.CreationDate) { $cDate = ([DateTime]$_.CreationDate).ToUniversalTime().ToString('o') } } catch {}; $role = if ($isDml) { 'directml' } elseif ($n -eq 'ollama app.exe') { 'app' } elseif ($cmd -match '\\brunner\\b') { 'runner' } elseif ($cmd -match '\\bserve\\b') { 'serve' } else { 'other' }; @{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; name = $n; CommandLine = $cmd; role = $role; startedAt = $cDate; kind = $(if ($isDml) { 'directml' } else { 'ollama' }) } } })",
-    "@{ isAdmin = [bool]$isAdmin; cpu = $cpu; gpu = $gpu; npu = $npu; userEnv = $userEnv; machineEnv = $machineEnv; machineEnvHasProp = $machineEnvHasProp; processes = $procs } | ConvertTo-Json -Depth 4 -Compress"
+    "@{ isAdmin = [bool]$isAdmin; cpu = $cpu; gpu = $gpu; npu = $npu; memory = $memory; os = $os; disks = $disks; userEnv = $userEnv; machineEnv = $machineEnv; machineEnvHasProp = $machineEnvHasProp; processes = $procs } | ConvertTo-Json -Depth 5 -Compress"
   ].join("; ");
 
   const data = await runPowerShellJson(psScript, {}, 5000);
@@ -824,6 +827,8 @@ async function getHostHardwareTelemetry(options = {}) {
     const ovOllama = ov.ollamaRuntime && typeof ov.ollamaRuntime === "object" ? ov.ollamaRuntime : null;
     const ovDml = ov.directmlRuntime && typeof ov.directmlRuntime === "object" ? ov.directmlRuntime : null;
     return {
+      source: "override/test",
+      measured: false,
       platform: ov.platform || process.platform,
       isAdmin: shadowAudit.isAdmin,
       collectedAt: new Date().toISOString(),
@@ -837,6 +842,9 @@ async function getHostHardwareTelemetry(options = {}) {
         name: ov.gpu?.name || "AMD Radeon(TM) 860M Graphics",
         driverVersion: ov.gpu?.driverVersion || "32.0.32015.12012",
         dedicatedVramGb: roundGb(ov.gpu?.dedicatedVramGb ?? 2.0),
+        reportedAdapterMemoryGb: roundGb(ov.gpu?.reportedAdapterMemoryGb ?? ov.gpu?.dedicatedVramGb ?? 2.0),
+        memoryType: ov.gpu?.memoryType || "shared",
+        isIntegrated: ov.gpu?.isIntegrated !== false,
         isRadeon860M: ov.gpu?.isRadeon860M !== false
       },
       npu: {
@@ -845,10 +853,13 @@ async function getHostHardwareTelemetry(options = {}) {
         status: ov.npu?.status || "OK"
       },
       ram: {
+        installedGb: roundGb(ov.ram?.installedGb ?? ov.ram?.totalGb ?? 29.66),
         totalGb: roundGb(ov.ram?.totalGb ?? 29.66),
+        usableGb: roundGb(ov.ram?.usableGb ?? ov.ram?.totalGb ?? 29.66),
         freeGb: roundGb(ov.ram?.freeGb ?? 7.2),
         usedGb: roundGb((ov.ram?.totalGb ?? 29.66) - (ov.ram?.freeGb ?? 7.2))
       },
+      storage: ov.storage && typeof ov.storage === "object" ? ov.storage : { measured: false, volumes: [], totalGb: 0, freeGb: 0, usedGb: 0 },
       env: {
         process: processEnv,
         user: userEnv,
@@ -923,10 +934,21 @@ async function getHostHardwareTelemetry(options = {}) {
     };
   }
 
-  const totalGb = roundGb(os.totalmem() / (1024 * 1024 * 1024));
-  const freeGb = roundGb(os.freemem() / (1024 * 1024 * 1024));
+  const nodeTotalGb = roundGb(os.totalmem() / (1024 * 1024 * 1024));
+  const nodeFreeGb = roundGb(os.freemem() / (1024 * 1024 * 1024));
   const cpus = os.cpus() || [];
   const cim = options.cim !== undefined ? options.cim : await queryWindowsCimSnapshot(Boolean(options.forceRefresh));
+
+  const installedBytes = Number(cim?.memory?.Sum || 0);
+  const installedGb = installedBytes > 0 ? roundGb(installedBytes / (1024 * 1024 * 1024)) : nodeTotalGb;
+  const cimUsableGb = Number(cim?.os?.TotalVisibleMemorySize || 0) > 0
+    ? roundGb(Number(cim.os.TotalVisibleMemorySize) / (1024 * 1024))
+    : nodeTotalGb;
+  const totalGb = cimUsableGb || nodeTotalGb;
+  const cimFreeGb = Number(cim?.os?.FreePhysicalMemory || 0) > 0
+    ? roundGb(Number(cim.os.FreePhysicalMemory) / (1024 * 1024))
+    : nodeFreeGb;
+  const freeGb = cimFreeGb || nodeFreeGb;
 
   const cpuName = (cim && cim.cpu && cim.cpu.Name) || (cpus[0] && cpus[0].model) || "CPU Host";
   const logicalThreads = Number((cim && cim.cpu && cim.cpu.NumberOfLogicalProcessors) || cpus.length || 8);
@@ -935,6 +957,15 @@ async function getHostHardwareTelemetry(options = {}) {
   const gpuName = (cim && cim.gpu && cim.gpu.Name) || "GPU Integrada / Sistema";
   const adapterRamBytes = Number((cim && cim.gpu && cim.gpu.AdapterRAM) || 0);
   const dedicatedVramGb = adapterRamBytes > 0 ? roundGb(adapterRamBytes / (1024 * 1024 * 1024)) : 2.0;
+  const storageVolumes = Array.isArray(cim?.disks)
+    ? cim.disks.map((disk) => {
+      const sizeGb = roundGb(Number(disk?.Size || 0) / (1024 * 1024 * 1024));
+      const freeDiskGb = roundGb(Number(disk?.FreeSpace || 0) / (1024 * 1024 * 1024));
+      return { drive: String(disk?.DeviceID || "").trim(), totalGb: sizeGb, freeGb: freeDiskGb, usedGb: roundGb(Math.max(0, sizeGb - freeDiskGb)) };
+    }).filter((disk) => disk.drive && disk.totalGb > 0)
+    : [];
+  const storageTotalGb = roundGb(storageVolumes.reduce((sum, disk) => sum + disk.totalGb, 0));
+  const storageFreeGb = roundGb(storageVolumes.reduce((sum, disk) => sum + disk.freeGb, 0));
 
   const processEnv = sanitizeEnvSubset(process.env);
   const userEnv = sanitizeEnvSubset((cim && cim.userEnv) || {});
@@ -958,6 +989,8 @@ async function getHostHardwareTelemetry(options = {}) {
   });
 
   return {
+    source: cim ? "windows-cim" : "node-os-fallback",
+    measured: Boolean(cim),
     platform: process.platform,
     isAdmin: shadowAudit.isAdmin,
     collectedAt: new Date().toISOString(),
@@ -971,6 +1004,9 @@ async function getHostHardwareTelemetry(options = {}) {
       name: String(gpuName).trim(),
       driverVersion: String((cim && cim.gpu && cim.gpu.DriverVersion) || ""),
       dedicatedVramGb,
+      reportedAdapterMemoryGb: dedicatedVramGb,
+      memoryType: /radeon|integrated/i.test(`${gpuName} ${cpuName}`) ? "shared" : "dedicated",
+      isIntegrated: /radeon\s*\(?tm\)?\s*860m|integrated/i.test(`${gpuName} ${cpuName}`),
       isRadeon860M: /860m|radeon/i.test(`${gpuName} ${cpuName}`)
     },
     npu: {
@@ -979,9 +1015,18 @@ async function getHostHardwareTelemetry(options = {}) {
       status: String((cim && cim.npu && cim.npu.Status) || "")
     },
     ram: {
+      installedGb,
       totalGb,
+      usableGb: totalGb,
       freeGb,
       usedGb: roundGb(Math.max(0, totalGb - freeGb))
+    },
+    storage: {
+      measured: Boolean(cim),
+      volumes: storageVolumes,
+      totalGb: storageTotalGb,
+      freeGb: storageFreeGb,
+      usedGb: roundGb(Math.max(0, storageTotalGb - storageFreeGb))
     },
     env: {
       process: processEnv,

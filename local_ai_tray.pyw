@@ -11,11 +11,13 @@ from PIL import Image
 import pystray
 from pystray import MenuItem, Menu
 
-BASE_DIR = r"C:\antigravityAS\Local AI Studio"
+BASE_DIR = r"C:\antigravityAS\local-ai-studio"
 SIDECAR_DIR = os.path.join(BASE_DIR, "sidecars", "local_ai_chat")
 SERVER_JS = os.path.join(SIDECAR_DIR, "server.js")
 MODELS_DIR = r"C:\antigravityAS\Modelos -ai-brains"
-DIRECTML_SCRIPT = os.path.join(MODELS_DIR, "api_openai.py")
+# El ejecutable versionado pertenece a esta instalación; la carpeta externa
+# sólo conserva los artefactos ONNX y no debe decidir qué backend se arranca.
+DIRECTML_SCRIPT = os.path.join(BASE_DIR, "sidecars", "directml", "api_openai.py")
 PROJECTS_DIR = r"C:\antigravityAS\SynthIA"
 PROJECTS_FALLBACK_DIR = r"C:\antigravityAS"
 ICO_PATH = os.path.join(BASE_DIR, "tray_icon.ico")
@@ -23,9 +25,12 @@ PNG_PATH = os.path.join(BASE_DIR, "tray_icon.png")
 
 APP_URL = "http://127.0.0.1:63719/"
 DIRECTML_HEALTH = "http://127.0.0.1:8002/health"
+DIRECTML_LOAD = "http://127.0.0.1:8002/v1/models/load"
+DIRECTML_DEFAULT_MODEL = "Hermes-3-8B-UNLOCKED-ONNX-DirectML"
 OLLAMA_TAGS = "http://127.0.0.1:11434/api/tags"
 POLL_INTERVAL_SECONDS = 5.0
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+PYTHON_RUNTIME = sys.executable.replace("pythonw.exe", "python.exe") if sys.executable.lower().endswith("pythonw.exe") else sys.executable
 
 server_proc = None
 dml_proc = None
@@ -89,6 +94,28 @@ def _is_proc_running(proc):
     return proc is not None and proc.poll() is None
 
 
+def ensure_directml_hermes(timeout=180.0):
+    """Deja Hermes cargado aunque DirectML ya estuviera levantado con otro modelo."""
+    ready, active = probe_directml_status(timeout=1.5)
+    if ready and active == DIRECTML_DEFAULT_MODEL:
+        return True
+    payload = json.dumps({"model": DIRECTML_DEFAULT_MODEL}).encode("utf-8")
+    request = urllib.request.Request(
+        DIRECTML_LOAD,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            if response.status not in (200, 201):
+                return False
+    except Exception:
+        return False
+    ready, active = probe_directml_status(timeout=3.0)
+    return ready and active == DIRECTML_DEFAULT_MODEL
+
+
 def start_server_js():
     global server_proc
     if _is_proc_running(server_proc) or is_url_alive(APP_URL):
@@ -106,6 +133,7 @@ def start_server_js():
 def start_directml():
     global dml_proc
     if _is_proc_running(dml_proc) or is_url_alive(DIRECTML_HEALTH):
+        ensure_directml_hermes()
         return
     env = dict(os.environ)
     if not env.get("OLIVE_GPU_MEMORY_LIMIT"):
@@ -114,16 +142,27 @@ def start_directml():
         env["OLIVE_CPU_THREADS"] = "12"
     if not env.get("ORT_DML_DEVICE_ID"):
         env["ORT_DML_DEVICE_ID"] = "0"
+    env["DIRECTML_DEFAULT_MODEL"] = DIRECTML_DEFAULT_MODEL
     env["OLLAMA_IGPU_ENABLE"] = "1"
     if not env.get("HSA_OVERRIDE_GFX_VERSION"):
         env["HSA_OVERRIDE_GFX_VERSION"] = "11.0.0"
 
     dml_proc = subprocess.Popen(
-        [sys.executable, DIRECTML_SCRIPT],
+        [PYTHON_RUNTIME, "-u", DIRECTML_SCRIPT],
         cwd=MODELS_DIR,
         env=env,
         creationflags=CREATE_NO_WINDOW,
     )
+
+    # El backend carga Hermes durante su arranque; esta espera evita abrir la
+    # interfaz mientras DirectML aún está vivo pero sin el Director disponible.
+    deadline = time.time() + 180.0
+    while time.time() < deadline and not _stop_event.is_set():
+        ready, active = probe_directml_status(timeout=2.0)
+        if ready and active == DIRECTML_DEFAULT_MODEL:
+            return
+        time.sleep(1.0)
+    ensure_directml_hermes(timeout=180.0)
 
 
 def start_ollama(icon=None, item=None):
