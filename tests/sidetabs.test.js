@@ -17,3 +17,16 @@ test('cada herramienta vacía tiene placeholders visuales y manejo de error', ()
   if (!html.includes('library-placeholder-grid')) throw new Error('sin grid de placeholders');
   if (!html.includes('function renderLibraryError(kind,message)')) throw new Error('sin estado de error');
 });
+
+test('el constructor explica cada estrategia y compilador y actualiza la indicación al cambiar', () => {
+  for (const value of ['auto', 'hybrid', 'cloud', 'manual']) {
+    if (!html.includes(`value="${value}"`)) throw new Error(`falta estrategia ${value}`);
+  }
+  for (const value of ['openrouter', 'freeai']) {
+    if (!html.includes(`value="${value}"`)) throw new Error(`falta compilador ${value}`);
+  }
+  for (const id of ['contextStrategyHint', 'contextProviderHint']) {
+    if (!html.includes(`id="${id}"`)) throw new Error(`falta indicación ${id}`);
+  }
+  if (!html.includes('function updateContextEngineHints()')) throw new Error('falta actualización dinámica de indicaciones');
+});

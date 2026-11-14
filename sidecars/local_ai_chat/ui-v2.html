@@ -565,6 +565,10 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-proyectos .context-engine-strip{align-items:flex-end;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(124,108,255,.06)}
 #view-proyectos .context-engine-strip label{display:flex;flex-direction:column;gap:4px;min-width:120px}
 #view-proyectos .context-engine-strip .input{padding:6px 8px;font-size:11px;min-height:30px}
+#view-proyectos .context-engine-help{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+#view-proyectos .context-engine-help>div{padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:rgba(7,7,13,.2);min-width:0}
+#view-proyectos .context-engine-help b{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
+#view-proyectos .context-engine-help span{display:block;color:var(--muted);font-size:10px;line-height:1.45}
 #view-proyectos #contextEngineStatus{min-height:16px}
 #view-proyectos .context-engine-progress{padding:8px 10px;border:1px solid rgba(34,211,238,.24);border-radius:10px;background:rgba(34,211,238,.05)}
 #view-proyectos .context-engine-progress .progress{height:7px;margin-top:6px;background:rgba(255,255,255,.08)}
@@ -1238,6 +1242,7 @@ export async function rotateSession(userId) { /* … */ }</div></div>
         </div>
         <div class="card project-context-card"><div class="flex between"><div><h3>🧱 Constructor de contexto</h3><p class="desc">El motor selecciona lo relevante, divide tandas y entrega como máximo 6k tokens.</p></div><span id="contextProjectTag" class="tag">sin proyecto</span></div>
           <div class="context-engine-strip flex wrap mt"><label class="tiny">Estrategia <select id="contextStrategySelect" class="input sm"><option value="auto">⚙️ Automático local</option><option value="hybrid">☁️ Híbrido · nube → DirectML</option><option value="cloud">🌐 Compilar solo en nube</option><option value="manual">✋ Manual</option></select></label><label class="tiny">Compilador <select id="contextProviderSelect" class="input sm"><option value="openrouter">OpenRouter</option><option value="freeai">Free.ai</option></select></label><button id="runAutoContextBtn" class="btn sm primary">🧠 Preparar contexto</button></div>
+          <div class="context-engine-help" aria-live="polite"><div><b id="contextStrategyLabel">Automático local</b><span id="contextStrategyHint">Indexa el proyecto en local y selecciona sólo los archivos relevantes. Recomendado para trabajo offline y cambios concretos.</span></div><div><b id="contextProviderLabel">OpenRouter</b><span id="contextProviderHint">Compilador externo para resumir tandas. Requiere red y credenciales; no sustituye al motor local.</span></div></div>
           <div id="contextEngineStatus" class="tiny muted mt">Modo automático: cada mensaje leerá solo los archivos relevantes y guardará el índice local del proyecto.</div>
           <div id="contextEngineProgressWrap" class="context-engine-progress mt" hidden><div class="flex between tiny"><span id="contextEnginePhase">Preparando…</span><span id="contextEngineEta">estimando demora…</span></div><div class="progress mt"><b id="contextEngineProgressBar" style="width:0%"></b></div><div id="contextEngineElapsed" class="tiny muted mt">Tiempo transcurrido: 0 s</div></div>
           <div class="context-file-toolbar"><span id="contextFileSummary">Selecciona un proyecto</span><div class="pager"><button id="contextFilePrev" class="icon-btn" aria-label="Página anterior">‹</button><span id="contextFilePage">—</span><button id="contextFileNext" class="icon-btn" aria-label="Página siguiente">›</button></div></div>
@@ -3673,6 +3678,24 @@ function projectTokenLabel(value){
   const n=Math.max(0,Number(value)||0);
   return n>=1000?(n/1000).toFixed(1).replace('.0','')+'k':String(n);
 }
+const CONTEXT_STRATEGY_INFO={
+  auto:{label:'Automático local',hint:'Indexa todo el proyecto en local y selecciona sólo lo relevante. No envía datos a la nube; recomendado para cambios concretos y trabajo offline.'},
+  hybrid:{label:'Híbrido · nube → DirectML',hint:'Local selecciona y el compilador resume por tandas; DirectML recibe el resumen y el código esencial dentro del límite de 6k.'},
+  cloud:{label:'Compilar sólo en nube',hint:'El compilador procesa el proyecto por tandas y crea un resumen global. Requiere red; el resumen no aplica cambios por sí solo.'},
+  manual:{label:'Manual',hint:'Usa los archivos seleccionados o fijados por ti. Da control total, pero debes incluir todos los archivos necesarios para la tarea.'}
+};
+const CONTEXT_PROVIDER_INFO={
+  openrouter:{label:'OpenRouter',hint:'Compilador externo para resumir tandas y arquitectura. Requiere red y credenciales; el resultado se limita antes de llegar al motor local.'},
+  freeai:{label:'Free.ai',hint:'Compilador externo orientado a síntesis de contexto. Requiere red y credenciales; si falla, debe informarse y degradar a local.'}
+};
+function updateContextEngineHints(){
+  const strategy=document.getElementById('contextStrategySelect'), provider=document.getElementById('contextProviderSelect');
+  const strategyInfo=CONTEXT_STRATEGY_INFO[(strategy&&strategy.value)||'auto']||CONTEXT_STRATEGY_INFO.auto;
+  const providerInfo=CONTEXT_PROVIDER_INFO[(provider&&provider.value)||'openrouter']||CONTEXT_PROVIDER_INFO.openrouter;
+  const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
+  set('contextStrategyLabel',strategyInfo.label);set('contextStrategyHint',strategyInfo.hint);
+  set('contextProviderLabel',providerInfo.label);set('contextProviderHint',providerInfo.hint);
+}
 function projectFileTokenEstimate(file){ return Math.max(1,Math.ceil((Number(file&&file.size)||0)/4)); }
 function projectSetTag(el,text,tone){ if(!el) return; el.textContent=text||''; el.className='tag'+(tone?' '+tone:''); }
 function renderProjectStats(data,changesCount){
@@ -3830,8 +3853,9 @@ async function loadProjectsViewReal(){
   const ctxCard=document.querySelector('#view-proyectos .project-context-card');
   if(ctxCard){
     const strategy=document.getElementById('contextStrategySelect'), provider=document.getElementById('contextProviderSelect'), autoBtn=document.getElementById('runAutoContextBtn');
-    if(strategy){strategy.value=localStorage.getItem('las-context-mode')||'auto';strategy.onchange=()=>localStorage.setItem('las-context-mode',strategy.value);}
-    if(provider){provider.value=localStorage.getItem('las-context-provider')||'openrouter';provider.onchange=()=>localStorage.setItem('las-context-provider',provider.value);}
+    if(strategy){strategy.value=localStorage.getItem('las-context-mode')||'auto';strategy.onchange=()=>{localStorage.setItem('las-context-mode',strategy.value);updateContextEngineHints();};}
+    if(provider){provider.value=localStorage.getItem('las-context-provider')||'openrouter';provider.onchange=()=>{localStorage.setItem('las-context-provider',provider.value);updateContextEngineHints();};}
+    updateContextEngineHints();
     if(autoBtn)autoBtn.onclick=runAutomaticContextReal;
     const apply=document.getElementById('applyProjectContextBtn');
     if(apply) apply.onclick=async()=>{
