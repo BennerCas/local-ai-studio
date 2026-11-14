@@ -569,6 +569,14 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-proyectos .context-engine-help>div{padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:rgba(7,7,13,.2);min-width:0}
 #view-proyectos .context-engine-help b{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
 #view-proyectos .context-engine-help span{display:block;color:var(--muted);font-size:10px;line-height:1.45}
+#view-proyectos .context-engine-guide{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:rgba(7,7,13,.18)}
+#view-proyectos .context-engine-guide summary{cursor:pointer;padding:9px 11px;color:var(--text);font-size:11px;font-weight:700;user-select:none}
+#view-proyectos .context-engine-guide summary::marker{color:var(--cyan)}
+#view-proyectos .context-engine-guide-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 10px 10px}
+#view-proyectos .context-engine-guide-body>div{padding:8px 9px;border-left:2px solid var(--cyan);background:rgba(124,108,255,.06);border-radius:0 8px 8px 0}
+#view-proyectos .context-engine-guide-body b{display:block;color:var(--text);font-size:11px;margin-bottom:3px}
+#view-proyectos .context-engine-guide-body p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}
+#view-proyectos .context-engine-guide-body .guide-wide{grid-column:1/-1;border-left-color:var(--amber)}
 #view-proyectos #contextEngineStatus{min-height:16px}
 #view-proyectos .context-engine-progress{padding:8px 10px;border:1px solid rgba(34,211,238,.24);border-radius:10px;background:rgba(34,211,238,.05)}
 #view-proyectos .context-engine-progress .progress{height:7px;margin-top:6px;background:rgba(255,255,255,.08)}
@@ -582,6 +590,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-proyectos .project-context-actions .btn{flex:1;justify-content:center;min-width:145px}
 @media(max-width:900px){#view-proyectos.active{overflow:auto}.project-workspace{grid-template-columns:1fr!important}.project-search-results{max-height:150px!important}}
 @media(max-width:900px){#view-proyectos .context-engine-help{grid-template-columns:1fr}}
+@media(max-width:900px){#view-proyectos .context-engine-guide-body{grid-template-columns:1fr}.context-engine-guide-body .guide-wide{grid-column:auto}}
 @media(max-width:900px){.library-placeholder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.library-placeholder-grid{grid-template-columns:1fr}.library-grid,#view-library #galleryGrid,#view-library #historyList,#view-library #codeList{grid-template-columns:1fr}}
 
@@ -1244,6 +1253,7 @@ export async function rotateSession(userId) { /* … */ }</div></div>
         <div class="card project-context-card"><div class="flex between"><div><h3>🧱 Constructor de contexto</h3><p class="desc">El motor selecciona lo relevante, divide tandas y entrega como máximo 6k tokens.</p></div><span id="contextProjectTag" class="tag">sin proyecto</span></div>
           <div class="context-engine-strip flex wrap mt"><label class="tiny">Estrategia <select id="contextStrategySelect" class="input sm"><option value="auto">⚙️ Automático local</option><option value="hybrid">☁️ Híbrido · nube → DirectML</option><option value="cloud">🌐 Compilar solo en nube</option><option value="manual">✋ Manual</option></select></label><label class="tiny">Alcance <select id="contextScopeSelect" class="input sm"><option value="focused">🎯 Tarea enfocada</option><option value="whole">🗺️ Proyecto completo</option></select></label><label class="tiny">Compilador <select id="contextProviderSelect" class="input sm"><option value="openrouter">OpenRouter</option><option value="freeai">Free.ai</option></select></label><button id="runAutoContextBtn" class="btn sm primary">🧠 Preparar contexto</button></div>
           <div class="context-engine-help" aria-live="polite"><div><b id="contextStrategyLabel">Automático local</b><span id="contextStrategyHint">Indexa el proyecto en local y selecciona sólo los archivos relevantes. Recomendado para trabajo offline y cambios concretos.</span></div><div><b id="contextScopeLabel">Tarea enfocada</b><span id="contextScopeHint">Selecciona código relevante para una tarea concreta; el mapa global del proyecto siempre se conserva.</span></div><div><b id="contextProviderLabel">OpenRouter</b><span id="contextProviderHint">Compilador externo para resumir tandas. Requiere red y credenciales; no sustituye al motor local.</span></div></div>
+          <details id="contextEngineGuide" class="context-engine-guide"><summary>¿Cómo utilizar el constructor?</summary><div class="context-engine-guide-body"><div><b>1. Define el objetivo</b><p>Selecciona un proyecto y escribe en “Buscar en el proyecto” qué quieres hacer: por ejemplo, “corregir el lanzador y evitar que abra una versión antigua”. Pulsa “Preparar contexto”.</p></div><div><b>2. Revisa el resultado</b><p>Comprueba archivos seleccionados, tokens, tandas y el indicador de confianza. “Confiable” significa que se preparó contenido suficiente; no sustituye revisar el código.</p></div><div><b>Tarea enfocada</b><p>Úsala para un bug, función o módulo concreto. El motor prioriza archivos relacionados con tu objetivo, más los seleccionados o fijados. Es la opción recomendada para trabajar rápido y sin ruido.</p></div><div><b>Mapa global del proyecto</b><p>Es un inventario ligero de todo el proyecto: cantidad de archivos, tipos, carpetas, tamaños y archivos prioritarios. Orienta al motor, pero no contiene el código completo.</p></div><div class="guide-wide"><b>Proyecto completo</b><p>Divide todos los archivos indexados en tandas respetando el máximo de 6k tokens por tanda. Para obtener una síntesis global, usa “Híbrido” o “Compilar solo en nube”; el compilador resume las tandas y las fusiona. Puede tardar más y requiere un proveedor configurado.</p></div><div><b>Manual</b><p>Marca los archivos con la casilla o fíjalos con el pin antes de preparar. Si no marcas ninguno, el motor conserva su selección automática para no dejar el contexto vacío.</p></div><div><b>Estrategias</b><p>Automático local = offline y rápido. Híbrido = resumen externo + trabajo local. Nube = síntesis externa. Manual = control directo de archivos.</p></div></div></details>
           <div id="contextEngineStatus" class="tiny muted mt">Modo automático: cada mensaje leerá solo los archivos relevantes y guardará el índice local del proyecto.</div>
           <div id="contextCoverageStatus" class="tiny muted mt">Cobertura: todavía no se ha preparado un contexto.</div>
           <div id="contextEngineProgressWrap" class="context-engine-progress mt" hidden><div class="flex between tiny"><span id="contextEnginePhase">Preparando…</span><span id="contextEngineEta">estimando demora…</span></div><div class="progress mt"><b id="contextEngineProgressBar" style="width:0%"></b></div><div id="contextEngineElapsed" class="tiny muted mt">Tiempo transcurrido: 0 s</div></div>
@@ -1736,6 +1746,9 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
             <label class="small">Modelo preferido<select class="input mt" id="createdAgentProvider"><option value="auto">Auto · según motor activo</option><option value="ollama">Ollama local</option><option value="directml">Hermes · DirectML</option><option value="freeai">Free.ai</option><option value="api">API del enjambre</option></select></label>
             <label class="small mt">Modelo concreto (opcional)<input class="input mt" id="createdAgentModel" placeholder="ej. qwen2.5-coder:7b"></label>
             <label class="small mt">Máximo de pasos por tarea<input class="input mt" id="createdAgentMaxSteps" type="number" min="1" max="100" value="12"></label>
+            <label class="small mt">Modo del runtime<select class="input mt" id="createdAgentRuntimeMode"><option value="supervised">Supervisado · pide aprobación</option><option value="autonomous">Autónomo · ejecuta con permisos concedidos</option><option value="dry-run">Simulación · no modifica archivos</option></select></label>
+            <label class="small mt">Política de aprobación<select class="input mt" id="createdAgentApprovalMode"><option value="confirm">Confirmar mutaciones</option><option value="auto">Automática dentro del alcance</option><option value="never">No ejecutar mutaciones</option></select></label>
+            <label class="tiny mt"><input type="checkbox" id="createdAgentRequireVerification" checked> Exigir verificación antes de finalizar</label>
           </div>
         </div>
         <div class="grid g2 mt">
@@ -2704,8 +2717,8 @@ function renderCreatedAgents(){
   const host=document.getElementById('createdAgentsList'); if(!host) return;
   if(!CREATED_AGENTS.length){ host.innerHTML='<div class="tiny muted">Aún no hay agentes creados. El primero que guardes aparecerá aquí y en el selector de Chat.</div>'; return; }
   host.innerHTML='<div class="small"><b>Agentes persistentes</b></div><div class="grid g2 mt">'+CREATED_AGENTS.map(a=>{
-    const p=a.modelPolicy||{}; const active=REAL.agentId===a.id;
-    return '<div class="card" style="background:var(--card2);border-color:'+(active?'var(--cyan)':'')+'"><div class="flex between"><h3>🤖 '+esc(a.name)+'</h3><span class="tag '+(active?'green':'cyan')+'">'+(active?'activo':'listo')+'</span></div><p class="desc mt">'+esc(a.description||'Sin objetivo descrito')+'</p><p class="tiny muted mt">Perfil: '+esc(a.profileId||'sin perfil')+' · '+(a.skillIds||[]).length+' skills · '+(a.tools||[]).length+' herramientas · '+esc(p.provider||'auto')+(p.model?' / '+esc(p.model):'')+'</p><div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="activateCreatedAgent(\''+a.id+'\')">'+(active?'✅ Activo':'▶ Activar en Chat')+'</button><button class="btn sm danger" onclick="deleteCreatedAgent(\''+a.id+'\')">🗑 Eliminar</button></div></div>';
+    const p=a.modelPolicy||{}; const rt=a.runtime||{}; const active=REAL.agentId===a.id;
+    return '<div class="card" style="background:var(--card2);border-color:'+(active?'var(--cyan)':'')+'"><div class="flex between"><h3>🤖 '+esc(a.name)+'</h3><span class="tag '+(active?'green':'cyan')+'">'+(active?'activo':'listo')+'</span></div><p class="desc mt">'+esc(a.description||'Sin objetivo descrito')+'</p><p class="tiny muted mt">Perfil: '+esc(a.profileId||'sin perfil')+' · '+(a.skillIds||[]).length+' skills · '+(a.tools||[]).length+' herramientas · '+esc(p.provider||'auto')+(p.model?' / '+esc(p.model):'')+'</p><p class="tiny muted mt">Runtime: '+esc(rt.mode||'supervisado')+' · aprobación '+esc(rt.approvalMode||'confirm')+' · verificación '+(rt.requireVerification===false?'no':'sí')+'</p><div class="flex wrap mt" style="gap:6px"><button class="btn sm primary" onclick="activateCreatedAgent(\''+a.id+'\')">'+(active?'✅ Activo':'▶ Activar en Chat')+'</button><button class="btn sm" onclick="runCreatedAgentPrompt(\''+a.id+'\')">▶ Ejecutar tarea</button><button class="btn sm danger" onclick="deleteCreatedAgent(\''+a.id+'\')">🗑 Eliminar</button></div></div>';
   }).join('')+'</div>';
 }
 async function loadCreatedAgents(){
@@ -2723,7 +2736,7 @@ async function createAgentFromUI(){
   const tools=[...document.querySelectorAll('[data-agent-tool]:checked')].map(x=>x.dataset.agentTool);
   const permissions={}; document.querySelectorAll('[data-agent-permission]').forEach(x=>permissions[x.dataset.agentPermission]=x.checked);
   const skillSel=document.getElementById('createdAgentSkills');
-  const payload={name,description,profileId:document.getElementById('createdAgentProfile')?.value||'',skillIds:[...(skillSel?.selectedOptions||[])].map(o=>o.value),tools,permissions,maxSteps:Number(document.getElementById('createdAgentMaxSteps')?.value||12),modelProvider:document.getElementById('createdAgentProvider')?.value||'auto',model:document.getElementById('createdAgentModel')?.value||''};
+  const payload={name,description,profileId:document.getElementById('createdAgentProfile')?.value||'',skillIds:[...(skillSel?.selectedOptions||[])].map(o=>o.value),tools,permissions,maxSteps:Number(document.getElementById('createdAgentMaxSteps')?.value||12),modelProvider:document.getElementById('createdAgentProvider')?.value||'auto',model:document.getElementById('createdAgentModel')?.value||'',runtime:{mode:document.getElementById('createdAgentRuntimeMode')?.value||'supervised',approvalMode:document.getElementById('createdAgentApprovalMode')?.value||'confirm',requireVerification:document.getElementById('createdAgentRequireVerification')?.checked!==false}};
   if(state) state.textContent='Guardando manifiesto…';
   try{
     const r=await API.post('/api/agents/create',payload);
@@ -2732,6 +2745,26 @@ async function createAgentFromUI(){
     toast('🤖 Agente creado y cableado a Chat/Staff','ok');
     try{ await loadProfilesReal(); }catch(e){}
   }catch(e){ if(state) state.textContent=e.message; toast('No se pudo crear el agente: '+e.message,'err'); }
+}
+async function runCreatedAgentPrompt(id){
+  const agent=CREATED_AGENTS.find(a=>a.id===id); if(!agent) return;
+  const task=window.prompt('¿Qué tarea debe ejecutar '+agent.name+'?'); if(!task||!task.trim()) return;
+  try{
+    const started=await API.post('/api/agents/run',{agentId:id,task:task.trim()});
+    const runId=started.runId; toast('🤖 Ejecución iniciada: '+runId,'ok');
+    let last='';
+    for(let i=0;i<120;i++){
+      await new Promise(r=>setTimeout(r,1000));
+      const snap=await API.get('/api/agents/runs/'+encodeURIComponent(runId));
+      const run=snap.run||{}; last=run.status||last;
+      if(['completed','failed','cancelled','approval_required','waiting_input','needs_review','max_steps'].includes(run.status)){
+        const answer=run.result&&run.result.answer?run.result.answer:run.error||('Estado final: '+run.status);
+        toast('🤖 '+run.status+': '+String(answer).slice(0,180),run.status==='completed'?'ok':'err');
+        return;
+      }
+    }
+    toast('La ejecución sigue activa ('+last+'). Revisa su estado en el runtime.','ok');
+  }catch(e){ toast('No se pudo ejecutar el agente: '+e.message,'err'); }
 }
 function activateCreatedAgent(id){
   const value=String(id||'');

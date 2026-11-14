@@ -29,5 +29,8 @@ test('el constructor explica cada estrategia y compilador y actualiza la indicac
     if (!html.includes(`id="${id}"`)) throw new Error(`falta indicación ${id}`);
   }
   if (!html.includes('id="contextScopeSelect"') || !html.includes('id="contextScopeHint"')) throw new Error('falta alcance del contexto');
+  for (const phrase of ['Tarea enfocada', 'Mapa global del proyecto', 'Proyecto completo', '¿Cómo utilizar el constructor?', 'máximo de 6k tokens']) {
+    if (!html.includes(phrase)) throw new Error(`falta guía del constructor: ${phrase}`);
+  }
   if (!html.includes('function updateContextEngineHints()')) throw new Error('falta actualización dinámica de indicaciones');
 });
