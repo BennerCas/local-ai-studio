@@ -1,11 +1,17 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const path = require('node:path');
 const vm = require('node:vm');
 const { FREE_SELF_HOSTED_IMAGE_MODELS } = require('../freeai-bridge.js');
 
+function readStudioV2Html() {
+  return fs.readFileSync(path.join(__dirname, '..', 'sidecars/local_ai_chat/ui-v2.html'), 'utf8')
+    .replace(/\r\n?/g, '\n');
+}
+
 function loadMasters() {
-  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'sidecars/local_ai_chat/ui-v2.html'), 'utf8');
+  const html = readStudioV2Html();
   const start = html.indexOf('function _mp(o){');
   const end = html.indexOf('const MASTER_FIELDS=');
   assert.ok(start > -1 && end > start, 'bloque de masters profesionales no encontrado');
@@ -63,7 +69,7 @@ test('el cambio de modelo sincroniza los masters automáticamente (cableado UI)'
 });
 
 function loadIO() {
-  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'sidecars/local_ai_chat/ui-v2.html'), 'utf8');
+  const html = readStudioV2Html();
   const s1 = html.indexOf('function _mp(o){');
   const e1 = html.indexOf('const MASTER_FIELDS=', s1) + 'const MASTER_FIELDS='.length + "['pos','neg','surprise','atomize'];".length;
   const s2 = html.indexOf('const MASTER_FIELD_TITLES=');
@@ -114,7 +120,7 @@ test('importar masterprompts.md: ida y vuelta parsea y actualiza los 72 masters'
 });
 
 test('la tuerca ⚙ con importar/exportar está bajo el visor de la biblioteca', () => {
-  const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'sidecars/local_ai_chat/ui-v2.html'), 'utf8');
+  const html = readStudioV2Html();
   assert.match(html, /id="masterGearBtn"[^>]*onclick="[^"]*masterGearMenu/);
   assert.match(html, /onclick="exportMasterPrompts\(\)">⬇️ Exportar masterprompts\.md/);
   assert.match(html, /⬆️ Importar masterprompts\.md/);

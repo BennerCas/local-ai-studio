@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'sidecars/local_ai_chat/ui-v2.html'), 'utf8');
 
-test('STAFF AI es la pestaña por defecto al iniciar', () => {
-  assert.match(html, /sideTab\('staff'\); \/\* STAFF AI es la pestaña por defecto al iniciar \*\//);
+test('SETUP es la pestaña por defecto al iniciar', () => {
+  assert.match(html, /sideTab\('setup'\); \/\* Chat normal por defecto; STAFF_MODE solo se activa al entrar en Staff AI \*\//);
 });
 
 test('el perfil del Director está forjado y completo en perfiles/', () => {
