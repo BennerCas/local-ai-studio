@@ -42,6 +42,26 @@ test("context-engine nunca supera el tope operativo de 6k tokens aunque se solic
     assert.equal(plan.budgetTokens, 6000);
     assert.ok(plan.approxTokens <= 6000);
     assert.ok(plan.totalChars <= 6000 * 4);
+    assert.equal(plan.projectMap.fileCount, 30);
+    assert.equal(plan.coverage.indexedFiles, 30);
+    assert.equal(plan.coverage.confidence, "reliable");
+
+    const manual = contextEngine.plan(root, "irrelevant", {
+      budgetTokens: 6000,
+      selectedFiles: ["src/module-0.js"],
+      onlySelected: true,
+      persist: false
+    });
+    assert.deepEqual(manual.selectedFiles, ["src/module-0.js"]);
+    const manualLate = contextEngine.plan(root, "irrelevant", {
+      budgetTokens: 6000,
+      selectedFiles: ["src/module-29.js"],
+      onlySelected: true,
+      maxFiles: 1,
+      persist: false
+    });
+    assert.deepEqual(manualLate.selectedFiles, ["src/module-29.js"]);
+    assert.equal(manualLate.coverage.indexedFiles, 30);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

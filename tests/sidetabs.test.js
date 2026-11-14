@@ -28,5 +28,6 @@ test('el constructor explica cada estrategia y compilador y actualiza la indicac
   for (const id of ['contextStrategyHint', 'contextProviderHint']) {
     if (!html.includes(`id="${id}"`)) throw new Error(`falta indicación ${id}`);
   }
+  if (!html.includes('id="contextScopeSelect"') || !html.includes('id="contextScopeHint"')) throw new Error('falta alcance del contexto');
   if (!html.includes('function updateContextEngineHints()')) throw new Error('falta actualización dinámica de indicaciones');
 });

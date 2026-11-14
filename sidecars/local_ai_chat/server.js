@@ -219,7 +219,7 @@ function buildAutomaticContextPlan(options = {}) {
   const target = options.target || {};
   const messages = options.messages || [];
   const mode = normalizeContextMode(payload.contextMode);
-  if (mode === "off" || mode === "manual") return null;
+  if (mode === "off") return null;
 
   const project = bridge.getActiveProject(options.projectIdentifier || null, options.convId || null, payload.token || null);
   if (!project || project.isGeneral || !project.path) return null;
@@ -233,6 +233,8 @@ function buildAutomaticContextPlan(options = {}) {
   const baselineTokens = baseCtx && baseCtx.metrics ? Number(baseCtx.metrics.approxTokens) || 0 : 0;
   const goal = extractContextGoal(messages);
   const userTokens = contextEngine.estimateTokens(goal);
+  const storedSnapshot = contextEngine.loadContextSnapshot(project.path);
+  const storedDigest = payload.contextDigest || (storedSnapshot && storedSnapshot.digest && storedSnapshot.digest.text) || "";
   const isDirectml = String(target.engine || "").toLowerCase() === "directml";
   const safePromptTokens = Math.min(
     contextEngine.CONTEXT_BUILDER_MAX_TOKENS,
@@ -240,7 +242,7 @@ function buildAutomaticContextPlan(options = {}) {
   );
   const compilerMode = mode === "hybrid" || mode === "cloud" || payload.compile === true;
   const compilerReserve = compilerMode ? Math.max(700, Number(payload.contextMaxTokens) || 1500) : 0;
-  const digestReserve = contextEngine.estimateTokens(payload.contextDigest || "");
+  const digestReserve = contextEngine.estimateTokens(storedDigest);
   const reserve = (isDirectml ? bridge.DIRECTML_OUTPUT_RESERVE_TOKENS + 256 : 700) + compilerReserve + digestReserve;
   const explicitBudget = Number(payload.contextBudgetTokens);
   const budgetTokens = Number.isFinite(explicitBudget) && explicitBudget > 0
@@ -258,15 +260,13 @@ function buildAutomaticContextPlan(options = {}) {
     mentionedFiles: options.mentionedFiles || [],
     maxFiles: Number(payload.contextMaxFiles) || 24,
     maxFilesPerBatch: Number(payload.contextBatchFiles) || 12,
+    contextScope: String(payload.contextScope || "focused").toLowerCase() === "whole" ? "whole" : "focused",
+    onlySelected: mode === "manual",
     persist: payload.contextPersistIndex !== false
   });
 }
 
-async function compileContextWithCloud(planResult, goal, payload = {}) {
-  const provider = resolveContextCompilerProvider(payload.contextProvider || payload.compilerProvider || "");
-  if (!provider) return { ok: false, skipped: true, reason: "No hay Free.ai ni OpenRouter configurado para sintetizar contexto." };
-  const model = String(payload.contextModel || provider.defaultModel || "").trim();
-  const prompt = contextEngine.buildCompilerPrompt(planResult, goal);
+async function compileOneContextWithCloud(provider, model, prompt, payload = {}, maxTokens = 1500, kind = "context_compile") {
   const messages = [
     {
       role: "system",
@@ -282,8 +282,8 @@ async function compileContextWithCloud(planResult, goal, payload = {}) {
       ...(key ? { Authorization: `Bearer ${key}` } : {}),
       ...(provider.id === "openrouter" ? { "HTTP-Referer": "http://127.0.0.1:63719", "X-Title": "Local AI Studio" } : {})
     },
-    body: JSON.stringify({ model, messages, stream: false, temperature: 0.1, max_tokens: Number(payload.contextMaxTokens) || 1500 })
-  }, "context_compile");
+    body: JSON.stringify({ model, messages, stream: false, temperature: 0.1, max_tokens: maxTokens })
+  }, kind);
   if (!response.ok) {
     if (provider.id === "freeai" && typeof freeai.rotateKey === "function") freeai.rotateKey();
     return { ok: false, provider: provider.id, status: response.status, error: response.localLimit ? response.detail : (response.detail || response.text || "Proveedor no disponible").slice(0, 240), retryAfterMs: response.retryAfterMs || 0 };
@@ -295,6 +295,71 @@ async function compileContextWithCloud(planResult, goal, payload = {}) {
     : "";
   if (!text) return { ok: false, provider: provider.id, error: "El compilador cloud no devolvió resumen." };
   return { ok: true, provider: provider.id, model, text: contextEngine.redactSecrets(text), approxTokens: contextEngine.estimateTokens(text) };
+}
+
+async function compileContextWithCloud(planResult, goal, payload = {}) {
+  const provider = resolveContextCompilerProvider(payload.contextProvider || payload.compilerProvider || "");
+  if (!provider) return { ok: false, skipped: true, reason: "No hay Free.ai ni OpenRouter configurado para sintetizar contexto." };
+  const model = String(payload.contextModel || provider.defaultModel || "").trim();
+  const wholeProject = String(payload.contextScope || "focused").toLowerCase() === "whole";
+  if (!wholeProject) {
+    const prompt = contextEngine.buildCompilerPrompt(planResult, goal);
+    return compileOneContextWithCloud(provider, model, prompt, payload, Number(payload.contextMaxTokens) || 1500, "context_compile");
+  }
+
+  const batches = Array.isArray(planResult.batches) && planResult.batches.length
+    ? planResult.batches
+    : [{ index: 1, files: planResult.selectedFiles || [], text: planResult.codeContext || "" }];
+  const requestedMaxBatches = Number(payload.contextMaxBatches);
+  const maxBatches = Number.isFinite(requestedMaxBatches) && requestedMaxBatches > 0
+    ? Math.max(1, Math.min(256, Math.round(requestedMaxBatches)))
+    : batches.length;
+  const selectedBatches = batches.slice(0, maxBatches);
+  const batchSummaryTokens = Math.max(320, Math.min(700, Number(payload.contextBatchSummaryTokens) || 500));
+  const summaries = [];
+  for (const batch of selectedBatches) {
+    const batchPlan = { ...planResult, selectedFiles: batch.files || [], codeContext: batch.text || "" };
+    const prompt = contextEngine.buildCompilerPrompt(batchPlan, goal, {
+      batchIndex: batch.index,
+      batchCount: batches.length,
+      selectedFiles: batch.files || [],
+      codeContext: batch.text || ""
+    });
+    const result = await compileOneContextWithCloud(provider, model, prompt, payload, batchSummaryTokens, "context_compile_batch");
+    if (!result.ok) return { ...result, stage: "batch", batchIndex: batch.index };
+    summaries.push(`TANDA ${batch.index} · ${(batch.files || []).join(", ")}\n${result.text}`);
+  }
+
+  const mergePrompt = `Objetivo del usuario:\n${String(goal || "Analiza el proyecto.").slice(0, 2000)}\n\n` +
+    `Mapa global del proyecto:\n${String(planResult.projectMapText || "").slice(0, 5000)}\n\n` +
+    `Resúmenes verificables de ${summaries.length}/${batches.length} tandas:\n${summaries.join("\n\n").slice(0, 26000)}\n\n` +
+    "Fusiona los hechos sin inventar. Devuelve arquitectura, archivos que deben tocarse, dependencias, riesgos y plan de ejecución. Indica explícitamente la cobertura de tandas.";
+  const merged = await compileOneContextWithCloud(provider, model, mergePrompt, payload, Number(payload.contextMaxTokens) || 1200, "context_compile_merge");
+  if (!merged.ok) return { ...merged, stage: "merge", batchesCompiled: summaries.length };
+  return {
+    ...merged,
+    stage: "whole_project",
+    batchesCompiled: summaries.length,
+    batchesTotal: batches.length,
+    complete: summaries.length === batches.length,
+    coverage: planResult.coverage || null
+  };
+}
+
+function persistCompiledContext(plan, compiled) {
+  if (!plan || !compiled || !compiled.ok) return null;
+  return contextEngine.saveContextSnapshot(plan.projectPath, {
+    projectMap: plan.projectMap,
+    projectMapText: plan.projectMapText,
+    coverage: plan.coverage,
+    digest: {
+      text: compiled.text,
+      approxTokens: compiled.approxTokens,
+      provider: compiled.provider,
+      model: compiled.model,
+      updatedAt: new Date().toISOString()
+    }
+  });
 }
 
 function readJsonBody(req, maxBytes = 10 * 1024 * 1024) {
@@ -2781,6 +2846,7 @@ function createStudioServer(options = {}) {
       const mode = normalizeContextMode(payload.contextMode);
       if (mode === "hybrid" || mode === "cloud" || payload.compile === true) {
         compiled = await compileContextWithCloud(plan, goal, payload);
+        persistCompiledContext(plan, compiled);
       }
       sendJson(res, 200, {
         ok: true,
@@ -2788,14 +2854,24 @@ function createStudioServer(options = {}) {
         plan: {
           projectPath: plan.projectPath,
           index: plan.index,
+          projectMap: plan.projectMap,
+          projectMapText: plan.projectMapText,
+          coverage: plan.coverage,
           budgetTokens: plan.budgetTokens,
           approxTokens: plan.approxTokens,
           selectedFiles: plan.selectedFiles,
           files: plan.files,
           batchCount: plan.batchCount,
+          projectBatchCount: plan.projectBatchCount,
           batches: plan.batches.map((batch) => ({ index: batch.index, files: batch.files, approxTokens: batch.approxTokens }))
         },
-        compiled
+        compiled,
+        snapshot: compiled && compiled.ok ? {
+          saved: true,
+          provider: compiled.provider || "",
+          approxTokens: compiled.approxTokens || 0,
+          complete: compiled.complete !== false
+        } : null
       });
       return;
     }
@@ -2818,7 +2894,27 @@ function createStudioServer(options = {}) {
         sendJson(res, compiled.skipped ? 400 : (compiled.status === 429 ? 429 : 502), compiled);
         return;
       }
-      sendJson(res, 200, { ok: true, compiled, plan: { selectedFiles: plan.selectedFiles, batchCount: plan.batchCount, approxTokens: plan.approxTokens } });
+      persistCompiledContext(plan, compiled);
+      sendJson(res, 200, { ok: true, compiled, plan: {
+        selectedFiles: plan.selectedFiles,
+        batchCount: plan.batchCount,
+        projectBatchCount: plan.projectBatchCount,
+        approxTokens: plan.approxTokens,
+        projectMap: plan.projectMap,
+        coverage: plan.coverage
+      } });
+      return;
+    }
+
+    if (pathname === "/api/context/snapshot" && req.method === "GET") {
+      const projectIdentifier = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
+      const project = bridge.getActiveProject(projectIdentifier, query.conversationId || null, query.token || null);
+      if (!project || project.isGeneral || !project.path) {
+        sendJsonError(res, 404, "No project found");
+        return;
+      }
+      const snapshot = contextEngine.loadContextSnapshot(project.path);
+      sendJson(res, 200, { ok: true, snapshot });
       return;
     }
 
@@ -4933,6 +5029,7 @@ function createStudioServer(options = {}) {
           });
           if (automaticContextPlan && (contextMode === "hybrid" || contextMode === "cloud" || payload.contextCompiler === true)) {
             compiledContext = await compileContextWithCloud(automaticContextPlan, extractContextGoal(flattenedMessages || messagesWithAttachments || []), payload);
+            persistCompiledContext(automaticContextPlan, compiledContext);
           }
         } catch (contextErr) {
           console.warn("[Context Engine] automatic planning skipped:", safeErrMsg(contextErr));
@@ -4949,8 +5046,14 @@ function createStudioServer(options = {}) {
       if (compiledContext && compiledContext.ok && compiledContext.text) {
         combinedSysPrompt += `\n\n<contexto_compilado_nube proveedor="${compiledContext.provider}" modelo="${compiledContext.model}">\n${compiledContext.text}\n</contexto_compilado_nube>`;
       }
-      if (typeof payload.contextDigest === "string" && payload.contextDigest.trim()) {
-        combinedSysPrompt += `\n\n<resumen_de_contexto_preparado>\n${contextEngine.redactSecrets(payload.contextDigest).slice(0, 12000)}\n</resumen_de_contexto_preparado>`;
+      const storedContextSnapshot = automaticContextPlan ? contextEngine.loadContextSnapshot(automaticContextPlan.projectPath) : null;
+      const preparedDigest = compiledContext && compiledContext.ok
+        ? ""
+        : (typeof payload.contextDigest === "string" && payload.contextDigest.trim())
+        ? payload.contextDigest
+        : (storedContextSnapshot && storedContextSnapshot.digest && storedContextSnapshot.digest.text) || "";
+      if (preparedDigest) {
+        combinedSysPrompt += `\n\n<resumen_de_contexto_preparado>\n${contextEngine.redactSecrets(preparedDigest).slice(0, 12000)}\n</resumen_de_contexto_preparado>`;
       }
       if (webSearch && webSearch.contextSuffix) {
         combinedSysPrompt = combinedSysPrompt
@@ -4963,10 +5066,10 @@ function createStudioServer(options = {}) {
       }
       if (!res.headersSent) {
         if (automaticContextPlan) {
-          res.setHeader("X-Context-Engine", JSON.stringify({ mode: contextMode, files: automaticContextPlan.selectedFiles.length, batches: automaticContextPlan.batchCount, tokens: automaticContextPlan.approxTokens }));
+          res.setHeader("X-Context-Engine", JSON.stringify({ mode: contextMode, scope: automaticContextPlan.coverage && automaticContextPlan.coverage.scope || "focused", files: automaticContextPlan.selectedFiles.length, indexedFiles: automaticContextPlan.coverage && automaticContextPlan.coverage.indexedFiles || 0, batches: automaticContextPlan.batchCount, projectBatches: automaticContextPlan.projectBatchCount || automaticContextPlan.batchCount, tokens: automaticContextPlan.approxTokens, confidence: automaticContextPlan.coverage && automaticContextPlan.coverage.confidence || "limited" }));
         }
         if (compiledContext) {
-          res.setHeader("X-Context-Compiler", JSON.stringify({ ok: compiledContext.ok, provider: compiledContext.provider || "", error: compiledContext.error || "" }));
+          res.setHeader("X-Context-Compiler", JSON.stringify({ ok: compiledContext.ok, provider: compiledContext.provider || "", stage: compiledContext.stage || "focused", complete: compiledContext.complete !== false, batchesCompiled: compiledContext.batchesCompiled || 0, error: compiledContext.error || "" }));
         }
       }
 

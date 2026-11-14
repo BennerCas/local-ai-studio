@@ -565,7 +565,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-proyectos .context-engine-strip{align-items:flex-end;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(124,108,255,.06)}
 #view-proyectos .context-engine-strip label{display:flex;flex-direction:column;gap:4px;min-width:120px}
 #view-proyectos .context-engine-strip .input{padding:6px 8px;font-size:11px;min-height:30px}
-#view-proyectos .context-engine-help{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+#view-proyectos .context-engine-help{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
 #view-proyectos .context-engine-help>div{padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:rgba(7,7,13,.2);min-width:0}
 #view-proyectos .context-engine-help b{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
 #view-proyectos .context-engine-help span{display:block;color:var(--muted);font-size:10px;line-height:1.45}
@@ -581,6 +581,7 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-proyectos .project-context-actions{flex-shrink:0;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 #view-proyectos .project-context-actions .btn{flex:1;justify-content:center;min-width:145px}
 @media(max-width:900px){#view-proyectos.active{overflow:auto}.project-workspace{grid-template-columns:1fr!important}.project-search-results{max-height:150px!important}}
+@media(max-width:900px){#view-proyectos .context-engine-help{grid-template-columns:1fr}}
 @media(max-width:900px){.library-placeholder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.library-placeholder-grid{grid-template-columns:1fr}.library-grid,#view-library #galleryGrid,#view-library #historyList,#view-library #codeList{grid-template-columns:1fr}}
 
@@ -1241,9 +1242,10 @@ export async function rotateSession(userId) { /* … */ }</div></div>
           </div>
         </div>
         <div class="card project-context-card"><div class="flex between"><div><h3>🧱 Constructor de contexto</h3><p class="desc">El motor selecciona lo relevante, divide tandas y entrega como máximo 6k tokens.</p></div><span id="contextProjectTag" class="tag">sin proyecto</span></div>
-          <div class="context-engine-strip flex wrap mt"><label class="tiny">Estrategia <select id="contextStrategySelect" class="input sm"><option value="auto">⚙️ Automático local</option><option value="hybrid">☁️ Híbrido · nube → DirectML</option><option value="cloud">🌐 Compilar solo en nube</option><option value="manual">✋ Manual</option></select></label><label class="tiny">Compilador <select id="contextProviderSelect" class="input sm"><option value="openrouter">OpenRouter</option><option value="freeai">Free.ai</option></select></label><button id="runAutoContextBtn" class="btn sm primary">🧠 Preparar contexto</button></div>
-          <div class="context-engine-help" aria-live="polite"><div><b id="contextStrategyLabel">Automático local</b><span id="contextStrategyHint">Indexa el proyecto en local y selecciona sólo los archivos relevantes. Recomendado para trabajo offline y cambios concretos.</span></div><div><b id="contextProviderLabel">OpenRouter</b><span id="contextProviderHint">Compilador externo para resumir tandas. Requiere red y credenciales; no sustituye al motor local.</span></div></div>
+          <div class="context-engine-strip flex wrap mt"><label class="tiny">Estrategia <select id="contextStrategySelect" class="input sm"><option value="auto">⚙️ Automático local</option><option value="hybrid">☁️ Híbrido · nube → DirectML</option><option value="cloud">🌐 Compilar solo en nube</option><option value="manual">✋ Manual</option></select></label><label class="tiny">Alcance <select id="contextScopeSelect" class="input sm"><option value="focused">🎯 Tarea enfocada</option><option value="whole">🗺️ Proyecto completo</option></select></label><label class="tiny">Compilador <select id="contextProviderSelect" class="input sm"><option value="openrouter">OpenRouter</option><option value="freeai">Free.ai</option></select></label><button id="runAutoContextBtn" class="btn sm primary">🧠 Preparar contexto</button></div>
+          <div class="context-engine-help" aria-live="polite"><div><b id="contextStrategyLabel">Automático local</b><span id="contextStrategyHint">Indexa el proyecto en local y selecciona sólo los archivos relevantes. Recomendado para trabajo offline y cambios concretos.</span></div><div><b id="contextScopeLabel">Tarea enfocada</b><span id="contextScopeHint">Selecciona código relevante para una tarea concreta; el mapa global del proyecto siempre se conserva.</span></div><div><b id="contextProviderLabel">OpenRouter</b><span id="contextProviderHint">Compilador externo para resumir tandas. Requiere red y credenciales; no sustituye al motor local.</span></div></div>
           <div id="contextEngineStatus" class="tiny muted mt">Modo automático: cada mensaje leerá solo los archivos relevantes y guardará el índice local del proyecto.</div>
+          <div id="contextCoverageStatus" class="tiny muted mt">Cobertura: todavía no se ha preparado un contexto.</div>
           <div id="contextEngineProgressWrap" class="context-engine-progress mt" hidden><div class="flex between tiny"><span id="contextEnginePhase">Preparando…</span><span id="contextEngineEta">estimando demora…</span></div><div class="progress mt"><b id="contextEngineProgressBar" style="width:0%"></b></div><div id="contextEngineElapsed" class="tiny muted mt">Tiempo transcurrido: 0 s</div></div>
           <div class="context-file-toolbar"><span id="contextFileSummary">Selecciona un proyecto</span><div class="pager"><button id="contextFilePrev" class="icon-btn" aria-label="Página anterior">‹</button><span id="contextFilePage">—</span><button id="contextFileNext" class="icon-btn" aria-label="Página siguiente">›</button></div></div>
           <div class="context-file-window"><table class="table"><thead><tr><th style="width:34px"></th><th>Archivo real</th><th style="width:74px">Tokens</th><th style="width:48px">Pin</th></tr></thead><tbody id="projectFilesBody"><tr><td colspan="4" class="muted tiny">Selecciona un proyecto para cargar sus archivos.</td></tr></tbody></table></div>
@@ -2591,6 +2593,7 @@ function sendMsg(){
            skillIds:REAL.activeSkills&&REAL.activeSkills.size?[...REAL.activeSkills]:undefined,
            customSystemPrompt:(typeof STAFF_MODE==='undefined'||!STAFF_MODE)?CHAT_VIBE_SYSTEM_PROMPT:undefined,
            contextMode:localStorage.getItem('las-context-mode')||'auto',
+           contextScope:localStorage.getItem('las-context-scope')||'focused',
            contextProvider:localStorage.getItem('las-context-provider')||'openrouter',
            contextDigest:(localStorage.getItem('las-context-digest-project')===(REAL.project&&REAL.project.name)?localStorage.getItem('las-context-digest')||undefined:undefined),
            project:REAL.project?(REAL.project.name||undefined):undefined,
@@ -3688,12 +3691,18 @@ const CONTEXT_PROVIDER_INFO={
   openrouter:{label:'OpenRouter',hint:'Compilador externo para resumir tandas y arquitectura. Requiere red y credenciales; el resultado se limita antes de llegar al motor local.'},
   freeai:{label:'Free.ai',hint:'Compilador externo orientado a síntesis de contexto. Requiere red y credenciales; si falla, debe informarse y degradar a local.'}
 };
+const CONTEXT_SCOPE_INFO={
+  focused:{label:'Tarea enfocada',hint:'Selecciona código relevante para una tarea concreta; el mapa global del proyecto siempre se conserva.'},
+  whole:{label:'Proyecto completo',hint:'Procesa todas las tandas del índice y conserva un resumen global. Puede tardar más y requiere compilador en nube para sintetizar.'}
+};
 function updateContextEngineHints(){
-  const strategy=document.getElementById('contextStrategySelect'), provider=document.getElementById('contextProviderSelect');
+  const strategy=document.getElementById('contextStrategySelect'), scope=document.getElementById('contextScopeSelect'), provider=document.getElementById('contextProviderSelect');
   const strategyInfo=CONTEXT_STRATEGY_INFO[(strategy&&strategy.value)||'auto']||CONTEXT_STRATEGY_INFO.auto;
+  const scopeInfo=CONTEXT_SCOPE_INFO[(scope&&scope.value)||'focused']||CONTEXT_SCOPE_INFO.focused;
   const providerInfo=CONTEXT_PROVIDER_INFO[(provider&&provider.value)||'openrouter']||CONTEXT_PROVIDER_INFO.openrouter;
   const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
   set('contextStrategyLabel',strategyInfo.label);set('contextStrategyHint',strategyInfo.hint);
+  set('contextScopeLabel',scopeInfo.label);set('contextScopeHint',scopeInfo.hint);
   set('contextProviderLabel',providerInfo.label);set('contextProviderHint',providerInfo.hint);
 }
 function projectFileTokenEstimate(file){ return Math.max(1,Math.ceil((Number(file&&file.size)||0)/4)); }
@@ -3797,22 +3806,26 @@ function finishContextEngineProgress(ok,started,summary){
   if(elapsed)elapsed.textContent='Tiempo total: '+seconds.toFixed(1)+' s';
 }
 async function runAutomaticContextReal(){
-  const modeEl=document.getElementById('contextStrategySelect'), providerEl=document.getElementById('contextProviderSelect'), status=document.getElementById('contextEngineStatus'), btn=document.getElementById('runAutoContextBtn');
+  const modeEl=document.getElementById('contextStrategySelect'), scopeEl=document.getElementById('contextScopeSelect'), providerEl=document.getElementById('contextProviderSelect'), status=document.getElementById('contextEngineStatus'), coverageStatus=document.getElementById('contextCoverageStatus'), btn=document.getElementById('runAutoContextBtn');
   if(!REAL.project||REAL.project.isGeneral){toast('Selecciona un proyecto específico','err');return;}
-  const mode=modeEl?modeEl.value:'auto', provider=providerEl?providerEl.value:'openrouter';
+  const mode=modeEl?modeEl.value:'auto', scope=scopeEl?scopeEl.value:'focused', provider=providerEl?providerEl.value:'openrouter';
   const goal=(document.getElementById('projectSearchInput')?.value||'').trim()||'Prepara el contexto relevante para continuar el trabajo de vibe coding en este proyecto.';
   if(btn)btn.disabled=true;
   const started=startContextEngineProgress(mode,provider);
   if(status)status.textContent='⏳ Preparando contexto automáticamente…';
   try{
-    const r=await API.post('/api/context/auto',{project:REAL.project.name,goal,engine:typeof engine==='string'&&engine==='directml'?'directml':'ollama',contextMode:mode,contextProvider:provider,compile:mode==='hybrid'||mode==='cloud'});
+    const r=await API.post('/api/context/auto',{project:REAL.project.name,goal,engine:typeof engine==='string'&&engine==='directml'?'directml':'ollama',contextMode:mode,contextScope:scope,contextProvider:provider,compile:mode==='hybrid'||mode==='cloud'});
     const p=r.plan||{}, selected=p.selectedFiles||[], batches=p.batches||[];
-    localStorage.setItem('las-context-mode',mode);localStorage.setItem('las-context-provider',provider);
+    localStorage.setItem('las-context-mode',mode);localStorage.setItem('las-context-scope',scope);localStorage.setItem('las-context-provider',provider);
     if(r.compiled&&r.compiled.ok){localStorage.setItem('las-context-digest-project',REAL.project.name);localStorage.setItem('las-context-digest',r.compiled.text||'');}
+    const coverage=p.coverage||{}, confidence=coverage.confidence==='reliable'?'confiable':'limitado';
+    const compileExpected=mode==='hybrid'||mode==='cloud';
+    const compileFailed=compileExpected&&(!r.compiled||!r.compiled.ok);
     const summary=selected.length+' archivos · '+(batches.length||1)+' tanda(s) · '+projectTokenLabel(p.approxTokens||0)+' tokens';
-    if(status)status.textContent='✅ Contexto listo · '+summary+(r.compiled&&r.compiled.ok?' · síntesis '+r.compiled.provider:'');
-    finishContextEngineProgress(true,started,r.compiled&&r.compiled.ok?'síntesis '+r.compiled.provider:summary);
-    toast('🧠 Contexto automático preparado','ok');
+    if(status)status.textContent=(compileFailed?'⚠':'✅')+' Contexto '+(compileFailed?'local preparado':'listo')+' · '+summary+(r.compiled&&r.compiled.ok?' · síntesis '+r.compiled.provider:'')+(compileFailed?' · compilador no disponible':'');
+    if(coverageStatus)coverageStatus.textContent='Cobertura: '+(coverage.selectedFiles||selected.length)+'/'+(coverage.indexedFiles||selected.length)+' archivos · '+(coverage.projectBatchCount||batches.length||1)+' tandas del proyecto · confianza '+confidence+(r.compiled&&r.compiled.complete===false?' · compilación parcial':'')+(compileFailed?' · falta síntesis externa':'');
+    finishContextEngineProgress(!compileFailed,started,r.compiled&&r.compiled.ok?'síntesis '+r.compiled.provider:summary);
+    toast(compileFailed?'Contexto local preparado; compilador no disponible':'🧠 Contexto automático preparado',compileFailed?'err':'ok');
   }catch(e){if(status)status.textContent='⚠ '+e.message;finishContextEngineProgress(false,started);toast('Contexto automático: '+e.message,'err');}
   finally{if(btn)btn.disabled=false;}
 }
@@ -3852,8 +3865,9 @@ async function loadProjectsViewReal(){
   // Botones de contexto
   const ctxCard=document.querySelector('#view-proyectos .project-context-card');
   if(ctxCard){
-    const strategy=document.getElementById('contextStrategySelect'), provider=document.getElementById('contextProviderSelect'), autoBtn=document.getElementById('runAutoContextBtn');
+    const strategy=document.getElementById('contextStrategySelect'), scope=document.getElementById('contextScopeSelect'), provider=document.getElementById('contextProviderSelect'), autoBtn=document.getElementById('runAutoContextBtn');
     if(strategy){strategy.value=localStorage.getItem('las-context-mode')||'auto';strategy.onchange=()=>{localStorage.setItem('las-context-mode',strategy.value);updateContextEngineHints();};}
+    if(scope){scope.value=localStorage.getItem('las-context-scope')||'focused';scope.onchange=()=>{localStorage.setItem('las-context-scope',scope.value);updateContextEngineHints();};}
     if(provider){provider.value=localStorage.getItem('las-context-provider')||'openrouter';provider.onchange=()=>{localStorage.setItem('las-context-provider',provider.value);updateContextEngineHints();};}
     updateContextEngineHints();
     if(autoBtn)autoBtn.onclick=runAutomaticContextReal;

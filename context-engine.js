@@ -9,6 +9,8 @@ const DEFAULT_CHARS_PER_TOKEN = 4;
 // Margen operativo del constructor: DirectML admite 6.144 como máximo técnico,
 // pero el contexto preparado debe quedarse por debajo de ese límite.
 const CONTEXT_BUILDER_MAX_TOKENS = 6000;
+const CONTEXT_MAP_VERSION = 1;
+const DEFAULT_CONTEXT_DIGEST_TOKENS = 1200;
 const INDEX_DIR = path.join(__dirname, "datos", "context-index");
 
 const IGNORED_DIRS = new Set([
@@ -132,7 +134,8 @@ function buildIndex(projectPath, options = {}) {
     projectPath: root,
     generatedAt: new Date().toISOString(),
     fileCount: files.length,
-    files
+    files,
+    projectMap: buildProjectMap({ projectPath: root, fileCount: files.length, files })
   };
   if (options.persist !== false) {
     try {
@@ -141,6 +144,93 @@ function buildIndex(projectPath, options = {}) {
     } catch (_e) {}
   }
   return index;
+}
+
+function buildProjectMap(index = {}) {
+  const files = Array.isArray(index.files) ? index.files : [];
+  const byExtension = {};
+  const byDirectory = {};
+  let totalBytes = 0;
+  let largeFiles = 0;
+  for (const file of files) {
+    const rel = normalizeRel(file.relPath);
+    const ext = String(file.ext || path.extname(rel) || "[sin extensión]").toLowerCase();
+    const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ".";
+    byExtension[ext] = (byExtension[ext] || 0) + 1;
+    byDirectory[dir] = (byDirectory[dir] || 0) + 1;
+    totalBytes += Math.max(0, Number(file.size) || 0);
+    if (file.tooLarge) largeFiles += 1;
+  }
+  const topFiles = files
+    .slice()
+    .sort((a, b) => (Number(b.priority) || 0) - (Number(a.priority) || 0) || normalizeRel(a.relPath).localeCompare(normalizeRel(b.relPath)))
+    .slice(0, 24)
+    .map((file) => normalizeRel(file.relPath));
+  return {
+    version: CONTEXT_MAP_VERSION,
+    projectPath: String(index.projectPath || ""),
+    generatedAt: index.generatedAt || new Date().toISOString(),
+    fileCount: files.length,
+    totalBytes,
+    largeFiles,
+    byExtension,
+    byDirectory,
+    topFiles
+  };
+}
+
+function buildProjectMapText(projectMap = {}) {
+  const ext = Object.entries(projectMap.byExtension || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([name, count]) => `${name}:${count}`)
+    .join(", ");
+  const dirs = Object.entries(projectMap.byDirectory || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([name, count]) => `${name} (${count})`)
+    .join(", ");
+  return [
+    `Proyecto: ${path.basename(String(projectMap.projectPath || "proyecto"))}`,
+    `Archivos indexados: ${Number(projectMap.fileCount) || 0}`,
+    `Tamaño aproximado: ${Math.round((Number(projectMap.totalBytes) || 0) / 1024)} KB`,
+    `Archivos grandes: ${Number(projectMap.largeFiles) || 0}`,
+    `Tipos: ${ext || "sin datos"}`,
+    `Directorios: ${dirs || "raíz"}`,
+    `Archivos prioritarios: ${(projectMap.topFiles || []).join(", ") || "sin datos"}`
+  ].join("\n");
+}
+
+function contextSnapshotPath(projectPath) {
+  const key = crypto.createHash("sha1").update(path.resolve(projectPath).toLowerCase()).digest("hex");
+  return path.join(INDEX_DIR, `${key}.snapshot.json`);
+}
+
+function saveContextSnapshot(projectPath, snapshot = {}) {
+  if (!projectPath) return null;
+  try {
+    fs.mkdirSync(INDEX_DIR, { recursive: true });
+    const payload = {
+      version: CONTEXT_MAP_VERSION,
+      projectPath: path.resolve(projectPath),
+      updatedAt: new Date().toISOString(),
+      ...snapshot
+    };
+    fs.writeFileSync(contextSnapshotPath(projectPath), JSON.stringify(payload), "utf8");
+    return payload;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function loadContextSnapshot(projectPath) {
+  if (!projectPath) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(contextSnapshotPath(projectPath), "utf8"));
+    return raw && typeof raw === "object" ? raw : null;
+  } catch (_e) {
+    return null;
+  }
 }
 
 function readFileSample(projectPath, relPath, maxChars = 12000) {
@@ -239,7 +329,8 @@ function createBatches(projectPath, rankedFiles, options = {}) {
       currentChars = 0;
     }
     if (block.length > batchChars) {
-      const clipped = block.slice(0, batchChars) + "\n[... archivo recortado ...]\n";
+      const marker = "\n[... archivo recortado ...]\n";
+      const clipped = block.slice(0, Math.max(0, batchChars - marker.length)) + marker;
       batches.push({ index: batches.length + 1, files: [file.relPath], text: clipped, approxTokens: estimateTokens(clipped) });
       continue;
     }
@@ -264,14 +355,48 @@ function plan(projectPath, query = "", options = {}) {
     Math.max(1, Number(options.charsPerToken) || DEFAULT_CHARS_PER_TOKEN)
   );
   const budgetChars = Math.max(1200, budgetTokens * charsPerToken);
-  const index = options.index || buildIndex(projectPath, options);
-  const rankedFiles = rankFiles(projectPath, index, query, options);
+  // `maxFiles` limita lo que se prepara en una tanda; no debe truncar el mapa
+  // global. El índice debe conocer todo el proyecto para que "Proyecto completo"
+  // y una selección manual puedan encontrar cualquier archivo.
+  const index = options.index || buildIndex(projectPath, {
+    ...options,
+    maxFiles: Math.max(1, Number(options.maxIndexFiles) || DEFAULT_MAX_FILES)
+  });
+  const projectMap = index.projectMap || buildProjectMap(index);
+  const projectMapText = buildProjectMapText(projectMap);
+  const rankedCandidates = rankFiles(projectPath, index, query, options);
+  const selectedFilter = new Set([
+    ...(Array.isArray(options.selectedFiles) ? options.selectedFiles : []),
+    ...(Array.isArray(options.pinnedFiles) ? options.pinnedFiles : [])
+  ].map(normalizeRel));
+  const rankedFiles = options.onlySelected && selectedFilter.size
+    ? rankedCandidates.filter((file) => selectedFilter.has(normalizeRel(file.relPath)))
+    : rankedCandidates;
   const packed = packFiles(projectPath, rankedFiles, { ...options, maxChars: budgetChars });
-  const batches = createBatches(projectPath, rankedFiles, { ...options, batchChars: budgetChars });
+  const selectedSet = new Set(packed.selectedFiles.map(normalizeRel));
+  const selectedRankedFiles = rankedFiles.filter((file) => selectedSet.has(normalizeRel(file.relPath)));
+  const selectedBatches = createBatches(projectPath, selectedRankedFiles, { ...options, batchChars: budgetChars });
+  const allBatches = createBatches(projectPath, rankedFiles, { ...options, batchChars: budgetChars });
+  const scope = String(options.contextScope || "focused").toLowerCase() === "whole" ? "whole" : "focused";
+  const batches = scope === "whole" ? allBatches : selectedBatches;
+  const coverage = {
+    scope,
+    indexedFiles: index.fileCount,
+    candidateFiles: rankedFiles.length,
+    selectedFiles: packed.selectedFiles.length,
+    selectedPercent: index.fileCount ? Math.round((packed.selectedFiles.length / index.fileCount) * 100) : 0,
+    projectBatchCount: allBatches.length,
+    preparedBatchCount: batches.length,
+    approximateTokens: packed.approxTokens,
+    reliable: packed.approxTokens >= 2000 && packed.selectedFiles.length > 0,
+    confidence: packed.approxTokens >= 2000 && packed.selectedFiles.length > 0 ? "reliable" : "limited"
+  };
   return {
     projectPath: path.resolve(projectPath),
     query: String(query || "").slice(0, 1000),
     index: { version: index.version, generatedAt: index.generatedAt, fileCount: index.fileCount },
+    projectMap,
+    projectMapText,
     budgetTokens,
     budgetChars,
     selectedFiles: packed.selectedFiles,
@@ -281,6 +406,9 @@ function plan(projectPath, query = "", options = {}) {
     approxTokens: packed.approxTokens,
     batches,
     batchCount: batches.length,
+    allBatches,
+    projectBatchCount: allBatches.length,
+    coverage,
     ranked: rankedFiles.slice(0, 60).map((file) => ({ relPath: file.relPath, size: file.size, score: file.score, ext: file.ext }))
   };
 }
@@ -292,11 +420,15 @@ function redactSecrets(value) {
     .replace(/([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*\s*=\s*)[^\r\n]+/gi, "$1[REDACTED]");
 }
 
-function buildCompilerPrompt(planResult, goal = "") {
-  const files = (planResult && planResult.codeContext) || "";
+function buildCompilerPrompt(planResult, goal = "", options = {}) {
+  const files = (options.codeContext !== undefined ? options.codeContext : planResult && planResult.codeContext) || "";
+  const mapText = (planResult && planResult.projectMapText) || buildProjectMapText(planResult && planResult.projectMap || {});
+  const batchLabel = options.batchIndex ? `Tanda ${options.batchIndex}/${options.batchCount || "?"}` : "Contexto priorizado";
   return `Objetivo del usuario:\n${String(goal || "Analiza el proyecto y prepara el contexto de trabajo.").slice(0, 2000)}\n\n` +
     `Proyecto: ${path.basename(String(planResult && planResult.projectPath || "proyecto"))}\n` +
-    `Archivos priorizados: ${(planResult && planResult.selectedFiles || []).join(", ")}\n\n` +
+    `${batchLabel}\n` +
+    `Mapa global del proyecto:\n${mapText.slice(0, 5000)}\n\n` +
+    `Archivos priorizados: ${(options.selectedFiles || planResult && planResult.selectedFiles || []).join(", ")}\n\n` +
     `Código y configuración disponibles:\n${redactSecrets(files).slice(0, 30000)}\n\n` +
     `Devuelve un resumen técnico accionable, sin inventar archivos ni cambios. Incluye: arquitectura relevante, archivos que deben tocarse, dependencias entre ellos, riesgos o incompatibilidades, y un plan de ejecución por pasos. Mantén el resumen por debajo de 1.500 tokens.`;
 }
@@ -305,9 +437,14 @@ module.exports = {
   INDEX_VERSION,
   DEFAULT_MAX_FILES,
   CONTEXT_BUILDER_MAX_TOKENS,
+  DEFAULT_CONTEXT_DIGEST_TOKENS,
   estimateTokens,
   normalizeRel,
   buildIndex,
+  buildProjectMap,
+  buildProjectMapText,
+  saveContextSnapshot,
+  loadContextSnapshot,
   rankFiles,
   packFiles,
   createBatches,
