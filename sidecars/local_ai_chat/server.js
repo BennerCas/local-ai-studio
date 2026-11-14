@@ -234,7 +234,10 @@ function buildAutomaticContextPlan(options = {}) {
   const goal = extractContextGoal(messages);
   const userTokens = contextEngine.estimateTokens(goal);
   const isDirectml = String(target.engine || "").toLowerCase() === "directml";
-  const safePromptTokens = isDirectml ? bridge.DIRECTML_SAFE_PROMPT_TOKENS : 12000;
+  const safePromptTokens = Math.min(
+    contextEngine.CONTEXT_BUILDER_MAX_TOKENS,
+    isDirectml ? bridge.DIRECTML_SAFE_PROMPT_TOKENS : 12000
+  );
   const compilerMode = mode === "hybrid" || mode === "cloud" || payload.compile === true;
   const compilerReserve = compilerMode ? Math.max(700, Number(payload.contextMaxTokens) || 1500) : 0;
   const digestReserve = contextEngine.estimateTokens(payload.contextDigest || "");

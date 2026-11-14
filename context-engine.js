@@ -6,6 +6,9 @@ const INDEX_VERSION = 1;
 const DEFAULT_MAX_FILES = 2500;
 const DEFAULT_MAX_FILE_BYTES = 512 * 1024;
 const DEFAULT_CHARS_PER_TOKEN = 4;
+// Margen operativo del constructor: DirectML admite 6.144 como máximo técnico,
+// pero el contexto preparado debe quedarse por debajo de ese límite.
+const CONTEXT_BUILDER_MAX_TOKENS = 6000;
 const INDEX_DIR = path.join(__dirname, "datos", "context-index");
 
 const IGNORED_DIRS = new Set([
@@ -200,11 +203,16 @@ function packFiles(projectPath, rankedFiles, options = {}) {
   for (const file of rankedFiles || []) {
     if (selectedFiles.length >= maxFiles) break;
     const header = `\n=== Archivo: ${normalizeRel(file.relPath)} ===\n`;
-    const remaining = maxChars - totalChars - header.length;
+    const blockPrefix = `${header}\`\`\`\n`;
+    const blockSuffix = "\n\`\`\`\n";
+    const remaining = maxChars - totalChars - blockPrefix.length - blockSuffix.length;
     if (remaining < 180) continue;
     const content = readFileForPack(projectPath, file, Math.min(remaining, Number(options.perFileChars) || 16000));
-    const clipped = content.length > remaining ? content.slice(0, remaining) + "\n[... archivo recortado para esta tanda ...]" : content;
-    const block = `${header}\`\`\`\n${clipped}\n\`\`\`\n`;
+    const truncationMarker = "\n[... archivo recortado para esta tanda ...]";
+    const clipped = content.length > remaining
+      ? content.slice(0, Math.max(0, remaining - truncationMarker.length)) + truncationMarker
+      : content;
+    const block = `${blockPrefix}${clipped}${blockSuffix}`;
     files.push({ relPath: file.relPath, size: file.size, score: file.score, chars: clipped.length, approxTokens: estimateTokens(block) });
     selectedFiles.push(file.relPath);
     totalChars += block.length;
@@ -243,8 +251,19 @@ function createBatches(projectPath, rankedFiles, options = {}) {
 }
 
 function plan(projectPath, query = "", options = {}) {
-  const budgetTokens = Math.max(320, Number(options.budgetTokens) || 3000);
-  const budgetChars = Math.max(1200, budgetTokens * (Number(options.charsPerToken) || DEFAULT_CHARS_PER_TOKEN));
+  const requestedBudgetTokens = Number(options.budgetTokens) || 3000;
+  const budgetTokens = Math.min(
+    CONTEXT_BUILDER_MAX_TOKENS,
+    Math.max(320, requestedBudgetTokens)
+  );
+  // estimateTokens() y el margen de DirectML usan 4 caracteres por token.
+  // Nunca aumentamos este valor mediante charsPerToken porque rompería el tope
+  // visible del constructor aunque budgetTokens ya estuviera limitado.
+  const charsPerToken = Math.min(
+    DEFAULT_CHARS_PER_TOKEN,
+    Math.max(1, Number(options.charsPerToken) || DEFAULT_CHARS_PER_TOKEN)
+  );
+  const budgetChars = Math.max(1200, budgetTokens * charsPerToken);
   const index = options.index || buildIndex(projectPath, options);
   const rankedFiles = rankFiles(projectPath, index, query, options);
   const packed = packFiles(projectPath, rankedFiles, { ...options, maxChars: budgetChars });
@@ -285,6 +304,7 @@ function buildCompilerPrompt(planResult, goal = "") {
 module.exports = {
   INDEX_VERSION,
   DEFAULT_MAX_FILES,
+  CONTEXT_BUILDER_MAX_TOKENS,
   estimateTokens,
   normalizeRel,
   buildIndex,

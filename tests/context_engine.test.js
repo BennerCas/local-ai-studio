@@ -23,6 +23,30 @@ test("context-engine indexa texto, prioriza el objetivo y divide tandas", () => 
   }
 });
 
+test("context-engine nunca supera el tope operativo de 6k tokens aunque se solicite más", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "local-ai-context-limit-"));
+  try {
+    fs.mkdirSync(path.join(root, "src"), { recursive: true });
+    for (let i = 0; i < 30; i += 1) {
+      fs.writeFileSync(
+        path.join(root, "src", `module-${i}.js`),
+        `export const module${i} = ${JSON.stringify("relevant context ".repeat(500))};\n`
+      );
+    }
+    const plan = contextEngine.plan(root, "relevant context", {
+      budgetTokens: 12000,
+      persist: false,
+      maxFiles: 30
+    });
+    assert.equal(contextEngine.CONTEXT_BUILDER_MAX_TOKENS, 6000);
+    assert.equal(plan.budgetTokens, 6000);
+    assert.ok(plan.approxTokens <= 6000);
+    assert.ok(plan.totalChars <= 6000 * 4);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("context-engine redacta secretos antes de compilar en nube", () => {
   const clean = contextEngine.redactSecrets("Authorization: Bearer sk-secret-value\nGROQ_API_KEY=gsk_1234567890");
   assert.match(clean, /Bearer \[REDACTED\]/);
