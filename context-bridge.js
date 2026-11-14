@@ -901,6 +901,10 @@ function buildProjectContext(projectName = null, convId = null, token = null, op
   const includeMasterPrompt = opts.includeMasterPrompt !== false;
   const modelOverridesPrompt = opts.modelOverridesPrompt || null;
   const mentionedFiles = Array.isArray(opts.mentionedFiles) ? opts.mentionedFiles : [];
+  const skipCodeContext = opts.skipCodeContext === true;
+  const maxCodeChars = (Number.isFinite(Number(opts.maxCodeChars)) && Number(opts.maxCodeChars) >= 0)
+    ? Math.max(0, Math.round(Number(opts.maxCodeChars)))
+    : 24000;
 
   let targetConvId = convId;
   let targetProjName = projectName;
@@ -970,10 +974,12 @@ function buildProjectContext(projectName = null, convId = null, token = null, op
     pastProgress = readCleanProgressTail(progressFile, 1200);
 
     selectedFiles = Array.isArray(opts.selectedFiles) ? opts.selectedFiles : getSelectedFiles(projectPath);
-    codeSnippets = readCodeFilesContext(projectPath, selectedFiles, 24000, {
-      pinnedFiles,
-      mentionedFiles
-    });
+    if (!skipCodeContext && maxCodeChars > 0) {
+      codeSnippets = readCodeFilesContext(projectPath, selectedFiles, maxCodeChars, {
+        pinnedFiles,
+        mentionedFiles
+      });
+    }
   }
 
   // 1. Master Prompt (+ overrides de modelo y sesión)

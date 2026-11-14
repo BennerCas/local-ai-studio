@@ -9,6 +9,7 @@ const envLoader = require("../../env-loader.js");
 envLoader.loadAllEnv();
 
 const bridge = require("../../context-bridge.js");
+const contextEngine = require("../../context-engine.js");
 const memoryStore = require("../../memory-store.js");
 const contextAnalyzer = require("../../context-analyzer.js");
 const skillsBridge = require("../../skills-bridge.js");
@@ -139,7 +140,9 @@ function buildProjectCompatibilitySummary(opts = {}) {
     profileId: opts.profileId || null,
     customSystemPrompt: opts.customSystemPrompt || null,
     modelOverridesPrompt: opts.modelOverridesPrompt || null,
-    selectedFiles: Array.isArray(opts.selectedFiles) ? opts.selectedFiles : undefined
+    selectedFiles: Array.isArray(opts.selectedFiles) ? opts.selectedFiles : undefined,
+    skipCodeContext: opts.skipCodeContext === true,
+    maxCodeChars: opts.maxCodeChars
   });
   if (!ctx) return { ctx: null, directmlCompatibility: null };
   const extraChars = Math.max(0, Math.round(Number(opts.extraChars) || 0));
@@ -154,6 +157,141 @@ function buildProjectCompatibilitySummary(opts = {}) {
     return { ctx, directmlCompatibility: compat };
   }
   return { ctx, directmlCompatibility: ctx.directmlCompatibility || null };
+}
+
+function extractContextGoal(messages = []) {
+  const list = Array.isArray(messages) ? messages : [];
+  const userMessages = list
+    .filter((message) => message && String(message.role || "").toLowerCase() === "user")
+    .map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content || ""))
+    .map((text) => String(text || "").replace(/<[^>]+>/g, " ").trim())
+    .filter(Boolean);
+  return userMessages.slice(-3).join("\n").slice(-4000);
+}
+
+function normalizeContextMode(value) {
+  const mode = String(value || "auto").trim().toLowerCase();
+  if (["off", "manual", "auto", "hybrid", "cloud"].includes(mode)) return mode;
+  return "auto";
+}
+
+function resolveContextCompilerProvider(preferred = "") {
+  const requested = String(preferred || "").trim().toLowerCase().replace(/\s+/g, "");
+  const ids = requested === "free.ai" || requested === "free-ai" ? ["freeai"]
+    : requested ? [requested]
+      : ["openrouter", "freeai"];
+  for (const id of ids) {
+    if (id === "openrouter") {
+      const provider = envLoader.getAgentProvider("openrouter");
+      if (provider && provider.configured) return provider;
+    }
+    if (id === "freeai") {
+      const key = freeai.getKey();
+      if (key) {
+        return {
+          id: "freeai",
+          name: "Free.ai",
+          baseUrl: freeai.getBaseUrl(),
+          keys: [key],
+          keyCount: 1,
+          configured: true,
+          defaultModel: "qwen7b"
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function contextBaseOptions(payload = {}, effectiveSkillIds = null, effectiveProfileId = null, effectiveCustomPrompt = "") {
+  return {
+    writeToDisk: false,
+    skillId: payload.skillId || null,
+    skillIds: effectiveSkillIds,
+    profileId: effectiveProfileId,
+    customSystemPrompt: effectiveCustomPrompt || null,
+    modelOverridesPrompt: payload.modelSystemPrompt || null
+  };
+}
+
+function buildAutomaticContextPlan(options = {}) {
+  const payload = options.payload || {};
+  const target = options.target || {};
+  const messages = options.messages || [];
+  const mode = normalizeContextMode(payload.contextMode);
+  if (mode === "off" || mode === "manual") return null;
+
+  const project = bridge.getActiveProject(options.projectIdentifier || null, options.convId || null, payload.token || null);
+  if (!project || project.isGeneral || !project.path) return null;
+
+  const baseOptions = { ...(options.baseOptions || {}) };
+  const baseCtx = bridge.buildProjectContext(options.projectIdentifier || null, options.convId || null, payload.token || null, {
+    ...baseOptions,
+    skipCodeContext: true,
+    maxCodeChars: 0
+  });
+  const baselineTokens = baseCtx && baseCtx.metrics ? Number(baseCtx.metrics.approxTokens) || 0 : 0;
+  const goal = extractContextGoal(messages);
+  const userTokens = contextEngine.estimateTokens(goal);
+  const isDirectml = String(target.engine || "").toLowerCase() === "directml";
+  const safePromptTokens = isDirectml ? bridge.DIRECTML_SAFE_PROMPT_TOKENS : 12000;
+  const compilerMode = mode === "hybrid" || mode === "cloud" || payload.compile === true;
+  const compilerReserve = compilerMode ? Math.max(700, Number(payload.contextMaxTokens) || 1500) : 0;
+  const digestReserve = contextEngine.estimateTokens(payload.contextDigest || "");
+  const reserve = (isDirectml ? bridge.DIRECTML_OUTPUT_RESERVE_TOKENS + 256 : 700) + compilerReserve + digestReserve;
+  const explicitBudget = Number(payload.contextBudgetTokens);
+  const budgetTokens = Number.isFinite(explicitBudget) && explicitBudget > 0
+    ? Math.min(Math.max(320, Math.round(explicitBudget)), safePromptTokens)
+    : Math.max(640, Math.min(safePromptTokens, safePromptTokens - baselineTokens - userTokens - reserve));
+  const state = memoryStore.getProjectState(project.path || project.name) || {};
+  const selectedFiles = Array.isArray(baseOptions.selectedFiles)
+    ? baseOptions.selectedFiles
+    : bridge.getSelectedFiles(project.path);
+  const pinnedFiles = Array.isArray(state.pinnedFiles) ? state.pinnedFiles : [];
+  return contextEngine.plan(project.path, goal, {
+    budgetTokens,
+    selectedFiles,
+    pinnedFiles,
+    mentionedFiles: options.mentionedFiles || [],
+    maxFiles: Number(payload.contextMaxFiles) || 24,
+    maxFilesPerBatch: Number(payload.contextBatchFiles) || 12,
+    persist: payload.contextPersistIndex !== false
+  });
+}
+
+async function compileContextWithCloud(planResult, goal, payload = {}) {
+  const provider = resolveContextCompilerProvider(payload.contextProvider || payload.compilerProvider || "");
+  if (!provider) return { ok: false, skipped: true, reason: "No hay Free.ai ni OpenRouter configurado para sintetizar contexto." };
+  const model = String(payload.contextModel || provider.defaultModel || "").trim();
+  const prompt = contextEngine.buildCompilerPrompt(planResult, goal);
+  const messages = [
+    {
+      role: "system",
+      content: "Eres el compilador de contexto de Local AI Studio. Resume solo hechos presentes en los archivos. No inventes código, rutas, APIs ni resultados de pruebas. Tu salida será inyectada en un modelo local para ejecutar una tarea de vibe coding."
+    },
+    { role: "user", content: prompt }
+  ];
+  const key = provider.keys && provider.keys[0] ? provider.keys[0] : "";
+  const response = await fetchProviderRequest(provider, `${provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      ...(provider.id === "openrouter" ? { "HTTP-Referer": "http://127.0.0.1:63719", "X-Title": "Local AI Studio" } : {})
+    },
+    body: JSON.stringify({ model, messages, stream: false, temperature: 0.1, max_tokens: Number(payload.contextMaxTokens) || 1500 })
+  }, "context_compile");
+  if (!response.ok) {
+    if (provider.id === "freeai" && typeof freeai.rotateKey === "function") freeai.rotateKey();
+    return { ok: false, provider: provider.id, status: response.status, error: response.localLimit ? response.detail : (response.detail || response.text || "Proveedor no disponible").slice(0, 240), retryAfterMs: response.retryAfterMs || 0 };
+  }
+  let body = {};
+  try { body = JSON.parse(response.text || "{}"); } catch (_e) {}
+  const text = body.choices && body.choices[0] && body.choices[0].message
+    ? body.choices[0].message.content
+    : "";
+  if (!text) return { ok: false, provider: provider.id, error: "El compilador cloud no devolvió resumen." };
+  return { ok: true, provider: provider.id, model, text: contextEngine.redactSecrets(text), approxTokens: contextEngine.estimateTokens(text) };
 }
 
 function readJsonBody(req, maxBytes = 10 * 1024 * 1024) {
@@ -2616,6 +2754,71 @@ function createStudioServer(options = {}) {
       return;
     }
 
+    if (pathname === "/api/context/auto" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectIdentifier = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
+      const goal = String(payload.goal || payload.query || "").trim();
+      const plan = buildAutomaticContextPlan({
+        payload: { ...payload, contextMode: payload.contextMode || "auto" },
+        target: { engine: payload.engine || "directml" },
+        messages: goal ? [{ role: "user", content: goal }] : [],
+        projectIdentifier,
+        convId: payload.conversationId || null,
+        baseOptions: {
+          ...contextBaseOptions(payload, payload.skillIds || payload.skillId || null, payload.profileId || null, payload.customSystemPrompt || ""),
+          selectedFiles: Array.isArray(payload.selectedFiles) ? payload.selectedFiles : undefined
+        },
+        mentionedFiles: Array.isArray(payload.mentionedFiles) ? payload.mentionedFiles : []
+      });
+      if (!plan) {
+        sendJsonError(res, 400, "Selecciona un proyecto específico y usa contextMode auto, hybrid o cloud.");
+        return;
+      }
+      let compiled = null;
+      const mode = normalizeContextMode(payload.contextMode);
+      if (mode === "hybrid" || mode === "cloud" || payload.compile === true) {
+        compiled = await compileContextWithCloud(plan, goal, payload);
+      }
+      sendJson(res, 200, {
+        ok: true,
+        mode,
+        plan: {
+          projectPath: plan.projectPath,
+          index: plan.index,
+          budgetTokens: plan.budgetTokens,
+          approxTokens: plan.approxTokens,
+          selectedFiles: plan.selectedFiles,
+          files: plan.files,
+          batchCount: plan.batchCount,
+          batches: plan.batches.map((batch) => ({ index: batch.index, files: batch.files, approxTokens: batch.approxTokens }))
+        },
+        compiled
+      });
+      return;
+    }
+
+    if (pathname === "/api/context/compile" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const projectIdentifier = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
+      const plan = buildAutomaticContextPlan({
+        payload: { ...payload, contextMode: "hybrid" },
+        target: { engine: payload.engine || "directml" },
+        messages: [{ role: "user", content: String(payload.goal || payload.query || "Analiza el proyecto.") }],
+        projectIdentifier,
+        convId: payload.conversationId || null,
+        baseOptions: contextBaseOptions(payload, payload.skillIds || payload.skillId || null, payload.profileId || null, payload.customSystemPrompt || ""),
+        mentionedFiles: Array.isArray(payload.mentionedFiles) ? payload.mentionedFiles : []
+      });
+      if (!plan) { sendJsonError(res, 400, "Selecciona un proyecto específico para compilar su contexto."); return; }
+      const compiled = await compileContextWithCloud(plan, String(payload.goal || payload.query || "Analiza el proyecto."), payload);
+      if (!compiled.ok) {
+        sendJson(res, compiled.skipped ? 400 : (compiled.status === 429 ? 429 : 502), compiled);
+        return;
+      }
+      sendJson(res, 200, { ok: true, compiled, plan: { selectedFiles: plan.selectedFiles, batchCount: plan.batchCount, approxTokens: plan.approxTokens } });
+      return;
+    }
+
     if (pathname === "/api/project/preview-context" && req.method === "GET") {
       const proj = resolveRequestProjectTarget(query.project || null, query.projectPath || null, query.customPath || null);
       const convId = query.conversationId || null;
@@ -2632,6 +2835,31 @@ function createStudioServer(options = {}) {
         return;
       }
       sendJson(res, 200, { ok: true, ...ctx });
+      return;
+    }
+
+    if (pathname === "/api/project/save-context" && req.method === "POST") {
+      const payload = ensurePlainObject(await readJsonBody(req));
+      const proj = resolveRequestProjectTarget(payload.project || null, payload.projectPath || null, payload.customPath || null);
+      const ctx = bridge.buildProjectContext(proj, payload.conversationId || null, payload.token || null, {
+        writeToDisk: true,
+        skillId: payload.skillId || null,
+        skillIds: payload.skillIds || payload.skillId || null,
+        profileId: payload.profileId || null,
+        customSystemPrompt: payload.customSystemPrompt || null
+      });
+      if (!ctx || !ctx.project || ctx.project.isGeneral) {
+        sendJsonError(res, 400, "Selecciona un proyecto específico para guardar PROJECT_CONTEXT.md");
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        project: ctx.project,
+        filePath: path.join(ctx.project.path, "PROJECT_CONTEXT.md"),
+        metrics: ctx.metrics,
+        directmlCompatibility: ctx.directmlCompatibility,
+        selectedFiles: ctx.selectedFiles || []
+      });
       return;
     }
 
@@ -2661,6 +2889,9 @@ function createStudioServer(options = {}) {
       }
       if (Array.isArray(payload.selectedFiles)) {
         statePatch.selectedFiles = payload.selectedFiles;
+        if (activeProj && activeProj.path && !isGen) {
+          bridge.setSelectedFiles(activeProj.path, payload.selectedFiles);
+        }
       }
       if (Array.isArray(payload.pinnedFiles)) {
         statePatch.pinnedFiles = payload.pinnedFiles;
@@ -4679,18 +4910,45 @@ function createStudioServer(options = {}) {
         : (payload.skillIds || payload.skillId || null);
       const agentSystemPrompt = createdAgent ? skillsBridge.buildAgentSystemPrompt(createdAgent) : "";
       const effectiveCustomPrompt = [payload.customSystemPrompt, agentSystemPrompt].filter(Boolean).join("\n\n");
+      const contextMode = normalizeContextMode(payload.contextMode);
+      let automaticContextPlan = null;
+      let compiledContext = null;
+      const baseContextOptions = {
+        ...contextBaseOptions(payload, effectiveSkillIds, effectiveProfileId, effectiveCustomPrompt),
+        mentionedFiles
+      };
+      if (contextMode !== "off" && contextMode !== "manual") {
+        try {
+          automaticContextPlan = buildAutomaticContextPlan({
+            payload: { ...payload, contextMode },
+            target,
+            messages: flattenedMessages || messagesWithAttachments || [],
+            projectIdentifier: rawProjIdentifier,
+            convId,
+            baseOptions: baseContextOptions,
+            mentionedFiles
+          });
+          if (automaticContextPlan && (contextMode === "hybrid" || contextMode === "cloud" || payload.contextCompiler === true)) {
+            compiledContext = await compileContextWithCloud(automaticContextPlan, extractContextGoal(flattenedMessages || messagesWithAttachments || []), payload);
+          }
+        } catch (contextErr) {
+          console.warn("[Context Engine] automatic planning skipped:", safeErrMsg(contextErr));
+        }
+      }
       const ctx = bridge.buildProjectContext(rawProjIdentifier, convId, payload.token || null, {
-        writeToDisk: false,
-        skillId: payload.skillId || null,
-        skillIds: effectiveSkillIds,
-        profileId: effectiveProfileId,
-        mentionedFiles,
-        customSystemPrompt: effectiveCustomPrompt || null,
-        modelOverridesPrompt: payload.modelSystemPrompt || null
+        ...baseContextOptions,
+        selectedFiles: automaticContextPlan ? automaticContextPlan.selectedFiles : undefined,
+        maxCodeChars: automaticContextPlan ? automaticContextPlan.budgetChars : undefined
       });
 
       const webSearch = await runWebSearchForChat(payload, flattenedMessages || messagesWithAttachments || []);
       let combinedSysPrompt = ctx && ctx.systemPrompt ? ctx.systemPrompt : "";
+      if (compiledContext && compiledContext.ok && compiledContext.text) {
+        combinedSysPrompt += `\n\n<contexto_compilado_nube proveedor="${compiledContext.provider}" modelo="${compiledContext.model}">\n${compiledContext.text}\n</contexto_compilado_nube>`;
+      }
+      if (typeof payload.contextDigest === "string" && payload.contextDigest.trim()) {
+        combinedSysPrompt += `\n\n<resumen_de_contexto_preparado>\n${contextEngine.redactSecrets(payload.contextDigest).slice(0, 12000)}\n</resumen_de_contexto_preparado>`;
+      }
       if (webSearch && webSearch.contextSuffix) {
         combinedSysPrompt = combinedSysPrompt
           ? `${combinedSysPrompt}${webSearch.contextSuffix}`
@@ -4699,6 +4957,14 @@ function createStudioServer(options = {}) {
       const extraHeaders = webSearch ? { "X-Web-Search-Meta": webSearch.headerValue } : {};
       if (webSearch && !res.headersSent) {
         res.setHeader("X-Web-Search-Meta", webSearch.headerValue);
+      }
+      if (!res.headersSent) {
+        if (automaticContextPlan) {
+          res.setHeader("X-Context-Engine", JSON.stringify({ mode: contextMode, files: automaticContextPlan.selectedFiles.length, batches: automaticContextPlan.batchCount, tokens: automaticContextPlan.approxTokens }));
+        }
+        if (compiledContext) {
+          res.setHeader("X-Context-Compiler", JSON.stringify({ ok: compiledContext.ok, provider: compiledContext.provider || "", error: compiledContext.error || "" }));
+        }
       }
 
       const unifiedMessages = injectSystemMessage(flattenedMessages, combinedSysPrompt);

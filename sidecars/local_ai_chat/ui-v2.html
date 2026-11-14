@@ -361,6 +361,24 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #psCreate .np-diag-card{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:10px;background:var(--card)}
 #psCreate .np-diag-card .np-cur{white-space:pre-wrap;max-height:110px;overflow:hidden}
 #psCreate .np-diag-card textarea{width:100%;min-height:64px;margin-top:5px}
+#npModePower .ps-body{overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+#npModePower .ps-body::-webkit-scrollbar{width:0;height:0;display:none}
+#npModePower textarea{scrollbar-width:none;-ms-overflow-style:none}
+#npModePower textarea::-webkit-scrollbar{width:0;height:0;display:none}
+#npPowDiagColumn{display:flex;flex-direction:column;min-height:0}
+#npPowDiagColumn .ps-body{display:flex;flex-direction:column}
+#npPowCards{display:flex;flex:1;flex-direction:column;min-height:0}
+#npPowCards .np-diag-card{display:flex;flex:1;flex-direction:column;min-height:0;margin-bottom:0}
+#npPowNav{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto 10px}
+#npPowNav .btn{min-width:34px;padding:6px 10px;font-size:16px;line-height:1}
+#npPowNav .np-pow-counter{min-width:58px;text-align:center;font-weight:800;color:var(--text)}
+#npPowCurrentTitle{text-align:center;font-size:15px;margin:0 0 7px}
+#npPowCurrentState{display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:10px}
+#npPowCurrentBody{display:flex;flex:1;flex-direction:column;min-height:0;border-top:1px solid var(--line);padding-top:9px}
+#npPowCurrentBody .np-cur{max-height:none;overflow:visible}
+#npPowCurrentBody textarea{flex:1;min-height:220px;resize:none}
+#npPowCurrentActions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px}
+#npPowCurrentActions label{display:flex;align-items:center;gap:6px}
 #npHelp{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);margin-bottom:12px;line-height:1.6}
 #profileMasterCol .master-edit{width:100%;height:100%;min-height:380px;resize:vertical;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font:12.5px/1.6 ui-monospace,Consolas,monospace}
 #treeUseBtn,#activateSkillsBtn{text-align:center;justify-content:center}
@@ -525,6 +543,40 @@ p,span,b,strong,small,label,td,.desc,.sugg,.list-item,.toast{overflow-wrap:break
 #view-library #historyList,#view-library #codeList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;align-content:start}
 #view-library #historyList .list-item,#view-library #codeList .list-item{min-height:112px;padding:15px;align-items:flex-start;background:var(--panel);border-radius:16px}
 #view-library #historyList .list-item:hover,#view-library #codeList .list-item:hover{transform:translateY(-3px);border-color:var(--vio);box-shadow:0 12px 28px rgba(124,108,255,.12)}
+#view-proyectos.active{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding-bottom:18px}
+#view-proyectos>.project-overview-grid{flex:0 0 auto}
+#view-proyectos>.project-workspace{flex:1;min-height:0;align-items:stretch}
+#view-proyectos .project-list-card,#view-proyectos .project-context-card{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#view-proyectos .project-list-scroll{flex:1;min-height:70px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+#view-proyectos .project-list-scroll::-webkit-scrollbar{width:0;height:0;display:none}
+#view-proyectos .project-search-sticky{flex-shrink:0;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);background:linear-gradient(180deg,transparent,var(--panel) 14%)}
+#view-proyectos .project-search-sticky h3{margin-top:0}
+#view-proyectos .project-search-results{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:118px;overflow:auto;scrollbar-width:none}
+#view-proyectos .project-search-results::-webkit-scrollbar{width:0;height:0;display:none}
+#view-proyectos .project-search-result{padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--card2);cursor:pointer;min-width:0}
+#view-proyectos .project-search-result:hover{border-color:var(--vio);background:var(--hover)}
+#view-proyectos .project-search-result .snippet{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:11px;margin-top:2px}
+#view-proyectos .context-file-window{flex:1;min-height:130px;overflow:hidden}
+#view-proyectos .context-file-window::-webkit-scrollbar{width:0;height:0}
+#view-proyectos .context-file-window .table{margin-top:0}
+#view-proyectos .context-file-window .table td{padding:6px 8px}
+#view-proyectos .context-file-window .table th{padding:6px 8px}
+#view-proyectos .context-file-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 6px;color:var(--muted);font-size:11px}
+#view-proyectos .context-engine-strip{align-items:flex-end;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(124,108,255,.06)}
+#view-proyectos .context-engine-strip label{display:flex;flex-direction:column;gap:4px;min-width:120px}
+#view-proyectos .context-engine-strip .input{padding:6px 8px;font-size:11px;min-height:30px}
+#view-proyectos #contextEngineStatus{min-height:16px}
+#view-proyectos .context-engine-progress{padding:8px 10px;border:1px solid rgba(34,211,238,.24);border-radius:10px;background:rgba(34,211,238,.05)}
+#view-proyectos .context-engine-progress .progress{height:7px;margin-top:6px;background:rgba(255,255,255,.08)}
+#view-proyectos #contextEngineProgressBar{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--vio),var(--cyan));transition:width .35s ease}
+#view-proyectos .context-file-toolbar .pager{display:flex;align-items:center;gap:5px}
+#view-proyectos .context-file-toolbar .icon-btn{width:28px;height:28px;font-size:13px}
+#view-proyectos .context-file-row{cursor:pointer}
+#view-proyectos .context-file-row.is-pinned td{color:var(--cyan2)}
+#view-proyectos .context-file-row .file-path{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-proyectos .project-context-actions{flex-shrink:0;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+#view-proyectos .project-context-actions .btn{flex:1;justify-content:center;min-width:145px}
+@media(max-width:900px){#view-proyectos.active{overflow:auto}.project-workspace{grid-template-columns:1fr!important}.project-search-results{max-height:150px!important}}
 @media(max-width:900px){.library-placeholder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.library-placeholder-grid{grid-template-columns:1fr}.library-grid,#view-library #galleryGrid,#view-library #historyList,#view-library #codeList{grid-template-columns:1fr}}
 
@@ -1167,31 +1219,31 @@ export async function rotateSession(userId) { /* … */ }</div></div>
     <section class="view" id="view-proyectos">
       <div class="flex between wrap"><div><div class="sect-title">🗂️ Proyectos y Contexto</div><p class="sect-sub" style="margin-bottom:0">El contexto se construye localmente y nunca sale de tu equipo salvo al motor elegido.</p></div>
       <div class="flex"><button class="btn" onclick="openModal('folderModal')">📂 Cargar carpeta…</button><button class="btn primary" onclick="openModal('newProjModal')">＋ Nuevo proyecto</button></div></div>
-      <div class="grid g4 mt">
-        <div class="stat"><div class="k">Proyecto activo</div><div class="v" style="font-size:19px">—</div><div class="s">se actualiza con tu proyecto real</div></div>
-        <div class="stat"><div class="k">Archivos en contexto</div><div class="v">12</div><div class="s">2 fijados con pin 📌</div></div>
-        <div class="stat"><div class="k">Tokens estimados</div><div class="v">8.4k</div><div class="s">42% de la ventana útil</div></div>
-        <div class="stat"><div class="k">Backups</div><div class="v">12</div><div class="s">último: hoy 09:41</div></div>
+      <div class="grid g4 mt project-overview-grid">
+        <div class="stat"><div class="k">Proyecto activo</div><div class="v" id="projectStatName" style="font-size:19px">—</div><div class="s" id="projectStatPath">selecciona un proyecto real</div></div>
+        <div class="stat"><div class="k">Archivos en contexto</div><div class="v" id="projectStatFiles">—</div><div class="s" id="projectStatFilesMeta">sin selección todavía</div></div>
+        <div class="stat"><div class="k">Tokens estimados</div><div class="v" id="projectStatTokens">—</div><div class="s" id="projectStatTokensMeta">esperando contexto</div></div>
+        <div class="stat"><div class="k">Backups y cambios</div><div class="v" id="projectStatBackups">—</div><div class="s" id="projectStatBackupsMeta">sin actividad registrada</div></div>
       </div>
-      <div class="grid mt" style="grid-template-columns:1fr 1.4fr">
-        <div class="card"><h3>📁 Mis proyectos</h3>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <div class="grid mt project-workspace" style="grid-template-columns:1fr 1.4fr">
+        <div class="card project-list-card"><h3>📁 Mis proyectos</h3>
+          <div class="project-list-scroll" style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
             <div class="list-item"><div class="avatar">📁</div><div class="grow"><b class="small">Cargando proyectos reales…</b><div class="tiny muted">Si no aparece ninguno, crea el primero con ＋ Nuevo proyecto.</div></div></div>
           </div>
-          <h3 class="mt">🔎 Buscar en el proyecto</h3>
-          <div class="flex mt"><input class="input grow" placeholder="Buscar texto o símbolo… ej. streamChat"><button class="btn primary" onclick="toast('3 resultados en 2 archivos','ok')">Buscar</button></div>
+          <div class="project-search-sticky">
+            <h3>🔎 Buscar en el proyecto</h3>
+            <div class="flex mt"><input id="projectSearchInput" class="input grow" placeholder="Buscar texto o símbolo… ej. streamChat"><button id="projectSearchBtn" class="btn primary">Buscar</button></div>
+            <div id="projectSearchResults" class="project-search-results" aria-live="polite"></div>
+          </div>
         </div>
-        <div class="card"><h3>🧱 Constructor de contexto</h3><p class="desc">Marca qué entra al prompt. Los archivos fijados 📌 siempre se incluyen.</p>
-          <table class="table mt"><thead><tr><th></th><th>Archivo</th><th>Tokens</th><th>Pin</th></tr></thead><tbody>
-            <tr><td><input type="checkbox" checked></td><td class="mono">server/index.ts</td><td>2 140</td><td>📌</td></tr>
-            <tr><td><input type="checkbox" checked></td><td class="mono">src/App.tsx</td><td>1 860</td><td>📌</td></tr>
-            <tr><td><input type="checkbox" checked></td><td class="mono">src/api/chat.ts</td><td>1 205</td><td>📍</td></tr>
-            <tr><td><input type="checkbox" checked></td><td class="mono">package.json</td><td>310</td><td>📍</td></tr>
-            <tr><td><input type="checkbox"></td><td class="mono">biblioteca/README.md</td><td>940</td><td>📍</td></tr>
-            <tr><td><input type="checkbox"></td><td class="mono">AVANCES_LOCAL_AI.md</td><td>1 480</td><td>📍</td></tr>
-          </tbody></table>
-          <div class="bar-row mt"><span>Ventana</span><div class="progress"><b style="width:42%"></b></div><span>8.4k / 20k</span></div>
-          <div class="flex mt wrap"><button class="btn primary" onclick="toast('Contexto aplicado al chat','ok')">Aplicar al chat</button><button class="btn" onclick="toast('Vista previa del prompt maestro','ok')">👁 Vista previa del prompt</button><button class="btn" onclick="toast('PROJECT_CONTEXT.md actualizado','ok')">💾 Guardar PROJECT_CONTEXT.md</button></div>
+        <div class="card project-context-card"><div class="flex between"><div><h3>🧱 Constructor de contexto</h3><p class="desc">El motor selecciona lo relevante, divide tandas y respeta el margen de DirectML.</p></div><span id="contextProjectTag" class="tag">sin proyecto</span></div>
+          <div class="context-engine-strip flex wrap mt"><label class="tiny">Estrategia <select id="contextStrategySelect" class="input sm"><option value="auto">⚙️ Automático local</option><option value="hybrid">☁️ Híbrido · nube → DirectML</option><option value="cloud">🌐 Compilar solo en nube</option><option value="manual">✋ Manual</option></select></label><label class="tiny">Compilador <select id="contextProviderSelect" class="input sm"><option value="openrouter">OpenRouter</option><option value="freeai">Free.ai</option></select></label><button id="runAutoContextBtn" class="btn sm primary">🧠 Preparar contexto</button></div>
+          <div id="contextEngineStatus" class="tiny muted mt">Modo automático: cada mensaje leerá solo los archivos relevantes y guardará el índice local del proyecto.</div>
+          <div id="contextEngineProgressWrap" class="context-engine-progress mt" hidden><div class="flex between tiny"><span id="contextEnginePhase">Preparando…</span><span id="contextEngineEta">estimando demora…</span></div><div class="progress mt"><b id="contextEngineProgressBar" style="width:0%"></b></div><div id="contextEngineElapsed" class="tiny muted mt">Tiempo transcurrido: 0 s</div></div>
+          <div class="context-file-toolbar"><span id="contextFileSummary">Selecciona un proyecto</span><div class="pager"><button id="contextFilePrev" class="icon-btn" aria-label="Página anterior">‹</button><span id="contextFilePage">—</span><button id="contextFileNext" class="icon-btn" aria-label="Página siguiente">›</button></div></div>
+          <div class="context-file-window"><table class="table"><thead><tr><th style="width:34px"></th><th>Archivo real</th><th style="width:74px">Tokens</th><th style="width:48px">Pin</th></tr></thead><tbody id="projectFilesBody"><tr><td colspan="4" class="muted tiny">Selecciona un proyecto para cargar sus archivos.</td></tr></tbody></table></div>
+          <div class="bar-row mt"><span>Ventana DirectML</span><div class="progress"><b id="projectContextProgress" style="width:0%"></b></div><span id="projectContextBudget">—</span></div>
+          <div class="project-context-actions flex wrap"><button id="applyProjectContextBtn" class="btn primary">Aplicar al chat</button><button id="previewProjectContextBtn" class="btn">👁 Vista previa</button><button id="saveProjectContextBtn" class="btn">💾 Guardar snapshot</button></div>
         </div>
       </div>
     </section>
@@ -1245,9 +1297,9 @@ Carga un proyecto (pestaña Proyecto) y haz clic en un archivo del explorador pa
           <p class="tiny muted" id="npPowMeta" style="margin-bottom:8px"></p>
           <div id="npPowDiag" style="margin-bottom:10px"></div>
           <div class="cols-ps" style="grid-template-columns:1fr 1.15fr">
-            <div class="ps-col">
+            <div class="ps-col" id="npPowDiagColumn">
               <div class="col-head">🔍 Diagnóstico · las 8 categorías</div>
-              <div class="ps-body"><div id="npPowCards"><p class="muted tiny">Elige un perfil y pulsa «Diagnosticar»: aquí verás las 8 categorías, lo que ya tiene, los huecos y la mejora editable de cada una.</p></div></div>
+              <div class="ps-body"><div id="npPowCards"><p class="muted tiny">Elige un perfil y pulsa «Diagnosticar»: aquí verás las 8 categorías, una por una, con su estado y mejora editable.</p></div></div>
               <div class="ps-foot" style="display:flex;gap:8px"><button class="btn primary" id="npPowGenAiBtn" style="flex:1" onclick="npPowGenAI()">✨ Gen AI</button><button class="btn primary" id="npPowAddBtn" style="flex:1" onclick="npPowApply()">➕ Añadir</button></div>
             </div>
             <div class="ps-col">
@@ -2533,6 +2585,9 @@ function sendMsg(){
            profileId:REAL.profileId||undefined,
            skillIds:REAL.activeSkills&&REAL.activeSkills.size?[...REAL.activeSkills]:undefined,
            customSystemPrompt:(typeof STAFF_MODE==='undefined'||!STAFF_MODE)?CHAT_VIBE_SYSTEM_PROMPT:undefined,
+           contextMode:localStorage.getItem('las-context-mode')||'auto',
+           contextProvider:localStorage.getItem('las-context-provider')||'openrouter',
+           contextDigest:(localStorage.getItem('las-context-digest-project')===(REAL.project&&REAL.project.name)?localStorage.getItem('las-context-digest')||undefined:undefined),
            project:REAL.project?(REAL.project.name||undefined):undefined,
           projectPath:REAL.project?(REAL.project.path||undefined):undefined})});
       if(!res.ok){ const j=await res.json().catch(()=>({})); throw new Error(j.error||('HTTP '+res.status)); }
@@ -2874,25 +2929,47 @@ function npPowExtract(title){
   for(const s of secs){ const seg=s.split('\n'); if(re.test(seg[0])) return seg.slice(1).join('\n').trim().slice(0,1200); }
   return '';
 }
+window._powDiagIndex=0; window._powDiagState={};
+function npPowSaveCurrent(){
+  const card=document.querySelector('#npPowCards .np-diag-card'); if(!card) return;
+  const title=card.dataset.title||''; const ta=card.querySelector('.np-pow-txt'); const chk=card.querySelector('.np-pow-chk');
+  if(!title) return;
+  window._powDiagState[title]=window._powDiagState[title]||{};
+  if(ta) window._powDiagState[title].text=ta.value;
+  if(chk) window._powDiagState[title].include=chk.checked;
+}
+function npPowRenderCurrent(){
+  const cards=document.getElementById('npPowCards'); if(!cards) return;
+  const cs=npPowChecks(); if(!cs.length) return;
+  window._powDiagIndex=Math.max(0,Math.min(window._powDiagIndex,cs.length-1));
+  const c=cs[window._powDiagIndex], state=window._powDiagState[c.t]||{};
+  const cur=npPowExtract(c.t), text=state.text!==undefined?state.text:(cur||npPowGenText(c.t));
+  const included=state.include!==false;
+  cards.innerHTML='<div class="np-pow-nav" id="npPowNav"><button class="btn" aria-label="Categoría anterior" onclick="npPowPrev()">‹</button><span class="np-pow-counter">'+(window._powDiagIndex+1)+' / '+cs.length+'</span><button class="btn" aria-label="Categoría siguiente" onclick="npPowNext()">›</button></div>'+
+    '<div class="np-diag-card" data-title="'+esc(c.t)+'">'+
+    '<h4 id="npPowCurrentTitle">'+esc(c.t)+'</h4>'+
+    '<div id="npPowCurrentState"><span class="tag '+(c.ok?'green':'')+'">'+(c.ok?'✓ ya lo tiene':'⬜ hueco')+'</span><label class="tiny"><input type="checkbox" class="np-pow-chk" data-title="'+esc(c.t)+'" '+(included?'checked':'')+'> Seleccionar</label></div>'+
+    '<div id="npPowCurrentBody"><p class="tiny muted" style="margin:0 0 5px">Lo que ya se tiene:</p><p class="tiny np-cur">'+(cur?esc(cur.slice(0,900)):'— nada todavía: es un hueco por cubrir.')+'</p><p class="tiny muted" style="margin:10px 0 5px">Mejora (editable):</p><textarea class="np-sec np-pow-txt" data-title="'+esc(c.t)+'">'+esc(text)+'</textarea></div>'+
+    '<div id="npPowCurrentActions"><label class="tiny"><input type="checkbox" class="np-pow-chk" data-title="'+esc(c.t)+'" '+(included?'checked':'')+'> Añadir</label><button class="btn sm" onclick="npPowImproveOne(this)">✨ Mejorar con AI</button></div>'+
+    '</div>';
+  const checks=cards.querySelectorAll('.np-pow-chk'); checks.forEach(ch=>ch.addEventListener('change',()=>{ window._powDiagState[c.t].include=ch.checked; checks.forEach(other=>{other.checked=ch.checked;}); }));
+}
 function npPowDiagnose(){
   const diag=document.getElementById('npPowDiag'); const cards=document.getElementById('npPowCards');
   if(!window._powBody){ if(cards) cards.innerHTML='<p class="muted tiny">Cargando su Master Prompt…</p>'; return; }
   const cs=npPowChecks(), miss=cs.filter(c=>!c.ok).length;
+  window._powDiagIndex=0; window._powDiagState={};
+  cs.forEach(c=>{ const cur=npPowExtract(c.t); window._powDiagState[c.t]={text:cur||npPowGenText(c.t),include:true}; });
   if(diag) diag.innerHTML='<span class="tiny"><b>Diagnóstico:</b> '+miss+' huecos de '+cs.length+' categorías</span> '+cs.map(c=>'<span class="tag '+(c.ok?'green':'')+'" style="margin-left:5px">'+(c.ok?'✓':'＋')+' '+c.t+'</span>').join('');
-  if(cards) cards.innerHTML=cs.map(c=>{
-    const cur=npPowExtract(c.t);
-    return '<div class="np-diag-card">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b class="small">'+esc(c.t)+'</b><span class="tag '+(c.ok?'green':'')+'">'+(c.ok?'✓ ya lo tiene':'⬜ hueco')+'</span></div>'
-      +'<p class="tiny muted" style="margin-top:7px">Lo que ya se tiene:</p><p class="tiny np-cur">'+(cur?esc(cur.slice(0,320)):'— nada todavía: es un hueco por cubrir.')+'</p>'
-      +'<p class="tiny muted" style="margin-top:7px">Mejora (editable):</p><textarea class="np-sec np-pow-txt" data-title="'+esc(c.t)+'">'+esc(cur||npPowGenText(c.t))+'</textarea>'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px"><label class="tiny" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="np-pow-chk" data-title="'+esc(c.t)+'" checked> Incluir al Añadir</label><button class="btn sm" onclick="npPowImproveOne(this)">✨ Mejorar con AI</button></div>'
-      +'</div>';
-  }).join('');
+  npPowRenderCurrent();
 }
+function npPowPrev(){ npPowSaveCurrent(); window._powDiagIndex=Math.max(0,window._powDiagIndex-1); npPowRenderCurrent(); }
+function npPowNext(){ npPowSaveCurrent(); const total=npPowChecks().length; window._powDiagIndex=Math.min(total-1,window._powDiagIndex+1); npPowRenderCurrent(); }
 async function npPowGenAI(){
   const btn=document.getElementById('npPowGenAiBtn');
   const pf=PROFILES_CACHE.find(x=>x.id===window._powFor);
   if(!pf||!window._powBody){ toast('Primero elige un perfil y diagnostícalo','err'); return; }
+  npPowSaveCurrent();
   const titles=npPowChecks().map(c=>c.t);
   if(btn){ btn.disabled=true; btn.textContent='✨ Hermes redactando…'; }
   try{
@@ -2900,7 +2977,8 @@ async function npPowGenAI(){
     const txt=await npHermes('Actúa como Director de Staff. POTENCIA el perfil «'+pf.name+'» ('+pf.category+').\n\nMASTER PROMPT ACTUAL (extracto):\n'+window._powBody.slice(0,6000)+'\n\nRedacta la MEJOR versión de cada una de estas 8 categorías (conserva lo bueno que ya exista y cubre los huecos): '+titles.join(', ')+'.'+(note?' Refuerzo pedido: '+note+'.':'')+'\nFormato obligatorio: cada categoría con su encabezado ## <titulo exacto>, en español, conciso y aplicable (sin comentarios fuera de las secciones).');
     const got=npParseSections(txt, titles);
     let n=0;
-    document.querySelectorAll('.np-pow-txt').forEach(ta=>{ if(got[ta.dataset.title]){ ta.value=got[ta.dataset.title]; n++; } });
+    titles.forEach(title=>{ if(got[title]){ window._powDiagState[title]=window._powDiagState[title]||{}; window._powDiagState[title].text=got[title]; n++; } });
+    npPowRenderCurrent();
     if(n) toast('✨ Gen AI: Hermes redactó mejores opciones para '+n+' categorías','ok');
     else toast('Hermes respondió sin las categorías pedidas','err');
   }catch(e){ toast('Hermes no respondió ('+e.message+')','err'); }
@@ -2913,7 +2991,7 @@ async function npPowImproveOne(btn){
   btn.disabled=true; btn.textContent='✨ Hermes…';
   try{
     const txt=await npHermes('Actúa como Director de Staff. Mejora SOLO la categoría «'+title+'» del perfil «'+(pf?pf.name:'')+'».\n\nVersión actual de la categoría:\n'+(ta?ta.value:'')+'\n\nDevuelve únicamente el texto mejorado de esa categoría (sin encabezado, sin comentarios), en español, conciso y aplicable.');
-    if(ta&&txt.trim()){ ta.value=txt.trim(); toast('✨ «'+title+'» mejorada por Hermes','ok'); }
+    if(ta&&txt.trim()){ ta.value=txt.trim(); window._powDiagState[title]=window._powDiagState[title]||{}; window._powDiagState[title].text=ta.value; toast('✨ «'+title+'» mejorada por Hermes','ok'); }
   }catch(e){ toast('Hermes no respondió ('+e.message+')','err'); }
   btn.disabled=false; btn.textContent='✨ Mejorar con AI';
 }
@@ -2921,11 +2999,9 @@ function npPowApply(){
   const pf=PROFILES_CACHE.find(x=>x.id===window._powFor);
   const prev=document.getElementById('npPowPreview');
   if(!pf){ toast('Elige primero un perfil','err'); return; }
+  npPowSaveCurrent();
   let out='# '+pf.name+'\n', n=0;
-  document.querySelectorAll('.np-diag-card').forEach(card=>{
-    const chk=card.querySelector('.np-pow-chk'), ta=card.querySelector('.np-pow-txt');
-    if(chk&&chk.checked&&ta&&ta.value.trim()){ out+='\n## '+chk.dataset.title+'\n\n'+ta.value.trim()+'\n'; n++; }
-  });
+  npPowChecks().forEach(c=>{ const state=window._powDiagState[c.t]||{}; if(state.include!==false&&String(state.text||'').trim()){ out+='\n## '+c.t+'\n\n'+String(state.text).trim()+'\n'; n++; } });
   window._powNew=out;
   if(prev) prev.innerHTML='<div class="masterbox">'+md(out.slice(0,14000))+'</div><p class="tiny muted" style="margin-top:8px">'+n+' categorías incluidas · '+out.length+' caracteres (antes '+window._powBody.length+'). Si te encaja, pulsa «💾 Guardar potenciado».</p>';
   toast('➕ Nuevo prompt compuesto con '+n+' categorías','ok');
@@ -3593,40 +3669,178 @@ function wireDualButtons(){
 }
 
 /* ---------- Proyectos reales ---------- */
+function projectTokenLabel(value){
+  const n=Math.max(0,Number(value)||0);
+  return n>=1000?(n/1000).toFixed(1).replace('.0','')+'k':String(n);
+}
+function projectFileTokenEstimate(file){ return Math.max(1,Math.ceil((Number(file&&file.size)||0)/4)); }
+function projectSetTag(el,text,tone){ if(!el) return; el.textContent=text||''; el.className='tag'+(tone?' '+tone:''); }
+function renderProjectStats(data,changesCount){
+  const active=data&&data.active||REAL.project||null, state=data&&data.projectState||{}, metrics=data&&data.metrics||{}, compat=data&&data.directmlCompatibility||{};
+  const selected=Array.isArray(state.selectedFiles)?state.selectedFiles:[], pinned=Array.isArray(state.pinnedFiles)?state.pinnedFiles:[];
+  const name=active&&active.name||'General', pathText=active&&active.isGeneral?'entorno general':(active&&active.path||'sin ruta');
+  const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
+  set('projectStatName',name); set('projectStatPath',pathText); set('projectStatFiles',String(selected.length));
+  set('projectStatFilesMeta',pinned.length+' fijados · '+(selected.length?'seleccionados':'selecciona archivos'));
+  set('projectStatTokens',projectTokenLabel(metrics.approxTokens));
+  const safe=Number(compat.safePromptLimit)||6144, used=Number(metrics.approxTokens)||0;
+  set('projectStatTokensMeta',used>safe?'⚠ supera '+projectTokenLabel(safe)+' DirectML':'límite seguro '+projectTokenLabel(safe));
+  set('projectStatBackups',String(Number(changesCount)||0)); set('projectStatBackupsMeta',changesCount?'cambios registrados':'sin actividad registrada');
+  const pct=safe?Math.min(100,Math.round(used/safe*100)):0, bar=document.getElementById('projectContextProgress');
+  if(bar){bar.style.width=pct+'%';bar.style.background=used>safe?'var(--red)':'var(--grad)';}
+  set('projectContextBudget',used?(projectTokenLabel(used)+' / '+projectTokenLabel(safe)+' tok'):'sin contexto');
+  projectSetTag(document.getElementById('contextProjectTag'),active&&active.isGeneral?'General':(compat.compatible===false?'⚠ '+name+' · ajustar':'● '+name),active&&active.isGeneral?'amber':(compat.compatible===false?'red':'green'));
+}
+window._projectFilesCache=[]; window._projectFilesState={}; window._projectFilePage=0;
+function renderProjectFilePage(){
+  const body=document.getElementById('projectFilesBody'); if(!body) return;
+  const files=window._projectFilesCache||[], state=window._projectFilesState||{}, pageSize=12, totalPages=Math.max(1,Math.ceil(files.length/pageSize));
+  window._projectFilePage=Math.max(0,Math.min(window._projectFilePage,totalPages-1));
+  const start=window._projectFilePage*pageSize, visible=files.slice(start,start+pageSize), selected=new Set(state.selectedFiles||[]), pinned=new Set(state.pinnedFiles||[]);
+  const summary=document.getElementById('contextFileSummary'), page=document.getElementById('contextFilePage');
+  if(summary)summary.textContent=files.length?(start+1)+'–'+Math.min(start+pageSize,files.length)+' de '+files.length+' archivos':'sin archivos';
+  if(page)page.textContent=files.length?(window._projectFilePage+1)+' / '+totalPages:'—';
+  const prev=document.getElementById('contextFilePrev'), next=document.getElementById('contextFileNext');
+  if(prev)prev.disabled=window._projectFilePage<=0; if(next)next.disabled=window._projectFilePage>=totalPages-1;
+  if(!files.length){body.innerHTML='<tr><td colspan="4" class="muted tiny">No hay archivos de código compatibles en este proyecto.</td></tr>';return;}
+  body.innerHTML=visible.map(file=>{
+    const rel=String(file.relPath||file.name||'').replace(/\\/g,'/'), tok=projectFileTokenEstimate(file), isSel=selected.has(rel), isPin=pinned.has(rel);
+    return '<tr class="context-file-row'+(isPin?' is-pinned':'')+'" data-file-row="'+esc(rel)+'" title="'+esc(String(file.size||0)+' bytes · doble clic para abrir')+'">'+
+      '<td><input type="checkbox" class="context-file-toggle" data-file="'+esc(rel)+'" '+(isSel?'checked':'')+' aria-label="Incluir '+esc(rel)+'"></td>'+
+      '<td class="mono file-path">'+esc(rel)+'</td><td class="tiny">'+projectTokenLabel(tok)+'</td>'+
+      '<td><button class="icon-btn context-pin-btn'+(isPin?' active':'')+'" data-pin-file="'+esc(rel)+'" title="'+(isPin?'Desfijar':'Fijar')+'">'+(isPin?'📌':'📍')+'</button></td></tr>';
+  }).join('');
+  body.querySelectorAll('.context-file-toggle').forEach(input=>input.addEventListener('change',()=>{
+    const count=body.querySelectorAll('.context-file-toggle:checked').length, meta=document.getElementById('projectStatFilesMeta');
+    if(meta) meta.textContent=count+' seleccionados · aplica para actualizar el chat';
+  }));
+  body.querySelectorAll('[data-pin-file]').forEach(btn=>btn.addEventListener('click',async ev=>{
+    ev.stopPropagation(); if(!REAL.project||REAL.project.isGeneral) return toast('Selecciona un proyecto específico','err');
+    const rel=btn.dataset.pinFile, current=[...body.querySelectorAll('[data-pin-file].active')].map(x=>x.dataset.pinFile), next=current.includes(rel)?current.filter(x=>x!==rel):[...current,rel];
+    try{await API.post('/api/project/pin-files',{project:REAL.project.name,pinnedFiles:next});await loadProjectsViewReal();toast(next.includes(rel)?'📌 Archivo fijado':'📍 Archivo desfijado','ok');}catch(e){toast('Pin: '+e.message,'err');}
+  }));
+  body.querySelectorAll('[data-file-row]').forEach(row=>row.addEventListener('dblclick',async()=>{await readFileReal(row.dataset.fileRow);go('archivos');}));
+}
+function renderProjectFiles(files,state){
+  window._projectFilesCache=Array.isArray(files)?files:[]; window._projectFilesState=state||{}; window._projectFilePage=0; renderProjectFilePage();
+}
+async function loadProjectFilesReal(project){
+  const body=document.getElementById('projectFilesBody');
+  if(!project||project.isGeneral){window._projectFilesCache=[];window._projectFilesState={};if(body)body.innerHTML='<tr><td colspan="4" class="muted tiny">El entorno General no inyecta código. Selecciona un proyecto local.</td></tr>';const s=document.getElementById('contextFileSummary');if(s)s.textContent='selecciona un proyecto';const pg=document.getElementById('contextFilePage');if(pg)pg.textContent='—';return;}
+  try{
+    const folder=await API.post('/api/project/load-folder',{folderPath:project.path}), current=await API.get('/api/projects?project='+encodeURIComponent(project.name));
+    REAL.project=current.active||project; renderProjectStats(current,0); renderProjectFiles(folder.files||[],current.projectState||{});
+    const tag=document.getElementById('contextProjectTag');if(tag)tag.title=(folder.files||[]).length+' archivos detectados';
+  }catch(e){if(body)body.innerHTML='<tr><td colspan="4" class="muted tiny">No se pudieron cargar los archivos: '+esc(e.message)+'</td></tr>';}
+}
+function renderProjectSearchResults(matches,query){
+  const el=document.getElementById('projectSearchResults');if(!el)return;
+  if(!matches.length){el.innerHTML='<div class="tiny muted">Sin coincidencias para «'+esc(query)+'».</div>';return;}
+  el.innerHTML=matches.slice(0,60).map(m=>'<div class="project-search-result" data-search-file="'+esc(m.relPath)+'"><b class="mono">'+esc(m.relPath)+':'+esc(String(m.line))+'</b><span class="snippet">'+esc(m.preview||'')+'</span></div>').join('');
+  el.querySelectorAll('[data-search-file]').forEach(item=>item.onclick=async()=>{await readFileReal(item.dataset.searchFile);go('archivos');});
+}
+let CONTEXT_ENGINE_PROGRESS_TIMER=0;
+function startContextEngineProgress(mode,provider){
+  const wrap=document.getElementById('contextEngineProgressWrap'), bar=document.getElementById('contextEngineProgressBar'), phase=document.getElementById('contextEnginePhase'), eta=document.getElementById('contextEngineEta'), elapsed=document.getElementById('contextEngineElapsed');
+  if(!wrap)return null;
+  const started=Date.now(), expected=(mode==='auto'?2800:(mode==='manual'?1800:8500));
+  wrap.hidden=false;wrap.dataset.started=String(started);wrap.dataset.expected=String(expected);
+  if(bar){bar.style.width='5%';bar.style.background='linear-gradient(90deg,var(--vio),var(--cyan))';}
+  if(phase)phase.textContent='Indexando archivos…';
+  if(eta)eta.textContent='estimación inicial: ~'+Math.ceil(expected/1000)+' s';
+  if(elapsed)elapsed.textContent='Tiempo transcurrido: 0 s';
+  clearInterval(CONTEXT_ENGINE_PROGRESS_TIMER);
+  CONTEXT_ENGINE_PROGRESS_TIMER=setInterval(()=>{
+    const seconds=(Date.now()-started)/1000, ratio=Math.min(.92,seconds/(expected/1000));
+    let label='Indexando archivos…';
+    if(seconds>(expected/1000)*.34)label='Puntuando relevancia…';
+    if(seconds>(expected/1000)*.62)label='Empaquetando tandas seguras…';
+    if((mode==='hybrid'||mode==='cloud')&&seconds>(expected/1000)*.78)label='Sintetizando con '+(provider==='freeai'?'Free.ai':'OpenRouter')+'…';
+    if(phase)phase.textContent=label;
+    if(bar)bar.style.width=Math.max(5,Math.round(ratio*100))+'%';
+    if(elapsed)elapsed.textContent='Tiempo transcurrido: '+seconds.toFixed(1)+' s';
+    if(eta){const remaining=Math.max(0,expected/1000-seconds);eta.textContent=remaining>0?'estimado: ~'+remaining.toFixed(1)+' s restantes':'la operación está tardando más de lo estimado…';}
+  },200);
+  return started;
+}
+function finishContextEngineProgress(ok,started,summary){
+  clearInterval(CONTEXT_ENGINE_PROGRESS_TIMER);CONTEXT_ENGINE_PROGRESS_TIMER=0;
+  const wrap=document.getElementById('contextEngineProgressWrap'),bar=document.getElementById('contextEngineProgressBar'),phase=document.getElementById('contextEnginePhase'),eta=document.getElementById('contextEngineEta'),elapsed=document.getElementById('contextEngineElapsed');
+  if(!wrap)return;
+  const seconds=Math.max(0,(Date.now()-(started||Date.now()))/1000);
+  wrap.hidden=false;if(bar){bar.style.width=ok?'100%':'100%';if(!ok)bar.style.background='var(--red)';}
+  if(phase)phase.textContent=ok?'✅ Contexto preparado':'⚠ Preparación detenida';
+  if(eta)eta.textContent=ok?'completado'+(summary?' · '+summary:''):'revisa el mensaje de error';
+  if(elapsed)elapsed.textContent='Tiempo total: '+seconds.toFixed(1)+' s';
+}
+async function runAutomaticContextReal(){
+  const modeEl=document.getElementById('contextStrategySelect'), providerEl=document.getElementById('contextProviderSelect'), status=document.getElementById('contextEngineStatus'), btn=document.getElementById('runAutoContextBtn');
+  if(!REAL.project||REAL.project.isGeneral){toast('Selecciona un proyecto específico','err');return;}
+  const mode=modeEl?modeEl.value:'auto', provider=providerEl?providerEl.value:'openrouter';
+  const goal=(document.getElementById('projectSearchInput')?.value||'').trim()||'Prepara el contexto relevante para continuar el trabajo de vibe coding en este proyecto.';
+  if(btn)btn.disabled=true;
+  const started=startContextEngineProgress(mode,provider);
+  if(status)status.textContent='⏳ Preparando contexto automáticamente…';
+  try{
+    const r=await API.post('/api/context/auto',{project:REAL.project.name,goal,engine:typeof engine==='string'&&engine==='directml'?'directml':'ollama',contextMode:mode,contextProvider:provider,compile:mode==='hybrid'||mode==='cloud'});
+    const p=r.plan||{}, selected=p.selectedFiles||[], batches=p.batches||[];
+    localStorage.setItem('las-context-mode',mode);localStorage.setItem('las-context-provider',provider);
+    if(r.compiled&&r.compiled.ok){localStorage.setItem('las-context-digest-project',REAL.project.name);localStorage.setItem('las-context-digest',r.compiled.text||'');}
+    const summary=selected.length+' archivos · '+(batches.length||1)+' tanda(s) · '+projectTokenLabel(p.approxTokens||0)+' tokens';
+    if(status)status.textContent='✅ Contexto listo · '+summary+(r.compiled&&r.compiled.ok?' · síntesis '+r.compiled.provider:'');
+    finishContextEngineProgress(true,started,r.compiled&&r.compiled.ok?'síntesis '+r.compiled.provider:summary);
+    toast('🧠 Contexto automático preparado','ok');
+  }catch(e){if(status)status.textContent='⚠ '+e.message;finishContextEngineProgress(false,started);toast('Contexto automático: '+e.message,'err');}
+  finally{if(btn)btn.disabled=false;}
+}
 async function loadProjectsViewReal(){
+  const pagePrev=document.getElementById('contextFilePrev'), pageNext=document.getElementById('contextFileNext');
+  if(pagePrev&&!pagePrev.dataset.bound){pagePrev.dataset.bound='1';pagePrev.onclick=()=>{window._projectFilePage--;renderProjectFilePage();};}
+  if(pageNext&&!pageNext.dataset.bound){pageNext.dataset.bound='1';pageNext.onclick=()=>{window._projectFilePage++;renderProjectFilePage();};}
   try{
     const r=await API.get('/api/projects');
-    const list=document.querySelector('#view-proyectos .card .list-item')?.parentElement;
+    REAL.project=r.active||null;
+    const list=document.querySelector('#view-proyectos .project-list-scroll');
     if(list && (r.projects||[]).length){
       list.innerHTML=(r.projects||[]).map(pr=>'<div class="list-item'+(REAL.project&&pr.name===REAL.project.name?' sel':'')+'" data-proj="'+esc(pr.name)+'"><div class="avatar">📁</div><div class="grow"><b class="small">'+esc(pr.name)+'</b><div class="tiny muted">'+esc(pr.path||'')+'</div></div>'+(REAL.project&&pr.name===REAL.project.name?'<span class="tag green">activo</span>':'')+'</div>').join('');
-      list.querySelectorAll('[data-proj]').forEach(el=>el.onclick=()=>{
+      list.querySelectorAll('[data-proj]').forEach(el=>el.onclick=async()=>{
         const pr=(r.projects||[]).find(x=>x.name===el.dataset.proj);
-        REAL.project=pr||{name:el.dataset.proj}; loadProject(); loadProjectsViewReal();
-        toast('📁 Proyecto activo: '+el.dataset.proj,'ok');
+        if(!pr)return;
+        try{const selected=await API.post('/api/context/select',{projectName:pr.name});REAL.project=selected.active||pr;await loadProjectsViewReal();toast('📁 Proyecto activo: '+el.dataset.proj,'ok');}
+        catch(e){toast('Proyecto: '+e.message,'err');}
       });
-    }
+    }else if(list) list.innerHTML='<div class="list-item"><div class="avatar">📁</div><div class="grow"><b class="small">No hay proyectos locales</b><div class="tiny muted">Crea uno o carga una carpeta.</div></div></div>';
+    let changes=0;
+    if(REAL.project&&!REAL.project.isGeneral){try{const cr=await API.get('/api/memory/changes?project='+encodeURIComponent(REAL.project.name)+'&limit=200');changes=(cr.changes||[]).length;}catch(_e){}}
+    renderProjectStats(r,changes); await loadProjectFilesReal(REAL.project);
+    if(REAL.project&&!REAL.project.isGeneral){const refreshed=await API.get('/api/projects?project='+encodeURIComponent(REAL.project.name));renderProjectStats(refreshed,changes);}
   }catch(e){}
   // Buscador real
-  const card=$all('#view-proyectos .card')[0];
-  const searchBtn=btnByText('Buscar', card), searchInput=card?card.querySelector('input'):null;
+  const card=document.querySelector('#view-proyectos .project-list-card');
+  const searchBtn=document.getElementById('projectSearchBtn'), searchInput=document.getElementById('projectSearchInput');
   if(searchBtn && searchInput) searchBtn.onclick=async()=>{
     const query=searchInput.value.trim(); if(!query){ toast('Escribe qué buscar','err'); return; }
     try{
       const r=await API.post('/api/project/search',{query, project:REAL.project?(REAL.project.name||undefined):undefined});
-      const n=(r.results||r.matches||[]).length;
-      toast('🔎 '+n+' resultado(s) para "'+query+'" en '+(REAL.project?REAL.project.name:'el proyecto'),'ok');
+      const matches=r.matches||r.results||[]; renderProjectSearchResults(matches,query);
+      toast('🔎 '+(r.totalMatches??matches.length)+' resultado(s) en '+(REAL.project?REAL.project.name:'el proyecto'),'ok');
     }catch(e){ toast('Buscar: '+e.message,'err'); }
   };
   // Botones de contexto
-  const ctxCard=$all('#view-proyectos .card')[1];
+  const ctxCard=document.querySelector('#view-proyectos .project-context-card');
   if(ctxCard){
-    const apply=btnByText('Aplicar al chat', ctxCard);
+    const strategy=document.getElementById('contextStrategySelect'), provider=document.getElementById('contextProviderSelect'), autoBtn=document.getElementById('runAutoContextBtn');
+    if(strategy){strategy.value=localStorage.getItem('las-context-mode')||'auto';strategy.onchange=()=>localStorage.setItem('las-context-mode',strategy.value);}
+    if(provider){provider.value=localStorage.getItem('las-context-provider')||'openrouter';provider.onchange=()=>localStorage.setItem('las-context-provider',provider.value);}
+    if(autoBtn)autoBtn.onclick=runAutomaticContextReal;
+    const apply=document.getElementById('applyProjectContextBtn');
     if(apply) apply.onclick=async()=>{
-      const files=$all('tbody tr', ctxCard).filter(tr=>tr.querySelector('input[type=checkbox]')&&tr.querySelector('input[type=checkbox]').checked).map(tr=>tr.querySelector('.mono').textContent.trim());
-      try{ await API.post('/api/context/select',{project:REAL.project?(REAL.project.name||undefined):undefined, selectedFiles:files}); toast('✅ Contexto aplicado: '+files.length+' archivos irán en cada mensaje','ok'); }
+      const files=[...ctxCard.querySelectorAll('.context-file-toggle:checked')].map(input=>input.dataset.file);
+      if(!REAL.project||REAL.project.isGeneral)return toast('Selecciona un proyecto específico','err');
+      try{await API.post('/api/context/select',{projectName:REAL.project.name,selectedFiles:files});await loadProjectsViewReal();toast('✅ Contexto aplicado: '+files.length+' archivos irán en cada mensaje','ok');}
       catch(e){ toast('Contexto: '+e.message,'err'); }
     };
-    const prev=btnByText('Vista previa del prompt', ctxCard);
+    const prev=document.getElementById('previewProjectContextBtn');
     if(prev) prev.onclick=async()=>{
       try{
         const r=await API.get('/api/project/preview-context?project='+encodeURIComponent(REAL.project?(REAL.project.name||''):''));
@@ -3636,9 +3850,10 @@ async function loadProjectsViewReal(){
         openModal('diffModal');
       }catch(e){ toast('Vista previa: '+e.message,'err'); }
     };
-    const save=btnByText('Guardar PROJECT_CONTEXT', ctxCard);
+    const save=document.getElementById('saveProjectContextBtn');
     if(save) save.onclick=async()=>{
-      try{ await API.post('/api/project/enter-context',{project:REAL.project?(REAL.project.name||undefined):undefined, telemetryOnly:true}); toast('💾 Contexto del proyecto persistido en memoria','ok'); }
+      if(!REAL.project||REAL.project.isGeneral)return toast('Selecciona un proyecto específico','err');
+      try{const r=await API.post('/api/project/save-context',{project:REAL.project.name});toast('💾 PROJECT_CONTEXT.md guardado · '+projectTokenLabel(r.metrics&&r.metrics.approxTokens)+' tokens','ok');}
       catch(e){ toast('Guardar contexto: '+e.message,'err'); }
     };
   }
