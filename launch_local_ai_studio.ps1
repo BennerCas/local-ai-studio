@@ -34,19 +34,13 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-ProcessSafely $_.ProcessId }
 
 $currentServerPath = $serverPath.ToLowerInvariant()
-Get-StudioProcesses |
-    Where-Object { $_.CommandLine.ToLowerInvariant() -notlike "*$currentServerPath*" } |
-    ForEach-Object { Stop-ProcessSafely $_.ProcessId }
+# Reinicia siempre la instancia del proyecto actual para que el lanzador no
+# conserve módulos Node cargados antes de una actualización del repositorio.
+Get-StudioProcesses | ForEach-Object { Stop-ProcessSafely $_.ProcessId }
 
 Start-Sleep -Milliseconds 750
 
-$currentServer = Get-StudioProcesses |
-    Where-Object { $_.CommandLine.ToLowerInvariant() -like "*$currentServerPath*" } |
-    Select-Object -First 1
-
-if (-not $currentServer) {
-    Start-Process -FilePath "node.exe" -ArgumentList @($serverPath) -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
-}
+Start-Process -FilePath "node.exe" -ArgumentList @($serverPath) -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
 
 $ready = $false
 $version = $null
